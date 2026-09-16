@@ -1,0 +1,14 @@
+# Python -- same convention as the sibling aei-* repos (aei-link-clearance,
+# aei-microwave-link-exposure, aei-geo-features)
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+dist/
+build/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
