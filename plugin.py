@@ -89,6 +89,7 @@ class VeloronaPlugin:
         self.weather_lines_layer = None
         self.terrain_layer = None
         self._extents_connected = False
+        self._project_read_connected = False
 
     # -- QGIS plugin lifecycle -------------------------------------------
 
@@ -116,6 +117,31 @@ class VeloronaPlugin:
             self.run_satellite,
         )
 
+        # Guard against a stale/pre-existing project: one saved before
+        # PROJECT_CRS was forced to EPSG:3857, or one whose CRS was later
+        # changed independently via QGIS's own Project Properties dialog.
+        # load_public_data()'s own setCrs() call only fires when that
+        # action is (re-)run -- it doesn't help a project that's already
+        # open (at plugin activation, or right after the user opens a
+        # .qgz file) and already contains Velorona's basemap layer.
+        QgsProject.instance().readProject.connect(self._check_stale_project_crs)
+        self._project_read_connected = True
+        self._check_stale_project_crs()
+
+    def _check_stale_project_crs(self, *args):
+        """If the currently open project already contains Velorona's
+        basemap layer but its CRS isn't PROJECT_CRS, correct it. Scoped to
+        Velorona projects specifically (presence of BASEMAP_NAME) so this
+        never forces a CRS change on an unrelated project that happens to
+        be open."""
+        project = QgsProject.instance()
+        has_velorona_basemap = any(
+            layer.name() == BASEMAP_NAME for layer in project.mapLayers().values()
+        )
+        if has_velorona_basemap and project.crs() != PROJECT_CRS:
+            project.setCrs(PROJECT_CRS)
+            self.iface.mapCanvas().setDestinationCrs(PROJECT_CRS)
+
     def _make_action(self, label, tooltip, slot) -> QAction:
         action = QAction(label, self.iface.mainWindow())
         action.setToolTip(tooltip)
@@ -133,6 +159,9 @@ class VeloronaPlugin:
         if self._extents_connected:
             self.iface.mapCanvas().extentsChanged.disconnect(self._refresh_viewport_layers)
             self._extents_connected = False
+        if self._project_read_connected:
+            QgsProject.instance().readProject.disconnect(self._check_stale_project_crs)
+            self._project_read_connected = False
         if self.dock is not None:
             self.iface.removeDockWidget(self.dock)
             self.dock = None
