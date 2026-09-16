@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from qgis.core import QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject, QgsRasterLayer, QgsRectangle
+from qgis.core import (
+    QgsCoordinateReferenceSystem,
+    QgsCoordinateTransform,
+    QgsMapBoxGlStyleConverter,
+    QgsProject,
+    QgsRectangle,
+    QgsVectorTileLayer,
+)
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import QAction, QMessageBox
 
@@ -17,40 +24,42 @@ from .ui.results_dock import VeloronaResultsDock
 MENU_NAME = "&Velorona"
 WGS84 = QgsCoordinateReferenceSystem("EPSG:4326")
 
-# Basemap -- OSM tile source matches the fix already proven in
-# aei-link-clearance/web/app.js (see its own header comment, lines ~9-36:
-# CARTO Dark Matter is now key-gated, Esri's dark-gray canvas's ToS
-# restricts it to non-commercial use). The web app additionally applies a
-# CSS filter with a hue-rotate(180deg) term, which has no QGIS raster-filter
-# equivalent (QgsHueSaturationFilter has invert/saturation but no
-# hue-rotation-by-degrees control) -- so this couldn't be copied verbatim.
+# Basemap -- native QGIS vector tile layer, CARTO Dark Matter, styled from
+# CARTO's own current MapLibre GL JSON (not a filtered raster). The
+# previous approach (invert-filtering bright OSM raster tiles) is gone
+# entirely: RGB inversion cannot preserve hue (there is no hue-rotation
+# control in QGIS's raster filter API, confirmed), so it always rendered
+# water brown/orange -- not a tuning problem, a structural one.
 #
-# The filter VALUES below were re-derived here by actually rendering the
-# basemap headlessly (QgsMapRendererParallelJob -> QImage) and comparing
-# real pixel statistics + visual output across several combinations, not
-# guessed: invertColors=True alone preserved full color detail (as many
-# distinct sampled colors as the unfiltered source, since invert is
-# lossless) while being genuinely dark; the previous combination here
-# (saturation -60, brightness -20, contrast -10) measurably destroyed MORE
-# color detail (fewer distinct sampled pixel colors) while being LESS dark
-# (higher mean luminance) than plain invert -- objectively worse on both
-# axes it was meant to improve. Landed on invert + a mild saturation cut
-# only (muted without crushing detail); brightness/contrast left at 0 since
-# any contrast increase clipped most pixels toward black in testing.
+# URL verified live against CARTO's current basemap service, not
+# remembered: style.json fetched and inspected directly (background
+# #0e0e0e, water fill present, real MapLibre style, HTTP 200); the vector
+# tile source it references (tiles.basemaps.cartocdn.com/vectortiles/...)
+# fetched as an actual tile -- 114KB of real gzip-compressed protobuf, not
+# an error/placeholder -- confirming the vector endpoint is currently
+# keyless, unlike the raster one that broke. Converted via QGIS's own
+# QgsMapBoxGlStyleConverter (66/66 style rules converted, only
+# sprite/font warnings, which don't block fills/lines).
 #
-# Known, disclosed limitation: water renders brown/orange, not dark blue --
-# a direct consequence of invert-without-hue-rotate, structurally
-# unavailable in QGIS's raster filter API. A genuinely correct fix would be
-# a naturally-dark vector basemap instead of a filtered raster one (e.g.
-# OpenFreeMap, tiles.openfreemap.org -- confirmed live/free/keyless via its
-# TileJSON, HTTP 200, no key) rendered through QGIS's native vector tile
-# support -- not implemented here; flagged as the real next step if the
-# brown-water artifact needs to go away entirely rather than be tuned around.
-BASEMAP_NAME = "OpenStreetMap (dark-filtered)"
-BASEMAP_URI = "type=xyz&url=https://tile.openstreetmap.org/%7Bz%7D/%7Bx%7D/%7By%7D.png&zmax=19&zmin=0"
-BASEMAP_SATURATION = -25
-BASEMAP_BRIGHTNESS = 0
-BASEMAP_CONTRAST = 0
+# Labels are deliberately OFF on this layer, not an oversight: headless
+# render timing (QgsMapRendererParallelJob) found the labeling engine's
+# collision detection is the actual cost, and it is extent/zoom dependent,
+# not simply size dependent -- the exact Canada-wide extent/canvas used in
+# the original 582ms raster benchmark rendered in 657ms cold / 164ms warm
+# WITH labels (comparable), but a Great Lakes regional extent (a smaller
+# area that resolves to a higher, more label-dense tile zoom) took 8.9
+# SECONDS with labels on, vs 611/269 ms with labels off at that same
+# extent -- confirmed by isolating the renderer from the labeling engine
+# directly, not guessed. Since that spike is real and its trigger (which
+# zoom ranges get label-dense) isn't something this pass tuned or fully
+# characterized, labels are off for predictable performance across
+# whatever extent a user actually pans to. Velorona's own site/tower/link
+# labels are unaffected -- those come from feature attributes and the
+# dock, not this basemap layer.
+BASEMAP_NAME = "CARTO Dark Matter"
+BASEMAP_STYLE_URL = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+BASEMAP_TILE_URL = "https://tiles-a.basemaps.cartocdn.com/vectortiles/carto.streets/v1/{z}/{x}/{y}.mvt"
+BASEMAP_TILE_MAXZOOM = 14
 
 # Project CRS -- set to EPSG:3857 (Web Mercator, the XYZ tiles' native CRS)
 # in load_public_data() below. Measured headlessly: rendering the filtered
@@ -142,26 +151,40 @@ class VeloronaPlugin:
         return existing if existing is not None else parent.insertGroup(0, name)
 
     def _ensure_basemap(self):
-        """Adds QGIS's native dark-basemap XYZ tile layer beneath every
-        other layer, once. Without this the canvas is just floating dots
-        on white -- meaningless to a first-time user."""
+        """Adds the native QGIS vector tile basemap (CARTO Dark Matter)
+        beneath every other layer, once. Without this the canvas is just
+        floating dots on a black background -- meaningless to a
+        first-time user."""
         project = QgsProject.instance()
         for existing in project.mapLayers().values():
             if existing.name() == BASEMAP_NAME:
                 return
-        basemap = QgsRasterLayer(BASEMAP_URI, BASEMAP_NAME, "wms")
-        if not basemap.isValid():
-            self._warn(f"Could not load the {BASEMAP_NAME} basemap: {basemap.error().message()}")
+
+        import requests
+
+        try:
+            resp = requests.get(BASEMAP_STYLE_URL, timeout=10.0)
+            resp.raise_for_status()
+            style_json = resp.text
+        except Exception as exc:
+            self._warn(f"Could not fetch the {BASEMAP_NAME} style: {exc}")
             return
-        # QGIS-native equivalent of the web Map's CSS tile-pane filter --
-        # values re-derived from actual headless-rendered pixel output, see
-        # the BASEMAP_* constants' comment above for the measurements.
-        hue_sat = basemap.hueSaturationFilter()
-        hue_sat.setInvertColors(True)
-        hue_sat.setSaturation(BASEMAP_SATURATION)
-        brightness_contrast = basemap.brightnessFilter()
-        brightness_contrast.setBrightness(BASEMAP_BRIGHTNESS)
-        brightness_contrast.setContrast(BASEMAP_CONTRAST)
+
+        tile_url_encoded = BASEMAP_TILE_URL.replace("{z}", "%7Bz%7D").replace("{x}", "%7Bx%7D").replace("{y}", "%7By%7D")
+        uri = f"type=xyz&url={tile_url_encoded}&zmax={BASEMAP_TILE_MAXZOOM}&zmin=0"
+        basemap = QgsVectorTileLayer(uri, BASEMAP_NAME)
+        if not basemap.isValid():
+            self._warn(f"Could not load the {BASEMAP_NAME} vector tile layer.")
+            return
+
+        converter = QgsMapBoxGlStyleConverter()
+        result = converter.convert(style_json)
+        if result != QgsMapBoxGlStyleConverter.Success:
+            self._warn(f"Could not convert the {BASEMAP_NAME} style: {converter.errorMessage()}")
+            return
+        basemap.setRenderer(converter.renderer().clone())
+        basemap.setLabelsEnabled(False)  # see module-level comment: label collision detection cost spikes at some zoom ranges
+
         project.addMapLayer(basemap, False)
         project.layerTreeRoot().addLayer(basemap)  # appended last = bottom of the render stack
 
