@@ -142,12 +142,34 @@ SATELLITE_REFRESH_SECONDS = 600
 
 # Selection behaviour. Exactly one feature gets the full investigation --
 # endpoint weather is fetched only in that case, so a whole-layer selection can
-# never fan out into thousands of live requests. Beyond SELECTION_TABLE_LIMIT
-# the summary stops listing individual records and asks the user to narrow the
-# selection; SELECTION_SCAN_LIMIT caps how many features are read for the
-# aggregate figures so even 16,956 selected links stay responsive.
+# never fan out into thousands of live requests.
+#
+# Three separate budgets, because they cost wildly different amounts. Measured
+# against the full 16,956-link / 24,859-site ISED dataset:
+#
+#   what                                    1,455      16,956      24,859
+#   ------------------------------------  --------  ----------  ----------
+#   attribute scan for the aggregates       0.011s      0.145s      0.265s
+#   scan + capturing every row              0.025s      0.309s      0.637s
+#   populating the Records table widget     0.136s     25.542s         n/a
+#
+# Rendering is what costs; reading does not. A single shared cap used to tie
+# the export to the widget's budget, which is why a regional selection could be
+# summarised but not exported.
+#
+# SELECTION_TABLE_LIMIT bounds what is drawn on screen -- the Records table
+# widget and the evidence dock's HTML listing, which builds one table row per
+# record. 200 keeps both instant.
 SELECTION_TABLE_LIMIT = 200
-SELECTION_SCAN_LIMIT = 2000
+# SELECTION_LISTING_LIMIT bounds what is captured for export. Nothing is
+# rendered, so this is the cheap axis: it clears the entire national dataset at
+# 0.637s worst case. Past it the export says the listing was omitted and names
+# this number, rather than shipping a header with no rows under it.
+SELECTION_LISTING_LIMIT = 25000
+# SELECTION_SCAN_LIMIT caps how many features are read for the aggregate
+# figures. It has to be at least SELECTION_LISTING_LIMIT: the capture happens
+# inside the scan loop, so a lower scan cap would silently truncate the listing.
+SELECTION_SCAN_LIMIT = 25000
 
 
 class VeloronaPlugin:
@@ -885,7 +907,9 @@ class VeloronaPlugin:
         source_key = layer_helpers.layer_source_key(layer)
         columns = records_table.COLUMNS.get(source_key, [])
         scanned = min(count, SELECTION_SCAN_LIMIT)
-        want_rows = count <= SELECTION_TABLE_LIMIT
+        # Capture for export, not for display: the dock and the Records widget
+        # apply their own, much smaller SELECTION_TABLE_LIMIT before drawing.
+        want_rows = count <= SELECTION_LISTING_LIMIT
 
         rows, licensees, frequencies = [], set(), []
         extent = QgsRectangle()
@@ -920,6 +944,7 @@ class VeloronaPlugin:
             columns=[label for label, _ in columns],
             rows=rows,
             table_limit=SELECTION_TABLE_LIMIT,
+            listing_limit=SELECTION_LISTING_LIMIT,
             licensee_filter=self._licensee_filter,
         )
 

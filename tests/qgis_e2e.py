@@ -17,6 +17,7 @@ from qgis.core import (  # noqa: E402
     QgsApplication,
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
+    QgsFeatureRequest,
     QgsMapRendererParallelJob,
     QgsProject,
     QgsRectangle,
@@ -99,6 +100,7 @@ canvas.destinationCrsChanged.connect(
 from velorona.core import export, inspector  # noqa: E402
 from velorona.core.engines import microwave_exposure, satellite_earth_space, terrestrial  # noqa: E402
 from velorona.core.inspector import feature_to_entry  # noqa: E402
+import velorona.plugin as plugin_module  # noqa: E402
 from velorona.plugin import BASEMAP_NAME, VeloronaPlugin  # noqa: E402
 
 plugin = VeloronaPlugin(iface)
@@ -625,9 +627,20 @@ try:
           f"{large.count:,}")
     check("whole-layer selection issues no weather requests", http_calls["n"] == 0,
           f"{http_calls['n']} requests")
-    check("whole-layer selection lists no individual records", not large.rows)
-    check("whole-layer selection caps the attribute scan",
-          large.scanned <= 2000 < large.count, f"scanned {large.scanned:,} of {large.count:,}")
+    # These two used to assert the opposite: that a whole-layer selection was
+    # scan-capped at 2,000 and captured no rows at all. Both were consequences
+    # of one shared cap sized for the Records *widget* (25.5s to draw 16,956
+    # rows), not for reading them (0.31s). The budgets are separate now, so the
+    # whole layer is both fully scanned and fully exportable -- what must still
+    # hold is that none of it is *drawn*.
+    check("whole-layer selection captures every record for export",
+          len(large.rows) == large.count, f"{len(large.rows):,} rows of {large.count:,}")
+    check("whole-layer selection scans every record for the aggregates",
+          large.scanned == large.count, f"scanned {large.scanned:,} of {large.count:,}")
+    check("whole-layer selection is still never drawn into the evidence table",
+          large.count > plugin_module.SELECTION_TABLE_LIMIT
+          and "<table class='grid'>" not in plugin.dock.browser.toHtml(),
+          f"count {large.count:,} > table cap {plugin_module.SELECTION_TABLE_LIMIT}")
     check("whole-layer selection does not freeze the UI", large_seconds < 3.0,
           f"{large_seconds:.2f}s")
     check("whole-layer selection tells the user to narrow it",
@@ -663,7 +676,6 @@ from qgis.PyQt.QtWidgets import QApplication  # noqa: E402
 
 from velorona.core import basemap_labels, network_context  # noqa: E402
 from velorona.plugin import BASEMAP_NAME  # noqa: E402
-import velorona.plugin as plugin_module  # noqa: E402
 
 # 1. the host theme is the user's, never written by Velorona
 plugin_source = open(os.path.join(PLUGIN_DIR, "plugin.py")).read()
@@ -1062,12 +1074,14 @@ check("the O/C/I evidence header is NOT imposed on a raw-record selection",
 # Above the listing limit the rows are never captured. The file must say so
 # rather than shipping a header with no rows under it.
 _sel_big = inspector.SelectionSummary(
-    kind_label="Fixed Service sites", feature_kind="site", count=5000, scanned=2000,
-    columns=["Site", "Licensee"], rows=[], table_limit=200)
+    kind_label="Fixed Service sites", feature_kind="site", count=30000, scanned=25000,
+    columns=["Site", "Licensee"], rows=[], listing_limit=25000)
 _big_csv = export.result_to_csv(_sel_big)
 check("an over-limit selection still exports", bool(_big_csv))
 check("an over-limit selection says the listing was omitted and why",
-      "Per-record listing: Not determined" in _big_csv and "200-record listing limit" in _big_csv)
+      "Per-record listing: Not determined" in _big_csv and "25,000-record export limit" in _big_csv)
+check("the omission message names the export cap, not the on-screen cap",
+      "25,000-record export limit" in _big_csv and "200-record" not in _big_csv)
 check("a partially scanned selection does not let its aggregates imply completeness",
       "describe the scanned subset only" in _big_csv)
 
@@ -1102,6 +1116,79 @@ check("single-record site export is unchanged by the selection-export branch",
       _drop_generated(_routed) == _drop_generated(site_csv))
 check("single-record export still uses the wide record header, not O/C/I",
       "Name / Licensee" in _routed and ",".join(export.EVIDENCE_HEADER) not in _routed)
+
+# -- The three selection budgets are genuinely separate ----------------------
+# They used to be one constant, which tied the export to the *rendering*
+# budget: a 1,455-link regional selection could be summarised but not exported.
+# Measured on the full dataset, capturing every row costs 0.31s while drawing
+# them into the Records widget costs 25.5s -- so the caps must not be shared.
+check("the export cap is far larger than the on-screen cap",
+      plugin_module.SELECTION_LISTING_LIMIT > plugin_module.SELECTION_TABLE_LIMIT * 10,
+      f"listing={plugin_module.SELECTION_LISTING_LIMIT:,} table={plugin_module.SELECTION_TABLE_LIMIT:,}")
+check("the on-screen cap stays small enough to draw instantly",
+      plugin_module.SELECTION_TABLE_LIMIT <= 200, plugin_module.SELECTION_TABLE_LIMIT)
+# The capture happens inside the scan loop, so a scan cap below the listing cap
+# would silently truncate the listing without anything saying so.
+check("the scan cap cannot silently truncate the export listing",
+      plugin_module.SELECTION_SCAN_LIMIT >= plugin_module.SELECTION_LISTING_LIMIT,
+      f"scan={plugin_module.SELECTION_SCAN_LIMIT:,} listing={plugin_module.SELECTION_LISTING_LIMIT:,}")
+check("the export cap clears the whole loaded dataset",
+      plugin_module.SELECTION_LISTING_LIMIT >= sites_layer.featureCount(),
+      f"cap={plugin_module.SELECTION_LISTING_LIMIT:,} sites={sites_layer.featureCount():,}")
+
+# A real regional selection must now come back with every row.
+_region = QgsRectangle(-80.10, 43.20, -79.10, 43.95)
+_region_fids = [f.id() for f in links_layer2.getFeatures(QgsFeatureRequest().setFilterRect(_region))]
+links_layer2.selectByIds(_region_fids)
+_t0 = time.monotonic()
+_region_summary = plugin._summarize_selection(links_layer2, "link", len(_region_fids))
+_region_seconds = time.monotonic() - _t0
+check("a regional selection is well past the old 200 cap",
+      len(_region_fids) > 1000, f"{len(_region_fids):,} links")
+check("a regional selection now captures every row for export",
+      len(_region_summary.rows) == len(_region_fids),
+      f"{len(_region_summary.rows):,} of {len(_region_fids):,}")
+check("capturing a regional selection does not block the UI",
+      _region_seconds < 1.0, f"{_region_seconds:.3f}s")
+_region_csv = export.result_to_csv(_region_summary)
+check("the regional export carries one data row per selected link",
+      len([ln for ln in _region_csv.splitlines()
+           if ln and not ln.startswith("#")]) == len(_region_fids) + 1,
+      f"{len(_region_fids):,} rows + header")
+check("the regional export no longer claims the listing was omitted",
+      "Per-record listing: Not determined" not in _region_csv)
+links_layer2.removeSelection()
+
+# -- Licensees preamble line is readable, and the count stays exact ----------
+_many = [f"Licensee Number {i:02d} Communications Limited" for i in range(46)]
+_many_csv = export.result_to_csv(inspector.SelectionSummary(
+    kind_label="Fixed Service links", feature_kind="link", count=1455, scanned=1455,
+    licensees=_many, columns=["Authorization"], rows=[["x"]]))
+_lic_line = [ln for ln in _many_csv.splitlines() if ln.startswith("# Licensees:")][0]
+check("the distinct-licensee count is never truncated",
+      "Distinct licensees: 46" in _many_csv)
+check("the licensee names line is truncated to a readable length",
+      len(_lic_line) < 520, f"{len(_lic_line)} chars")
+check("the truncated licensee line states the exact remainder",
+      "... and " in _lic_line and "more" in _lic_line)
+check("the shown-plus-remainder always reconciles to the exact total",
+      _lic_line.count(" | ") + 1 + int(_lic_line.split("... and ")[1].split(" more")[0].replace(",", ""))
+      == 46)
+check("a short licensee list is not truncated at all",
+      "... and " not in export.result_to_csv(inspector.SelectionSummary(
+          kind_label="links", feature_kind="link", count=2, scanned=2,
+          licensees=["Bell Mobility Inc.", "TeraGo Networks Inc."],
+          columns=["Authorization"], rows=[["x"]])))
+
+# -- Numeric precision in the preamble: no silent truncation anywhere --------
+_prec_csv = export.result_to_csv(inspector.SelectionSummary(
+    kind_label="links", feature_kind="link", count=1, scanned=1,
+    frequency_range=(933.5125, 85125.0), extent_wgs84=(-80.49605, 43.05111, -78.39844, 44.09472),
+    columns=["Authorization"], rows=[["x"]]))
+check("preamble frequencies keep ISED's full published precision",
+      "933.5125" in _prec_csv and "85125.0" in _prec_csv)
+check("preamble extent keeps 5 decimal places, matching the source records",
+      "-80.49605, 43.05111, -78.39844, 44.09472" in _prec_csv)
 
 # normal links stay subordinate to the selection in both appearances
 check("normal link ink differs per appearance",
