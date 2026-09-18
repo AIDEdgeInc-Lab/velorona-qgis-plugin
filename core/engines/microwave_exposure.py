@@ -16,10 +16,25 @@ from aei_mw_exposure.representativeness import WeatherRepresentativeness, assess
 
 from ..features import feature_id_name, feature_to_latlon
 
+# See terrestrial.py's PARAM_SPEC note. The frequency bound here is stronger
+# than the terrestrial one: it is the rain model's own tabulated validity
+# range, enforced in the library, not an engineering judgment.
 PARAM_SPEC = [
-    {"key": "frequency_ghz", "label": "Frequency", "type": "float", "default": 18.0, "suffix": " GHz"},
+    {"key": "frequency_ghz", "label": "Frequency", "type": "float",
+     "default": 18.0, "suffix": " GHz", "min": 1.0, "max": 100.0,
+     "basis": "Derived and library-enforced: ITU-R P.838-3's tabulated range "
+              "(aei_mw_exposure.physics.MIN_FREQ_GHZ/MAX_FREQ_GHZ). "
+              "rain_coefficients() raises outside it rather than extrapolate, "
+              "because extrapolating that regression is not defensible. Note some "
+              "real ISED records sit below 1 GHz (down to 915.1 MHz); those cannot "
+              "have rain attenuation computed by this method at all."},
     {"key": "polarization", "label": "Polarization", "type": "choice", "default": "V", "choices": ["V", "H"]},
-    {"key": "fade_margin_db", "label": "Fade margin", "type": "float", "default": 32.0, "suffix": " dB"},
+    {"key": "fade_margin_db", "label": "Fade margin", "type": "float",
+     "default": 32.0, "suffix": " dB", "min": 0.1, "max": 100.0,
+     "basis": "Lower bound derived: aei_mw_exposure.microwave.MicrowaveLink raises "
+              "ValueError for fade_margin_db <= 0. The 100 dB ceiling is a "
+              "conservative engineering limit, not a derived bound -- real microwave "
+              "link fade margins run roughly 20-50 dB."},
 ]
 
 
