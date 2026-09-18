@@ -22,6 +22,13 @@ from skyfield.api import EarthSatellite, load
 
 CELESTRAK_URL = "https://celestrak.org/NORAD/elements/gp.php"
 CELESTRAK_GROUPS = ["geo", "intelsat", "ses", "eutelsat", "telesat"]
+# (connect, read), not one float for both. A single 15.0 gave a dead host the
+# same 15s budget as a large TLE download deserves: connecting to a host that
+# is answering takes well under a second, so 5s is generous for connect, while
+# read stays long enough for the biggest group's payload. This fetch runs on
+# the GUI thread (see plugin._populate_satellites), so every second of it is a
+# second the map is frozen.
+CELESTRAK_TIMEOUT = (5.0, 20.0)
 SOURCE_CELESTRAK = "CelesTrak GP element sets (geo/intelsat/ses/eutelsat/telesat groups, deduplicated by NORAD catalog number), Public Domain"
 
 GROUND_STATIONS_SNAPSHOT_PATH = os.path.join(
@@ -67,20 +74,32 @@ def _classify_orbit(altitude_km: float, period_minutes: float) -> str:
 
 
 def _fetch_celestrak_group_tle(group: str) -> str:
-    resp = requests.get(CELESTRAK_URL, params={"GROUP": group, "FORMAT": "tle"}, timeout=15.0)
+    resp = requests.get(CELESTRAK_URL, params={"GROUP": group, "FORMAT": "tle"},
+                        timeout=CELESTRAK_TIMEOUT)
     resp.raise_for_status()
     return resp.text
 
 
 def fetch_celestrak_satellites() -> Dict[str, Tuple[str, str, str]]:
     """Returns {norad_cat_id: (name, line1, line2)}, deduplicated across
-    all 5 groups, same as space.js's loadCelestrakElements()."""
+    all 5 groups, same as space.js's loadCelestrakElements().
+
+    Degrades per group rather than raising -- one group being unavailable
+    should not cost the whole layer -- with one exception: if the host would
+    not accept a connection at all, the remaining groups are the same host
+    and cannot succeed, so asking them only spends another connect timeout
+    each. Measured against the live service while it was unreachable:
+    75.077s to return nothing (5 groups x the old single-float 15s timeout)
+    against 5.007s with the split timeout and this bail-out. All of that
+    time is spent on the GUI thread, which is what "the map is stuck" was."""
     by_id: Dict[str, Tuple[str, str, str]] = {}
     for group in CELESTRAK_GROUPS:
         try:
             text = _fetch_celestrak_group_tle(group)
+        except requests.exceptions.ConnectionError:
+            break     # host unreachable -- the other groups are the same host
         except Exception:
-            continue  # live public service -- degrade, don't crash the whole layer
+            continue  # this group alone (404, rate-limit, bad payload); others may work
         lines = [ln for ln in text.splitlines() if ln.strip()]
         for i in range(0, len(lines) - 2, 3):
             name, line1, line2 = lines[i].strip(), lines[i + 1], lines[i + 2]

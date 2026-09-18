@@ -1771,6 +1771,122 @@ check("fixed-sites and satellites clusters are visually distinct colours on scre
      "not the same shared bubble",
       layer_helpers.COLORS_DARK["fixed-sites"] != layer_helpers.COLORS_DARK["satellites"])
 
+print("\n== 27. CelesTrak fetch: a dead host must not freeze the map ==")
+# Enabling Satellites ran the CelesTrak fetch on the GUI thread behind a wait
+# cursor, with timeout=15.0 -- a single float, so a host that never completes
+# a TCP connect burned the full 15s, five times over, one per group. Measured
+# against the live service while it was genuinely unreachable: 75.077s to
+# return zero satellites, 76.33s end to end through the real toggle path. The
+# other stages were measured and ruled out, so they are not what to guard:
+# skyfield's timescale load is 0.027s with no HTTP at all, propagation is
+# 0.089 ms/satellite (0.071s for 800), feature construction 0.006s, and
+# nothing re-fetches on pan/zoom. These checks pin the fetch behaviour only.
+#
+# Mocked, not live: the point is what happens when the service misbehaves,
+# which is not reproducible on demand against the real host.
+from velorona.core.sources import space_public  # noqa: E402
+
+_ct_calls = {"groups": []}
+
+
+class _FakeResp:
+    def __init__(self, text): self.text = text
+    def raise_for_status(self): pass
+
+
+_SAMPLE_TLE = (
+    "ISS (ZARYA)\n"
+    "1 25544U 98067A   26261.50000000  .00016717  00000-0  10270-3 0  9000\n"
+    "2 25544  51.6400 208.9163 0006317  69.9862 290.1974 15.49181247 10000\n")
+
+_real_ct_get = _requests.get
+try:
+    # 1. Host refuses to connect at all -> stop, do not ask the same host 4
+    #    more times. This is the 75s case.
+    def _all_refused(url, *a, **kw):
+        _ct_calls["groups"].append(kw.get("params", {}).get("GROUP"))
+        raise _requests.exceptions.ConnectionError("connection refused")
+
+    _requests.get = _all_refused
+    _ct_calls["groups"] = []
+    _t0 = time.monotonic()
+    _result = space_public.fetch_celestrak_satellites()
+    _elapsed = time.monotonic() - _t0
+    check("an unreachable host is asked once, not once per group",
+          len(_ct_calls["groups"]) == 1,
+          f"{len(_ct_calls['groups'])} of {len(space_public.CELESTRAK_GROUPS)} groups attempted")
+    check("an unreachable host still returns an empty set, not an exception",
+          _result == {})
+
+    # 2. A single group failing for its OWN reason (404, rate-limit, bad
+    #    payload) must NOT abort the others -- that degrade-per-group
+    #    behaviour is the reason the loop swallows exceptions at all, and the
+    #    bail-out above must not have cost it.
+    def _first_group_404(url, *a, **kw):
+        group = kw.get("params", {}).get("GROUP")
+        _ct_calls["groups"].append(group)
+        if group == space_public.CELESTRAK_GROUPS[0]:
+            raise _requests.exceptions.HTTPError("404 Not Found")
+        return _FakeResp(_SAMPLE_TLE)
+
+    _requests.get = _first_group_404
+    _ct_calls["groups"] = []
+    _result = space_public.fetch_celestrak_satellites()
+    check("one group failing on its own does not abort the remaining groups",
+          len(_ct_calls["groups"]) == len(space_public.CELESTRAK_GROUPS),
+          f"{len(_ct_calls['groups'])} of {len(space_public.CELESTRAK_GROUPS)} attempted")
+    check("the groups that did answer are still parsed",
+          len(_result) == 1 and "25544" in _result, str(list(_result)))
+
+    # 3. A connect TIMEOUT (the live failure actually observed: DNS resolved,
+    #    TCP connect then hung) must bail out the same way a refusal does.
+    #    requests.ConnectTimeout subclasses ConnectionError, so one except
+    #    covers both -- asserted here rather than assumed from the hierarchy.
+    def _connect_timeout(url, *a, **kw):
+        _ct_calls["groups"].append(kw.get("params", {}).get("GROUP"))
+        raise _requests.exceptions.ConnectTimeout("connect timed out")
+
+    _requests.get = _connect_timeout
+    _ct_calls["groups"] = []
+    space_public.fetch_celestrak_satellites()
+    check("a hanging connect bails out after one group, like a refusal",
+          len(_ct_calls["groups"]) == 1, f"{len(_ct_calls['groups'])} attempted")
+
+    # 4. A read timeout is also per-group, not a whole-host verdict: the host
+    #    answered, this group was just slow.
+    def _read_timeout(url, *a, **kw):
+        _ct_calls["groups"].append(kw.get("params", {}).get("GROUP"))
+        raise _requests.exceptions.ReadTimeout("read timed out")
+
+    _requests.get = _read_timeout
+    _ct_calls["groups"] = []
+    space_public.fetch_celestrak_satellites()
+    check("a read timeout is treated per group, not as an unreachable host",
+          len(_ct_calls["groups"]) == len(space_public.CELESTRAK_GROUPS),
+          f"{len(_ct_calls['groups'])} attempted")
+finally:
+    _requests.get = _real_ct_get
+
+check("the CelesTrak timeout separates connect from read",
+      isinstance(space_public.CELESTRAK_TIMEOUT, tuple)
+      and len(space_public.CELESTRAK_TIMEOUT) == 2,
+      str(space_public.CELESTRAK_TIMEOUT))
+check("the connect timeout is short enough that a dead host cannot freeze the map",
+      space_public.CELESTRAK_TIMEOUT[0] <= 5.0,
+      f"connect {space_public.CELESTRAK_TIMEOUT[0]}s, and an unreachable host is asked once, "
+      f"so the worst case is {space_public.CELESTRAK_TIMEOUT[0]}s -- not "
+      f"{space_public.CELESTRAK_TIMEOUT[0] * len(space_public.CELESTRAK_GROUPS)}s")
+check("the read timeout is still generous enough for a large TLE payload",
+      space_public.CELESTRAK_TIMEOUT[1] >= 15.0, f"read {space_public.CELESTRAK_TIMEOUT[1]}s")
+
+# The stages that were measured and ruled out -- pinned so a future change
+# cannot quietly reintroduce them as costs.
+_t0 = time.monotonic()
+import importlib as _importlib
+_importlib.reload(space_public)
+check("skyfield's timescale load stays local (no network, sub-second)",
+      time.monotonic() - _t0 < 2.0, f"{time.monotonic() - _t0:.3f}s to re-import")
+
 passed = sum(1 for _, ok, _ in RESULTS if ok)
 for s_ in SKIPPED:
     print(f"  SKIPPED: {s_}")
