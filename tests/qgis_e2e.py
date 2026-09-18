@@ -14,6 +14,7 @@ PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(PLUGIN_DIR))
 
 from qgis.core import (  # noqa: E402
+    Qgis,
     QgsApplication,
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
@@ -22,7 +23,7 @@ from qgis.core import (  # noqa: E402
     QgsProject,
     QgsRectangle,
 )
-from qgis.gui import QgsLayerTreeMapCanvasBridge, QgsMapCanvas  # noqa: E402
+from qgis.gui import QgsLayerTreeMapCanvasBridge, QgsMapCanvas, QgsMessageBar  # noqa: E402
 from qgis.PyQt.QtCore import QSize, Qt  # noqa: E402
 from qgis.PyQt.QtWidgets import QMainWindow  # noqa: E402
 
@@ -47,12 +48,19 @@ class FakeIface:
         self.window.setCentralWidget(self.canvas)
         self.canvas.resize(1280, 800)
         self.docks = []
+        # A real QgsMessageBar, not a stub -- so tests exercise the actual
+        # push/pop behaviour Velorona's status messages depend on, not a
+        # mock that would pass regardless of what the real widget does.
+        self._message_bar = QgsMessageBar(self.window)
 
     def mapCanvas(self):
         return self.canvas
 
     def mainWindow(self):
         return self.window
+
+    def messageBar(self):
+        return self._message_bar
 
     def addToolBarIcon(self, a):
         pass
@@ -1886,6 +1894,144 @@ import importlib as _importlib
 _importlib.reload(space_public)
 check("skyfield's timescale load stays local (no network, sub-second)",
       time.monotonic() - _t0 < 2.0, f"{time.monotonic() - _t0:.3f}s to re-import")
+
+print("\n== 28. satellite fetch: status message on the map's own message bar ==")
+# The fetch is bounded now (section 27), but it is still a blocking call on
+# the GUI thread -- so an operator toggling Satellites on still sees a short
+# pause. A status message explains it instead of the map just appearing to
+# freeze, and is replaced with a plain explanation rather than silently
+# reverting to blank on failure. plugin.py:_populate_satellites is the only
+# thing touched; Ground/Earth Stations, colours, filter, export and CRS are
+# untouched by this pass.
+_mb_calls = []
+_real_push = plugin.iface.messageBar().pushMessage
+_real_pop = plugin.iface.messageBar().popWidget
+
+
+def _recording_push(*a, **kw):
+    _mb_calls.append(("push", a, kw))
+    return _real_push(*a, **kw)
+
+
+def _recording_pop(*a, **kw):
+    _mb_calls.append(("pop", a, kw))
+    return _real_pop(*a, **kw)
+
+
+plugin.iface.messageBar().pushMessage = _recording_push
+plugin.iface.messageBar().popWidget = _recording_pop
+
+_sat_layer28 = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_SATELLITES)
+_sat_node28 = project.layerTreeRoot().findLayer(_sat_layer28.id())
+_real_fetch28 = space_public.fetch_celestrak_satellites
+
+try:
+    _ONE_SAT = {"25544": (
+        "ISS (ZARYA)",
+        "1 25544U 98067A   26261.50000000  .00016717  00000-0  10270-3 0  9000",
+        "2 25544  51.6400 208.9163 0006317  69.9862 290.1974 15.49181247 10000")}
+
+    # -- Case 1: the fetch is still in progress when the caller checks -------
+    # (mid-call instrumentation, not just "the code calls processEvents()" --
+    # this catches the message being pushed AFTER the blocking call instead
+    # of before, which would defeat the whole point.) A fast fake, NOT
+    # _real_fetch28 -- this must not touch the real network.
+    _mid_call = {}
+
+    def _slow_fetch_probe():
+        _mid_call["visible"] = plugin.iface.messageBar().isVisible()
+        _mid_call["pushed_before_call"] = any(c[0] == "push" for c in _mb_calls)
+        return _ONE_SAT
+
+    space_public.fetch_celestrak_satellites = _slow_fetch_probe
+    plugin._satellites_fetched_at = None
+    plugin.iface.messageBar().clearWidgets()
+    _mb_calls.clear()
+    _sat_node28.setItemVisibilityChecked(False)
+    qgs.processEvents()
+    _sat_node28.setItemVisibilityChecked(True)
+    qgs.processEvents()
+
+    check("the status message is pushed and visible BEFORE the blocking fetch starts",
+          _mid_call.get("pushed_before_call") is True and _mid_call.get("visible") is True)
+    _connecting_calls = [c for c in _mb_calls if c[0] == "push"
+                         and "Connecting to satellite data" in str(c[1])]
+    check("the in-progress message is plain and honest, not a bare 'Loading...'",
+          len(_connecting_calls) == 1 and "few seconds" in str(_connecting_calls[0][1]))
+
+    # -- Case 2: fetch succeeds -> message is cleared, nothing lingers -------
+    space_public.fetch_celestrak_satellites = lambda: _ONE_SAT
+    plugin._satellites_fetched_at = None
+    plugin.iface.messageBar().clearWidgets()
+    _mb_calls.clear()
+    _sat_node28.setItemVisibilityChecked(False)
+    qgs.processEvents()
+    _sat_node28.setItemVisibilityChecked(True)
+    qgs.processEvents()
+
+    check("a successful fetch pops the in-progress message (cleanup happens)",
+          any(c[0] == "pop" for c in _mb_calls))
+    check("a successful fetch pushes no failure message",
+          not any(c[0] == "push" and "unavailable" in str(c[1]).lower() for c in _mb_calls))
+    check("the message bar is not left showing anything after a success",
+          not plugin.iface.messageBar().isVisible())
+
+    # -- Case 3: fetch degrades to empty (the actual observed failure mode --
+    # a refused/hanging connection is caught inside fetch_celestrak_satellites
+    # itself and returns {}, it does not raise) -> plain explanation, not a
+    # silent revert to blank.
+    space_public.fetch_celestrak_satellites = lambda: {}
+    plugin._satellites_fetched_at = None
+    plugin.iface.messageBar().clearWidgets()
+    _mb_calls.clear()
+    _sat_node28.setItemVisibilityChecked(False)
+    qgs.processEvents()
+    _sat_node28.setItemVisibilityChecked(True)
+    qgs.processEvents()
+
+    _failure_pushes = [c for c in _mb_calls if c[0] == "push"
+                       and "unavailable" in str(c[1]).lower()]
+    check("an empty (degraded) result still gets a plain failure explanation",
+          len(_failure_pushes) == 1, str(_mb_calls))
+    check("the failure message names CelesTrak, not a generic error",
+          "CelesTrak" in str(_failure_pushes[0][1]) if _failure_pushes else False)
+    check("the failure message is a warning, not styled as routine info",
+          bool(_failure_pushes) and len(_failure_pushes[0][1]) >= 3
+          and _failure_pushes[0][1][2] == Qgis.MessageLevel.Warning)
+    check("the failure message does not silently vanish -- it is still showing after",
+          plugin.iface.messageBar().isVisible())
+
+    # -- Case 4: an outright exception (not the degrade path) is handled the
+    # same honest way, and the wait cursor is unconditionally restored.
+    def _raises(*a, **kw):
+        raise RuntimeError("unexpected failure, not a network degrade")
+
+    space_public.fetch_celestrak_satellites = _raises
+    plugin._satellites_fetched_at = None
+    plugin.iface.messageBar().clearWidgets()
+    _mb_calls.clear()
+    _sat_node28.setItemVisibilityChecked(False)
+    qgs.processEvents()
+    _sat_node28.setItemVisibilityChecked(True)
+    qgs.processEvents()
+
+    _exc_pushes = [c for c in _mb_calls if c[0] == "push"
+                  and "unavailable" in str(c[1]).lower()]
+    check("an unexpected exception also gets the plain failure explanation, not a stack trace",
+          len(_exc_pushes) == 1, str(_mb_calls))
+    check("the wait cursor is restored even when the fetch raises",
+          QApplication.overrideCursor() is None)
+finally:
+    space_public.fetch_celestrak_satellites = _real_fetch28
+    plugin.iface.messageBar().pushMessage = _real_push
+    plugin.iface.messageBar().popWidget = _real_pop
+    plugin.iface.messageBar().clearWidgets()
+    _sat_node28.setItemVisibilityChecked(False)
+    qgs.processEvents()
+    plugin._satellites_fetched_at = None
+
+check("the wait cursor is restored after an ordinary run too",
+      QApplication.overrideCursor() is None)
 
 passed = sum(1 for _, ok, _ in RESULTS if ok)
 for s_ in SKIPPED:

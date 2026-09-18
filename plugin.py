@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 
 from qgis.core import (
+    Qgis,
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
     QgsLayerTreeLayer,
@@ -759,27 +760,50 @@ class VeloronaPlugin:
         """Fetches CelesTrak element sets and propagates sub-points, once the
         Satellites layer is actually visible. Sub-points are time-dependent, so
         a refresh is re-run if the layer is switched off and on again after the
-        positions have gone stale."""
+        positions have gone stale.
+
+        The fetch is bounded (worst case ~5s connect timeout, see
+        core/sources/space_public.py) but is still a blocking call on this
+        thread, so a status message explains the short pause instead of the
+        map just appearing to freeze -- QGIS's own message bar, not a modal:
+        this is a background-feeling wait, not a decision the user needs to
+        act on. It is replaced with a plain explanation on failure rather
+        than silently vanishing, and always cleared before this returns."""
         if self.satellites_layer is None:
             return
         now = time.monotonic()
         if self._satellites_fetched_at is not None and now - self._satellites_fetched_at < SATELLITE_REFRESH_SECONDS:
             return
+        bar = self.iface.messageBar()
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        QApplication.processEvents()
+        if bar is not None:
+            bar.pushMessage("Velorona", "Connecting to satellite data -- this may take a few seconds...",
+                            Qgis.MessageLevel.Info, 0)
+        QApplication.processEvents()  # paint the busy cursor and the message before the blocking fetch
         try:
             records = space_public.build_satellite_records(space_public.fetch_celestrak_satellites())
         except Exception as exc:
+            if bar is not None:
+                bar.popWidget()
+                bar.pushMessage("Velorona", "Satellite data unavailable -- CelesTrak could not be reached.",
+                                Qgis.MessageLevel.Warning, 8)
             self._warn(f"Satellites (CelesTrak) unavailable right now: {exc}")
             return
         finally:
             QApplication.restoreOverrideCursor()
+        if bar is not None:
+            bar.popWidget()
         layer_helpers.replace_point_features(self.satellites_layer, records, space_public.SATELLITE_FIELDS)
         self._satellites_fetched_at = now
         if not records:
-            # fetch_celestrak_satellites degrades per group rather than raising,
-            # so an empty result is silent otherwise -- say so instead of
-            # leaving an empty layer with no explanation.
+            # fetch_celestrak_satellites degrades per group rather than raising
+            # -- an unreachable host (the actual failure observed while this
+            # was built) ends up here, not in the except branch above, so the
+            # plain explanation belongs here too, not only on a raised
+            # exception.
+            if bar is not None:
+                bar.pushMessage("Velorona", "Satellite data unavailable -- CelesTrak could not be reached.",
+                                Qgis.MessageLevel.Warning, 8)
             self._warn("CelesTrak returned no element sets just now (the service rate-limits "
                        "repeated requests). The Satellites layer is empty; switch it off and on "
                        "again later to retry.")
