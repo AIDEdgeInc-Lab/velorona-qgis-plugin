@@ -5,14 +5,15 @@ same field mapping, same provenance strings), `requests` instead of
 existing fetch/parse logic from JS to Python so it can build native QGIS
 layers.
 
-fixed_service and ground_stations below read the existing static
-snapshots checked into aei-link-clearance/web/ read-only -- never
-modified, never copied.
+load_fixed_service_snapshot below reads a static snapshot bundled with this
+plugin under data/, byte-identical to the one aei-link-clearance/web/ ships.
+It is read-only at runtime and never modified.
 """
 
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, Dict, List, Tuple
 
 import requests
@@ -22,13 +23,23 @@ GEOHUB_URL = "https://ws.lioservices.lrc.gov.on.ca/arcgis2/rest/services/LIO_OPE
 ISED_CELLULAR_URL = "https://services.arcgis.com/wjcPoefzjpzCgffS/ArcGIS/rest/services/Spectrum_Licences_Site_Data/FeatureServer/0/query"
 RELEVANT_TOWER_SUBTYPES = ["Communication Tower", "Microwave Tower", "Radio Tower"]
 
+# Hoisted so the viewport cache can key on the exact query variant, not just
+# the service URL.
+TOWER_WHERE = "CLASS_SUBTYPE IN (" + ",".join(f"'{s}'" for s in RELEVANT_TOWER_SUBTYPES) + ")"
+CELLULAR_WHERE = "1=1"
+TOWER_SOURCE_KEY = (GEOHUB_URL, TOWER_WHERE)
+CELLULAR_SOURCE_KEY = (ISED_CELLULAR_URL, CELLULAR_WHERE)
+
 SOURCE_GEOHUB = "Ontario GeoHub -- Tower dataset (MNRF), Open Government Licence - Ontario"
 SOURCE_ISED_CELLULAR = "ISED Spectrum Licences Site Data (cellular/mobile), via Esri Canada mirror, Open Government Licence - Canada"
 SOURCE_ISED_FIXED = "ISED SMS Authorization Data Extract: Fixed Service, Open Government Licence - Canada"
 
-# Read-only inputs -- the exact static snapshots aei-link-clearance's own
-# web app already ships and maintains. Never modified, never duplicated.
-FIXED_SERVICE_SNAPSHOT_PATH = "/Users/aidedgeinc./velorona-repos/aei-link-clearance/web/fixed_service_snapshot.json"
+# Read-only input -- the same static snapshot aei-link-clearance's own web app
+# ships, bundled here so the plugin is self-contained wherever it is installed.
+# Resolved against the plugin package, never an absolute machine path.
+FIXED_SERVICE_SNAPSHOT_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "data", "fixed_service_snapshot.json")
 
 TOWER_FIELDS = [
     ("id", QVariant.String), ("name", QVariant.String), ("source", QVariant.String),
@@ -81,8 +92,7 @@ def _query_arcgis(url: str, bbox: Tuple[float, float, float, float], where: str 
 
 
 def fetch_geohub_towers(bbox: Tuple[float, float, float, float]) -> Tuple[List[dict], bool]:
-    where = "CLASS_SUBTYPE IN (" + ",".join(f"'{s}'" for s in RELEVANT_TOWER_SUBTYPES) + ")"
-    features, exceeded = _query_arcgis(GEOHUB_URL, bbox, where)
+    features, exceeded = _query_arcgis(GEOHUB_URL, bbox, TOWER_WHERE)
     sites = []
     for f in features:
         geom = f.get("geometry") or {}
@@ -105,7 +115,7 @@ def fetch_geohub_towers(bbox: Tuple[float, float, float, float]) -> Tuple[List[d
 
 
 def fetch_ised_cellular(bbox: Tuple[float, float, float, float]) -> Tuple[List[dict], bool]:
-    features, exceeded = _query_arcgis(ISED_CELLULAR_URL, bbox)
+    features, exceeded = _query_arcgis(ISED_CELLULAR_URL, bbox, CELLULAR_WHERE)
     groups: Dict[str, Dict[str, Any]] = {}
     for f in features:
         a = f.get("attributes") or {}

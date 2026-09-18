@@ -4,13 +4,15 @@ classification thresholds. `satellite.js` (browser) -> `skyfield`
 (Python, wraps the same SGP4 algorithm) -- not a re-derivation, a
 same-algorithm library swap, verified against a live/known TLE before use.
 
-ground_stations reads the existing static snapshot checked into
-aei-link-clearance/web/ read-only -- never modified, never copied.
+load_ground_station_snapshot reads a static snapshot bundled with this plugin
+under data/, byte-identical to the one aei-link-clearance/web/ ships. It is
+read-only at runtime and never modified.
 """
 
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from typing import Dict, List, Tuple
 
@@ -22,7 +24,9 @@ CELESTRAK_URL = "https://celestrak.org/NORAD/elements/gp.php"
 CELESTRAK_GROUPS = ["geo", "intelsat", "ses", "eutelsat", "telesat"]
 SOURCE_CELESTRAK = "CelesTrak GP element sets (geo/intelsat/ses/eutelsat/telesat groups, deduplicated by NORAD catalog number), Public Domain"
 
-GROUND_STATIONS_SNAPSHOT_PATH = "/Users/aidedgeinc./velorona-repos/aei-link-clearance/web/satnogs_snapshot.json"
+GROUND_STATIONS_SNAPSHOT_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "data", "satnogs_snapshot.json")
 SOURCE_SATNOGS = "SatNOGS Network -- Ground Stations, static snapshot"
 
 LEO_MAX_ALTITUDE_KM = 2000
