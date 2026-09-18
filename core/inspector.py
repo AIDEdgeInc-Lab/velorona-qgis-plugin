@@ -54,6 +54,9 @@ class SelectionSummary:
     columns: list = field(default_factory=list)
     rows: list = field(default_factory=list)
     table_limit: int = 200
+    # The layer-level filter the selection was made through, so the export can
+    # state which subset the records were drawn from. Empty means unfiltered.
+    licensee_filter: str = ""
     kind: str = "selection-summary"
 
 

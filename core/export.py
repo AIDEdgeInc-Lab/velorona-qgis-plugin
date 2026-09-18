@@ -88,6 +88,97 @@ def link_feature_to_csv(attrs: dict, site_a_point, site_b_point) -> str:
     return buf.getvalue()
 
 
+def _fmt_extent(extent) -> str:
+    """WGS84 bounding box as minlon,minlat,maxlon,maxlat -- the same axis order
+    QGIS reports and the Web Map's export writes, so the two agree."""
+    if not extent:
+        return NOT_DETERMINED + " -- the selected records carry no usable geometry"
+    return ", ".join(f"{value:.5f}" for value in extent)
+
+
+def selection_summary_to_csv(result) -> str:
+    """A multi-record selection: one row per selected public record.
+
+    Raw records, not an analysis result, so this keeps the wide record shape
+    that feature_to_csv()/link_feature_to_csv() already use rather than the
+    Observed/Calculated/Inferred long format. That is the same judgment call
+    already documented at the top of this module, and it is the honest one
+    here: nothing in a selection is inferred, so an O/C/I table would carry a
+    structurally empty Inferred column and read as though an analysis had run
+    and found nothing to infer. Nothing was run.
+
+    The columns are the Records table's own curated columns via
+    records_table.display_row(), so a record reads identically in the table and
+    in the exported file -- no third representation to reconcile.
+
+    Everything that narrowed the selection goes in the preamble, so the file
+    can answer "is this every record, or the ones you picked?" on its own.
+    """
+    count = result.count or 0
+    scanned = result.scanned or 0
+    partial = scanned < count
+
+    licensee_filter = (result.licensee_filter or "").strip()
+    lines = [
+        "Velorona QGIS export -- multi-record selection",
+        f"Selection: {count:,} {result.kind_label}",
+        f"Generated: {datetime.now(timezone.utc).isoformat()}",
+        f"Licensee filter: {licensee_filter or 'None -- all licensees'}",
+        f"Records selected: {count:,}",
+    ]
+
+    # The aggregates below are computed over the scanned subset, not
+    # necessarily over every selected record. Say so rather than letting the
+    # numbers imply a completeness they do not have.
+    if partial:
+        lines.append(
+            f"Records scanned for the aggregates below: {scanned:,} "
+            f"-- the remaining {count - scanned:,} were not read, so the "
+            f"licensee, frequency and extent lines describe the scanned subset only")
+    else:
+        lines.append(f"Records scanned for the aggregates below: {scanned:,} (all of them)")
+
+    if result.licensees:
+        lines.append(f"Distinct licensees: {len(result.licensees):,}")
+        lines.append("Licensees: " + " | ".join(result.licensees))
+    else:
+        lines.append("Distinct licensees: " + NOT_DETERMINED
+                     + " -- the selected records carry no licensee field")
+
+    if result.frequency_range:
+        low, high = result.frequency_range
+        # Printed at full float precision, not rounded: ISED publishes
+        # frequencies to 4 decimal places (959.9375 MHz and the like) and a
+        # %g-style 6-significant-figure format silently drops the last digit.
+        lines.append(f"Published frequency range: {low} - {high} MHz")
+    else:
+        lines.append("Published frequency range: " + NOT_DETERMINED
+                     + " -- no published frequency on the selected records")
+
+    lines.append("Selection extent (WGS84 minlon, minlat, maxlon, maxlat): "
+                 + _fmt_extent(result.extent_wgs84))
+    lines.append("Evidence typing: not applicable -- these are raw public records as "
+                 "selected, not an analysis result. No weather was fetched, no "
+                 "per-record analysis was run, and nothing here is inferred.")
+
+    rows = result.rows or []
+    if not rows and count:
+        lines.append(
+            f"Per-record listing: {NOT_DETERMINED} -- the selection exceeds the "
+            f"{result.table_limit:,}-record listing limit, so no rows were captured. "
+            f"Narrow the selection to {result.table_limit:,} records or fewer to "
+            f"include them.")
+
+    buf = io.StringIO()
+    buf.write(_preamble(lines))
+    writer = csv.writer(buf)
+    if result.columns:
+        writer.writerow(result.columns)
+    for row in rows:
+        writer.writerow(row)
+    return buf.getvalue()
+
+
 def result_to_csv(result) -> str:
     if result.kind == "terrestrial":
         return _terrestrial_to_csv(result)
@@ -95,6 +186,8 @@ def result_to_csv(result) -> str:
         return _microwave_to_csv(result)
     if result.kind == "link-investigation":
         return _link_investigation_to_csv(result)
+    if result.kind == "selection-summary":
+        return selection_summary_to_csv(result)
     if result.kind == "link":
         return link_feature_to_csv(result.data, result.site_a_point, result.site_b_point)
     if result.kind in ("site", "satellite", "ground-station"):
