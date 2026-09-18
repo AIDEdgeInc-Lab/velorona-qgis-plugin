@@ -19,40 +19,142 @@ from __future__ import annotations
 import html
 
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import QDockWidget, QFileDialog, QHBoxLayout, QMessageBox, QPushButton, QTextBrowser, QVBoxLayout, QWidget
+from qgis.PyQt.QtWidgets import (
+    QDockWidget,
+    QFileDialog,
+    QHBoxLayout,
+    QMessageBox,
+    QComboBox,
+    QLabel,
+    QPushButton,
+    QTabWidget,
+    QTextBrowser,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ..core.export import NotExportable, result_to_csv
+from . import theme
+from .records_table import VeloronaRecordsTable
 
 NOT_DETERMINED = "Not determined"
 
 
-class VeloronaResultsDock(QDockWidget):
-    def __init__(self, parent=None):
-        super().__init__("Velorona -- Results / Evidence", parent)
-        self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
-        self._result = None
-        self.elevation_profile_requested = None  # callable, set by plugin.py
+EMPTY_STATE = "<p class='caveat'>Select a Velorona feature to inspect its evidence.</p>"
 
-        container = QWidget(self)
-        layout = QVBoxLayout(container)
-        self.browser = QTextBrowser(container)
+DEFAULT_APPEARANCE = "dark"
+
+
+class VeloronaResultsDock(QDockWidget):
+    """One Velorona dock with two surfaces: Records (a curated table over the
+    loaded Velorona layers) and Results / Evidence (the selected-feature
+    investigation). The evidence drawer is unchanged -- Records is an
+    additional way in, not a replacement."""
+
+    def __init__(self, parent=None):
+        super().__init__("Velorona", parent)
+        # A stable object name is what lets QGIS list the panel under
+        # View > Panels and restore it across sessions after the user closes it.
+        self.setObjectName("VeloronaDock")
+        self.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
+        self._result = None
+        self._dark = True
+        self.elevation_profile_requested = None  # callable, set by plugin.py
+        self.map_appearance_changed = None       # callable, set by plugin.py
+
+        evidence = QWidget(self)
+        layout = QVBoxLayout(evidence)
+        layout.setContentsMargins(6, 6, 6, 6)
+        self.browser = QTextBrowser(evidence)
         button_row = QHBoxLayout()
-        self.export_button = QPushButton("Export as CSV...", container)
+        self.export_button = QPushButton("Export as CSV...", evidence)
         self.export_button.clicked.connect(self._on_export_clicked)
-        self.elevation_button = QPushButton("Open Elevation Profile", container)
+        self.export_button.hide()
+        self.elevation_button = QPushButton("Open Elevation Profile", evidence)
         self.elevation_button.clicked.connect(self._on_elevation_clicked)
         self.elevation_button.hide()
         button_row.addWidget(self.export_button)
         button_row.addWidget(self.elevation_button)
         layout.addWidget(self.browser)
         layout.addLayout(button_row)
-        self.setWidget(container)
+
+        self.records = VeloronaRecordsTable(self)
+        self.tabs = QTabWidget(self)
+        self.tabs.addTab(self.records, "Records")
+        self.tabs.addTab(evidence, "Results / Evidence")
+        self._evidence_tab_index = 1
+
+        # A single compact control, not a settings system: the map appearance
+        # is Velorona's own, because this QGIS build offers no UI theme choice.
+        header = QWidget(self)
+        header.setObjectName("veloronaHeader")
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(8, 6, 8, 0)
+        map_label = QLabel("Map", header)
+        map_label.setObjectName("veloronaHeaderLabel")
+        self.appearance_combo = QComboBox(header)
+        self.appearance_combo.setObjectName("veloronaAppearance")
+        self.appearance_combo.addItem("Dark", "dark")
+        self.appearance_combo.addItem("Light", "light")
+        self.appearance_combo.setToolTip(
+            "Velorona basemap appearance. Changes only this map, never QGIS's own theme.")
+        self.appearance_combo.currentIndexChanged.connect(self._on_appearance_changed)
+        header_layout.addWidget(map_label)
+        header_layout.addWidget(self.appearance_combo)
+        header_layout.addStretch(1)
+
+        root = QWidget(self)
+        root.setObjectName("veloronaRoot")
+        root_layout = QVBoxLayout(root)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+        root_layout.addWidget(header)
+        root_layout.addWidget(self.tabs)
+        self._root = root
+        self.setWidget(root)
+        # Panel and map share one appearance, chosen in the header control --
+        # never split between a light panel and a dark map.
+        self.set_map_appearance(DEFAULT_APPEARANCE)
+
+    def set_map_appearance(self, appearance: str) -> None:
+        """Reflect the plugin's current appearance in the control without
+        re-emitting a change back to it."""
+        index = self.appearance_combo.findData(appearance)
+        if index < 0:
+            return
+        self.appearance_combo.blockSignals(True)
+        self.appearance_combo.setCurrentIndex(index)
+        self.appearance_combo.blockSignals(False)
+        self._dark = appearance == "dark"
+        self._root.setStyleSheet(theme.widget_stylesheet(self._dark))
+        self._rerender()
+
+    def _on_appearance_changed(self, _index):
+        appearance = self.appearance_combo.currentData()
+        self._dark = appearance == "dark"
+        self._root.setStyleSheet(theme.widget_stylesheet(self._dark))
+        self._rerender()
+        if self.map_appearance_changed is not None:
+            self.map_appearance_changed(appearance)
+
+    def _rerender(self) -> None:
+        if self._result is None:
+            self.browser.setHtml(report_style(self._dark) + EMPTY_STATE)
+        else:
+            self.browser.setHtml(_render_html(self._result, self._dark))
 
     def show_result(self, result) -> None:
         self._result = result
-        self.browser.setHtml(_render_html(result))
+        self.browser.setHtml(_render_html(result, getattr(self, "_dark", True)))
         self.elevation_button.setVisible(result.kind == "terrestrial")
         self.export_button.setVisible(result.kind != "satellite-earth-space")
+        self.tabs.setCurrentIndex(self._evidence_tab_index)
+
+    def show_empty_state(self) -> None:
+        self._result = None
+        self.browser.setHtml(report_style(getattr(self, "_dark", True)) + EMPTY_STATE)
+        self.export_button.hide()
+        self.elevation_button.hide()
 
     def _on_export_clicked(self):
         if self._result is None:
@@ -78,10 +180,15 @@ def _esc(value) -> str:
     return html.escape(str(value)) if value is not None else ""
 
 
-def _field_row(label: str, value) -> str:
+def _field_row(label: str, value, note: str = None) -> str:
+    """One label/value row. `note` is a short qualifier (for example the
+    provenance of a parameter) rendered as muted text -- passed separately and
+    escaped here, never concatenated into `value` as markup, which would be
+    escaped and shown to the user as literal HTML."""
     if value is None or value == "":
         return ""
-    return f"<tr><td class='fk'>{_esc(label)}</td><td>{_esc(value)}</td></tr>"
+    note_html = f" <span class='note'>{_esc(note)}</span>" if note else ""
+    return f"<tr><td class='fk'>{_esc(label)}</td><td>{_esc(value)}{note_html}</td></tr>"
 
 
 def _field_row_checked(d: dict, key: str, label: str, formatter=None) -> str:
@@ -98,36 +205,31 @@ def _field_row_checked(d: dict, key: str, label: str, formatter=None) -> str:
     return _field_row(label, formatter(value) if formatter else value)
 
 
+def _sub_section(label: str, rows: str) -> str:
+    if not rows.strip():
+        return ""
+    return f"<div class='sub'>{_esc(label)}</div><table cellpadding='2'>{rows}</table>"
+
+
 def _section_html(label: str, rows: str) -> str:
     if not rows.strip():
         return ""
     return f"<div class='sec'>{_esc(label)}</div><table cellpadding='3'>{rows}</table>"
 
 
-_STYLE = """
-<style>
-body { font-family: sans-serif; font-size: 12.5px; }
-.kicker { font-size: 10px; letter-spacing: 0.06em; color: #888; margin-bottom: 2px; }
-h3 { margin: 0 0 10px; font-size: 14px; }
-.sec { font-size: 10.5px; letter-spacing: 0.04em; color: #888; text-transform: uppercase;
-       margin: 12px 0 3px; border-top: 1px solid #444; padding-top: 6px; }
-table { border-collapse: collapse; width: 100%; margin-bottom: 2px; }
-td { padding: 1px 6px 1px 0; vertical-align: top; }
-td.fk { color: #999; white-space: nowrap; }
-td.nd { color: #777; font-style: italic; }
-.caveat { color: #888; font-size: 11px; margin: 4px 0; }
-.src { color: #999; font-size: 11px; margin: 2px 0 8px; }
-.assumption { font-size: 11px; background: rgba(128,128,128,0.12); padding: 4px 6px;
-              white-space: pre-wrap; margin: 2px 0; }
-p { margin: 3px 0; }
-</style>
-"""
 
 
-def _render_html(result) -> str:
+
+def report_style(dark: bool = True) -> str:
+    return theme.report_stylesheet(dark)
+
+
+def _render_html(result, dark: bool = True) -> str:
     renderers = {
         "site": _render_site_feature,
         "link": _render_link_feature,
+        "link-investigation": _render_link_investigation,
+        "selection-summary": _render_selection_summary,
         "satellite": _render_satellite_feature,
         "ground-station": _render_ground_station_feature,
         "terrestrial": _render_terrestrial,
@@ -136,8 +238,8 @@ def _render_html(result) -> str:
     }
     renderer = renderers.get(result.kind)
     if renderer is None:
-        return _STYLE + f"<p>Unknown result kind: {_esc(result.kind)}</p>"
-    return _STYLE + renderer(result)
+        return report_style(dark) + f"<p>Unknown result kind: {_esc(result.kind)}</p>"
+    return report_style(dark) + renderer(result)
 
 
 # ---------------------------------------------------------------------
@@ -271,7 +373,8 @@ def _render_ground_station_feature(entry) -> str:
 
 def _render_terrestrial(result) -> str:
     r = result.result
-    status_color = {"clear": "#2ca25f", "marginal": "#e6b800", "obstructed": "#d7191c"}[r.los_status]
+    status_color = {"clear": theme.CLEAR, "marginal": theme.MARGINAL,
+                    "obstructed": theme.OBSTRUCTED}[r.los_status]
     badge = f"<b style='color:{status_color}'>{_esc((r.near_threshold and 'NEAR THRESHOLD') or r.los_status.upper())}</b>"
 
     height_a_note = "from feature attribute" if result.site_a_height_from_feature else "default shown in dialog, user-confirmed"
@@ -342,10 +445,7 @@ def _render_weather_evidence_site(rep) -> str:
     elif station is not None:
         calculated += _field_row("Difference", "not calculable (see note)")
 
-    level_color = {
-        "consistent": "#2ca25f", "moderate_disagreement": "#e6b800",
-        "high_disagreement": "#d7191c", "insufficient_evidence": "#888888",
-    }[rep.level]
+    level_color = theme.REPRESENTATIVENESS_COLORS[rep.level]
     level_label = rep.level.replace("_", " ").title()
     interpreted = f"<p><b style='color:{level_color}'>{_esc(level_label)}</b></p><p>{_esc(rep.note)}</p>"
     if rep.level == "insufficient_evidence":
@@ -365,10 +465,238 @@ def _render_weather_evidence_site(rep) -> str:
     return f"<p><b>{_esc(rep.site.name)}</b></p>{body}"
 
 
+def _render_endpoint_weather(label, rep, point) -> str:
+    """One link endpoint: what was observed there, the independent evidence
+    that corroborates or contradicts it, and how representative it is.
+
+    Every field the previous layout carried is still here -- this groups them
+    instead of dropping them, and the endpoint is named once."""
+    lat, lon = point or (None, None)
+    coords = f"{lat:.5f}, {lon:.5f}" if lat is not None else NOT_DETERMINED
+    head = f"<div class='site'>{_esc(label)}<span class='coord'>{_esc(coords)}</span></div>"
+    if rep is None:
+        return head + f"<p class='caveat'>{NOT_DETERMINED} &mdash; no weather evidence retrieved for this endpoint.</p>"
+
+    model = rep.model_observation
+    observed = ""
+    if model is not None:
+        observed += _field_row("Temperature", f"{model.temperature_c:.1f} °C" if model.temperature_c is not None else NOT_DETERMINED)
+        observed += _field_row("Precipitation", f"{model.rain_rate_mm_h:.1f} mm/h" if model.rain_rate_mm_h is not None else NOT_DETERMINED)
+        observed += _field_row("Wind", f"{model.wind_speed_kmh:.1f} km/h" if model.wind_speed_kmh is not None else NOT_DETERMINED)
+        observed += _field_row("Observation time", model.timestamp)
+        observed += _field_row("Source", model.source)
+    else:
+        observed += _field_row("Model observation", NOT_DETERMINED, "provider unavailable")
+    # Not carried by the providers wired into this analysis -- stated so the
+    # absence is explicit rather than looking like an omission.
+    observed += _field_row("Humidity", NOT_DETERMINED, "not published by this source")
+    observed += _field_row("Pressure", NOT_DETERMINED, "not published by this source")
+
+    station = rep.nearest_station
+    independent = ""
+    if station is not None:
+        independent += _field_row("Nearest ECCC station", station.source)
+        independent += _field_row("Station distance", f"{rep.station_distance_km:.1f} km")
+        independent += _field_row("Station time", station.timestamp)
+        independent += _field_row(
+            "Station precipitation",
+            f"{station.rain_rate_mm_h:.1f} mm/h" if rep.station_reports_precipitation else NOT_DETERMINED,
+            None if rep.station_reports_precipitation else "not published by this station")
+    else:
+        independent += _field_row("Nearest ECCC station", NOT_DETERMINED,
+                                  "none reported in the last 90 minutes within the search radius")
+    if rep.model_observation is not None:
+        independent += _field_row("Model precipitation",
+                                  f"{rep.model_observation.rain_rate_mm_h:.1f} mm/h", rep.model_observation.source)
+    if rep.radar_observation is not None:
+        independent += _field_row("Radar precipitation", f"{rep.radar_observation.rain_rate_mm_h:.1f} mm/h",
+                                  f"estimated, {rep.radar_observation.timestamp}")
+    elif station is not None:
+        independent += _field_row("Radar precipitation", NOT_DETERMINED, "not available for this location/time")
+    if rep.precipitation_difference_mm_h is not None:
+        independent += _field_row("Station vs. model", f"{rep.precipitation_difference_mm_h:.1f} mm/h")
+    elif station is not None:
+        independent += _field_row("Station vs. model", NOT_DETERMINED, "not calculable -- see note")
+
+    level_color = theme.REPRESENTATIVENESS_COLORS[rep.level]
+    level_label = rep.level.replace("_", " ").title()
+    assessment = (
+        f"<p><span class='pill' style='color:{level_color}'>{_esc(level_label)}</span></p>"
+        f"<p class='note'>{_esc(rep.note)}</p>"
+    )
+    if rep.level == "insufficient_evidence":
+        assessment += ("<p class='caveat'>An honest, expected result when nearby evidence is thin "
+                       "-- not an error and not a low-risk result.</p>")
+
+    return (head
+            + _sub_section("Observed", observed)
+            + _sub_section("Independent evidence", independent)
+            + "<div class='sub'>Representativeness</div>" + assessment)
+
+
+def _render_selection_summary(result) -> str:
+    """Several features selected: what can be said about the group from the
+    records themselves, and a compact listing while the selection is small
+    enough to be worth listing. No weather, no per-link analysis."""
+    overview = _field_row(f"{result.kind_label} selected", f"{result.count:,}")
+    if result.licensees:
+        shown = ", ".join(result.licensees[:6])
+        more = f" +{len(result.licensees) - 6} more" if len(result.licensees) > 6 else ""
+        overview += _field_row("Unique licensees", f"{len(result.licensees):,}", shown + more)
+    if result.frequency_range:
+        low, high = result.frequency_range
+        overview += _field_row("Published frequency range",
+                               f"{low:,.1f} - {high:,.1f} MHz" if low != high else f"{low:,.1f} MHz")
+    if result.extent_wgs84:
+        x0, y0, x1, y1 = result.extent_wgs84
+        overview += _field_row("Geographic extent",
+                               f"{y0:.3f} to {y1:.3f} lat, {x0:.3f} to {x1:.3f} lon")
+    if result.scanned < result.count:
+        overview += _field_row("Figures based on", f"the first {result.scanned:,} selected records",
+                               "selection capped for responsiveness")
+
+    parts = [
+        f"<div class='kicker'>{_esc(result.kind_label.upper())}</div>",
+        f"<h3>{result.count:,} selected</h3>",
+        _section_html("Overview", overview),
+    ]
+
+    if result.count > result.table_limit:
+        parts.append(
+            "<div class='sec'>Endpoint evidence</div>"
+            f"<p>This selection is too large for endpoint-level weather analysis.</p>"
+            "<p class='caveat'>Use Records to narrow the selection, or select a single link for the "
+            "full investigation. Nothing was fetched for this selection.</p>")
+    else:
+        parts.append(
+            "<div class='sec'>Endpoint evidence</div>"
+            "<p>Endpoint-level weather evidence is available when a single link is selected.</p>")
+        if result.rows:
+            header = "".join(f"<th>{_esc(label)}</th>" for label in result.columns)
+            body = "".join(
+                "<tr>" + "".join(f"<td>{_esc(cell)}</td>" for cell in row) + "</tr>"
+                for row in result.rows)
+            parts.append(f"<div class='sec'>Selected {_esc(result.kind_label.lower())}</div>"
+                         f"<table class='grid'><tr>{header}</tr>{body}</table>")
+
+    parts.append("<p class='caveat'>Group figures are read from the selected public records only. "
+                 "No weather observation is attributed to a group of links, and no group-level "
+                 "condition is inferred.</p>")
+    return "".join(parts)
+
+
+def _render_link_investigation(result) -> str:
+    """Fixed Service link identity, the weather evidence at both endpoints, the
+    engineering calculation, and what it supports -- in that order."""
+    entry = result.entry
+    d = entry.data
+    exposure = result.exposure
+    origins = result.param_origins or {}
+    title = d.get("authorization_number") or d.get("licensee") or "Fixed Service link"
+
+    def note_for(key):
+        found = origins.get(key)
+        return found[0] if found else None
+
+    identity = (_field_row("Authorization", d.get("authorization_number") or NOT_DETERMINED)
+                + _field_row("Licensee", d.get("licensee") or NOT_DETERMINED))
+    technical = (
+        _field_row("Frequency", f"{d.get('frequencies_mhz')} MHz" if d.get("frequencies_mhz") else NOT_DETERMINED,
+                   note_for("frequency_ghz"))
+        + _field_row("In-service date", d.get("in_service_date") or NOT_DETERMINED)
+    )
+    a_lat, a_lon = entry.site_a_point or (None, None)
+    b_lat, b_lon = entry.site_b_point or (None, None)
+    endpoints = (
+        _field_row("Site A", f"{a_lat:.5f}, {a_lon:.5f}" if a_lat is not None else NOT_DETERMINED)
+        + _field_row("Site B", f"{b_lat:.5f}, {b_lon:.5f}" if b_lat is not None else NOT_DETERMINED)
+    )
+
+    parts = [
+        "<div class='kicker'>FIXED SERVICE LINK</div>",
+        f"<h3>{_esc(title)}</h3>",
+        _section_html("Identity", identity),
+        _section_html("Technical", technical),
+        _section_html("Endpoints", endpoints),
+        "<div class='sec'>Weather evidence</div>",
+    ]
+
+    if exposure is None:
+        parts.append(f"<p>{NOT_DETERMINED} &mdash; live weather evidence could not be retrieved for this link.</p>"
+                     f"<p class='caveat'>{_esc(result.weather_error or 'Weather provider unavailable.')}</p>")
+    else:
+        reps = list(exposure.representativeness.values())
+        parts.append(_render_endpoint_weather("Site A", reps[0] if reps else None, entry.site_a_point))
+        parts.append(_render_endpoint_weather("Site B", reps[1] if len(reps) > 1 else None, entry.site_b_point))
+
+        exp = exposure.exposure
+        att = exp.attenuation
+        severity_color = theme.SEVERITY_COLORS[exp.severity]
+        calculated = (
+            _field_row("Rain rate used", f"{exp.rain_rate_mm_h:.1f} mm/h", f"driver: {exp.source_site_id}")
+            + _field_row("Frequency used", f"{att.freq_ghz:.3f} GHz", note_for("frequency_ghz"))
+            + _field_row("Polarization", att.polarization, note_for("polarization"))
+            + _field_row("Fade margin", f"{exp.link.fade_margin_db:.0f} dB", note_for("fade_margin_db"))
+            + _field_row("Path length", f"{att.path_length_km:.2f} km")
+            + _field_row("Specific attenuation", f"{att.specific_attenuation_db_km:.4f} dB/km")
+            + _field_row("Predicted rain attenuation", f"{att.predicted_attenuation_db:.2f} dB")
+            + _field_row("Exposure ratio", f"{exp.exposure_ratio * 100:.0f}%")
+            + _field_row("Method", att.method)
+        )
+        parts.append(_section_html("Calculated exposure", calculated))
+        parts.append("<div class='sec'>Assessment</div>")
+        parts.append(f"<p><span class='pill' style='color:{severity_color}'>{_esc(exp.severity.title())}</span></p>"
+                     f"<p>{_esc(exp.operational_note)}</p>")
+        parts.append("<table cellpadding='3'>"
+                     + _field_row("Hardware condition", NOT_DETERMINED,
+                                  "no hardware telemetry input to this analysis")
+                     + "</table>")
+        if exposure.weather_errors:
+            notices = "".join(_field_row(key, message) for key, message in exposure.weather_errors.items())
+            parts.append(_section_html("Notices", notices))
+
+    connected_total = (result.connected_site_a or 0) + (result.connected_site_b or 0)
+    if connected_total:
+        shared = []
+        if result.connected_site_a:
+            shared.append(f"Site A ({result.connected_site_a})")
+        if result.connected_site_b:
+            shared.append(f"Site B ({result.connected_site_b})")
+        context_rows = (
+            _field_row("Connected links", f"{connected_total}")
+            + _field_row("Shared endpoint", " · ".join(shared))
+        )
+        parts.append(_section_html("Network context", context_rows))
+        parts.append("<p class='caveat'>Links terminating at this link's own endpoints in the same "
+                     "public record, shown on the map for spatial context only. Confirmed shared "
+                     "endpoints, never proximity. No fault propagation is inferred and no weather "
+                     "was retrieved for them.</p>")
+    else:
+        parts.append(_section_html("Network context",
+                                   _field_row("Connected links", "0",
+                                              "no other link in the record shares an endpoint")))
+
+    assumptions = "".join(
+        _field_row(key.replace("_", " ").title(), kind_, note)
+        for key, (kind_, note) in origins.items()
+    )
+    provenance = (
+        _field_row("Source", d.get("source"))
+        + _field_row("Coverage", d.get("coverage"))
+        + _field_row("Pairing", "Shared authorization number, two distinct coordinates",
+                     "not inferred from proximity or frequency")
+        + assumptions
+    )
+    parts.append(_section_html("Provenance and limitations", provenance))
+    parts.append("<p class='caveat'>Weather evidence supports or weakens weather as a plausible contributor. "
+                 "It does not determine hardware condition, and it is not an outage prediction.</p>")
+    return "".join(parts)
+
+
 def _render_microwave(result) -> str:
     exp = result.exposure
     link = exp.link
-    severity_color = {"low": "#2ca25f", "moderate": "#e6b800", "high": "#d7191c"}[exp.severity]
+    severity_color = theme.SEVERITY_COLORS[exp.severity]
     severity_label = exp.severity.title()
 
     observed = f"<p>{_esc(exp.rain_rate_assumption)}</p>" + f"<p>Rain rate used: <b>{exp.rain_rate_mm_h:.1f} mm/h</b></p>"
@@ -421,7 +749,7 @@ def _render_microwave(result) -> str:
 # ---------------------------------------------------------------------
 
 def _render_satellite_analysis(result) -> str:
-    badge_color = "#2ca25f" if result.visible else "#d7191c"
+    badge_color = theme.CLEAR if result.visible else theme.OBSTRUCTED
     geometry = (
         _field_row("Elevation angle", f"{result.elevation_deg:.2f}°")
         + _field_row("Azimuth", f"{result.azimuth_deg:.2f}°")

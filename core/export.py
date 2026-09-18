@@ -93,6 +93,8 @@ def result_to_csv(result) -> str:
         return _terrestrial_to_csv(result)
     if result.kind == "microwave-exposure":
         return _microwave_to_csv(result)
+    if result.kind == "link-investigation":
+        return _link_investigation_to_csv(result)
     if result.kind == "link":
         return link_feature_to_csv(result.data, result.site_a_point, result.site_b_point)
     if result.kind in ("site", "satellite", "ground-station"):
@@ -192,7 +194,19 @@ def _microwave_to_csv(result) -> str:
         _evidence_row("Hardware condition", "Inferred", "", interpretation=f"{NOT_DETERMINED} -- no hardware telemetry input to this analysis."),
     ]
 
-    for rep in result.representativeness.values():
+    rows.extend(_representativeness_rows(result.representativeness))
+
+    for row in rows:
+        writer.writerow(row)
+    return buf.getvalue()
+
+
+def _representativeness_rows(representativeness) -> list:
+    """Per-endpoint weather evidence rows, shared by the standalone microwave
+    export and the Fixed Service link investigation export so the two cannot
+    disagree about what the weather evidence said."""
+    rows = []
+    for rep in representativeness.values():
         site_label = rep.site.name
         station = rep.nearest_station
         if station is not None:
@@ -233,6 +247,92 @@ def _microwave_to_csv(result) -> str:
 
         rows.append(_evidence_row(f"Weather representativeness ({site_label})", "Inferred", "aei_mw_exposure",
                                    interpretation=f"{rep.level.replace('_', ' ').upper()} -- {rep.note}"))
+    return rows
+
+
+def _link_investigation_to_csv(result) -> str:
+    """Fixed Service link investigation: the record's own identity plus the
+    same weather evidence the Results/Evidence panel showed. UI and export come
+    from one analysis, so they cannot disagree; when weather could not be
+    retrieved the limitation is exported rather than a substituted value."""
+    entry = result.entry
+    d = entry.data
+    origins = result.param_origins or {}
+    authorization = d.get("authorization_number") or d.get("id") or "Fixed Service link"
+    source = d.get("source") or "ISED Fixed Service extract"
+
+    preamble = _preamble([
+        "Velorona QGIS -- Fixed Service link investigation export",
+        f"Authorization: {authorization}",
+        "Evidence of weather, not a hardware diagnosis or an outage prediction.",
+        f"Generated: {datetime.now(timezone.utc).isoformat()}",
+    ])
+    buf = io.StringIO()
+    buf.write(preamble)
+    writer = csv.writer(buf)
+    writer.writerow(EVIDENCE_HEADER)
+
+    a_lat, a_lon = entry.site_a_point or (None, None)
+    b_lat, b_lon = entry.site_b_point or (None, None)
+    rows = [
+        _evidence_row("Authorization", "Observed", source, observation_input=authorization),
+        _evidence_row("Licensee", "Observed", source, observation_input=d.get("licensee") or NOT_DETERMINED),
+        _evidence_row("In-service date", "Observed", source, observation_input=d.get("in_service_date") or NOT_DETERMINED),
+        _evidence_row("Published frequencies", "Observed", source,
+                      observation_input=(f"{d.get('frequencies_mhz')} MHz" if d.get("frequencies_mhz") else NOT_DETERMINED)),
+        _evidence_row("Site A location", "Observed", source,
+                      observation_input=(f"{a_lat:.5f}, {a_lon:.5f}" if a_lat is not None else NOT_DETERMINED)),
+        _evidence_row("Site B location", "Observed", source,
+                      observation_input=(f"{b_lat:.5f}, {b_lon:.5f}" if b_lat is not None else NOT_DETERMINED)),
+        _evidence_row("Link pairing", "Observed", source,
+                      observation_input="Shared authorization number, two distinct coordinates",
+                      interpretation="Not inferred from proximity or frequency."),
+        _evidence_row("Coverage", "Observed", source, observation_input=d.get("coverage") or NOT_DETERMINED),
+    ]
+
+    if result.exposure is None:
+        rows.append(_evidence_row(
+            "Weather evidence", "Observed", "Open-Meteo / ECCC", observation_input=NOT_DETERMINED,
+            interpretation=(result.weather_error or "Live weather services were unavailable for this link.")))
+    else:
+        e = result.exposure.exposure
+        link = e.link
+        att = e.attenuation
+        freq_kind, freq_note = origins.get("frequency_ghz", ("Observed", ""))
+        pol_kind, pol_note = origins.get("polarization", ("Observed", ""))
+        fade_kind, fade_note = origins.get("fade_margin_db", ("Observed", ""))
+        rows += [
+            _evidence_row("Rain rate used", "Observed", f"Open-Meteo ({e.source_site_id})",
+                          observation_input=f"{e.rain_rate_mm_h:.1f} mm/h", interpretation=e.rain_rate_assumption),
+            # Type stays in the canonical Observed/Calculated/Inferred vocabulary;
+            # whether a parameter came from the public record or is an engine
+            # assumption is carried in Source, the same convention the standalone
+            # microwave export already uses for user-entered link parameters.
+            _evidence_row("Frequency used for attenuation", "Observed",
+                          source if freq_kind == "Observed"
+                          else "aei_mw_exposure default -- not published in the ISED Fixed Service extract",
+                          observation_input=f"{link.frequency_ghz:.3f} GHz", interpretation=freq_note),
+            _evidence_row("Polarization", "Observed",
+                          source if pol_kind == "Observed"
+                          else "aei_mw_exposure default -- not published in the ISED Fixed Service extract",
+                          observation_input=f"{link.polarization}", interpretation=pol_note),
+            _evidence_row("Fade margin", "Observed",
+                          source if fade_kind == "Observed"
+                          else "aei_mw_exposure default -- not published in the ISED Fixed Service extract",
+                          observation_input=f"{link.fade_margin_db:.0f} dB", interpretation=fade_note),
+            _evidence_row("Path length", "Calculated", "aei_mw_exposure (haversine)",
+                          calculated_result=f"{att.path_length_km:.2f} km"),
+            _evidence_row("Predicted rain attenuation", "Calculated", f"aei_mw_exposure ({att.method})",
+                          observation_input=f"{e.rain_rate_mm_h:.1f} mm/h, {link.frequency_ghz:.3f} GHz, {link.polarization}, {att.path_length_km:.2f} km",
+                          calculated_result=f"{att.predicted_attenuation_db:.2f} dB", interpretation=att.assumption),
+            _evidence_row("Exposure ratio", "Calculated", "aei_mw_exposure (predicted attenuation / fade margin)",
+                          calculated_result=f"{e.exposure_ratio * 100:.0f}%"),
+            _evidence_row("Severity", "Inferred", "aei_mw_exposure",
+                          interpretation=f"{e.severity.upper()} -- {e.operational_note}"),
+            _evidence_row("Hardware condition", "Inferred", "",
+                          interpretation=f"{NOT_DETERMINED} -- no hardware telemetry input to this analysis."),
+        ]
+        rows.extend(_representativeness_rows(result.exposure.representativeness))
 
     for row in rows:
         writer.writerow(row)
