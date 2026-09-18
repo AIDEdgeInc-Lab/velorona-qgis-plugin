@@ -96,6 +96,30 @@ def _fmt_extent(extent) -> str:
     return ", ".join(f"{value:.5f}" for value in extent)
 
 
+# A regional selection can span dozens of licensees (46 on a 1,455-link
+# Golden Horseshoe selection), and one preamble line carrying all of them is
+# unreadable in a CSV header. The names are truncated to a budget; the COUNT on
+# the line above is never truncated, so the real figure is always present and
+# the omission is presentational only, never a loss of the number.
+LICENSEE_PREVIEW_ITEMS = 12
+LICENSEE_PREVIEW_CHARS = 400
+
+
+def _licensee_preview(licensees) -> str:
+    """Licensee names up to a readable budget, then an explicit remainder."""
+    shown, used = [], 0
+    for name in licensees:
+        if len(shown) >= LICENSEE_PREVIEW_ITEMS or used + len(name) > LICENSEE_PREVIEW_CHARS:
+            break
+        shown.append(name)
+        used += len(name) + 3  # the " | " separator
+    remaining = len(licensees) - len(shown)
+    if not shown:  # a single pathologically long name still has to say something
+        return f"... {remaining:,} licensee(s), all names too long to list here"
+    text = " | ".join(shown)
+    return text + (f" ... and {remaining:,} more" if remaining else "")
+
+
 def selection_summary_to_csv(result) -> str:
     """A multi-record selection: one row per selected public record.
 
@@ -140,7 +164,7 @@ def selection_summary_to_csv(result) -> str:
 
     if result.licensees:
         lines.append(f"Distinct licensees: {len(result.licensees):,}")
-        lines.append("Licensees: " + " | ".join(result.licensees))
+        lines.append("Licensees: " + _licensee_preview(result.licensees))
     else:
         lines.append("Distinct licensees: " + NOT_DETERMINED
                      + " -- the selected records carry no licensee field")
@@ -165,8 +189,8 @@ def selection_summary_to_csv(result) -> str:
     if not rows and count:
         lines.append(
             f"Per-record listing: {NOT_DETERMINED} -- the selection exceeds the "
-            f"{result.table_limit:,}-record listing limit, so no rows were captured. "
-            f"Narrow the selection to {result.table_limit:,} records or fewer to "
+            f"{result.listing_limit:,}-record export limit, so no rows were captured. "
+            f"Narrow the selection to {result.listing_limit:,} records or fewer to "
             f"include them.")
 
     buf = io.StringIO()

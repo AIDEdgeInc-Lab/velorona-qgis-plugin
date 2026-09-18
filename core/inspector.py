@@ -53,7 +53,11 @@ class SelectionSummary:
     extent_wgs84: Optional[Tuple[float, float, float, float]] = None
     columns: list = field(default_factory=list)
     rows: list = field(default_factory=list)
+    # What the dock and Records widget will draw (rendering budget).
     table_limit: int = 200
+    # What was captured for export (reading budget) -- far larger, because
+    # nothing is rendered. See plugin.py's selection budget comment.
+    listing_limit: int = 25000
     # The layer-level filter the selection was made through, so the export can
     # state which subset the records were drawn from. Empty means unfiltered.
     licensee_filter: str = ""
