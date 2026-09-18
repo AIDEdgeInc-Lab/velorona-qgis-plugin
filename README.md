@@ -43,23 +43,55 @@ Three, all reused unmodified:
   (elevation, azimuth, slant range, visibility) between a selected ground
   station and satellite.
 
+## Records (the Velorona dock)
+
+The Velorona dock has two tabs. **Records** is a curated table over the
+Velorona layers already loaded — dataset picker, search, sortable columns —
+so you can browse and find a link without reading QGIS's generic Attribute
+Table (which stays available if you want it). Selecting a row selects that
+feature on the map and opens its evidence; selecting a feature on the map
+highlights its row.
+
 ## Evidence (the Results/Evidence dock)
 
 Every result is organized into sections, never QGIS's generic Attribute
-Table, labeled Observed / Calculated / Inferred wherever the underlying
-result distinguishes them (currently: Microwave Weather Exposure). See
+Table, labeled Observed / Calculated / Inferred. Terrestrial Path Clearance
+and Microwave Weather Exposure both export the full canonical structure. See
 `docs/EVIDENCE_EXPORT_AUDIT.md` for the exact current export schema and
 known gaps against a canonical Evidence/Type/Source/Observation-Input/
 Calculated-result/Interpretation structure.
 
 ## Requirements
 
-QGIS 3.22–4.99, with `aei-microwave-link-exposure`, `aei-link-clearance`,
-and `skyfield` installed into QGIS's own Python environment (not your
-system Python) — see `docs/` for the exact install commands verified
-against this project's QGIS install.
+QGIS 4.0–4.99 (validated against QGIS 4.2.2 / Qt 6.11.1 / Python 3.12), with
+`aei-microwave-link-exposure`, `aei-link-clearance`, `aei-geo-features` and
+`skyfield` installed into QGIS's own Python environment (not your system
+Python). On macOS that interpreter is:
+
+```
+/Applications/QGIS-final-4_2_2.app/Contents/MacOS/python3.12 -m pip install \
+    skyfield aei-microwave-link-exposure aei-link-clearance aei-geo-features
+```
+
+The ISED Fixed Service and SatNOGS snapshots the Explore step needs are
+bundled in `data/` — no extra download or configuration.
+
+## Dark workspace
+
+Velorona's dock inherits the QGIS palette and hard-codes no background
+colours, so it follows whatever application theme you choose. To match the
+CARTO Dark Matter basemap, set QGIS itself to a dark theme:
+
+Settings → Options → General → **UI Theme → Night Mapping**, then restart
+QGIS. Velorona does not change this setting for you — it is a global QGIS
+preference that affects every plugin and project.
+
+## Install
+
+Plugins → Manage and Install Plugins → Install from ZIP, and pick
+`velorona-1.0.0.zip`.
 
 ## Status
 
-Experimental / local development plugin — not yet packaged for the QGIS
-Plugin Repository.
+Version 1.0.0. Packaged and clean-profile install tested for QGIS 4.x. Not
+yet submitted to the QGIS Plugin Repository.

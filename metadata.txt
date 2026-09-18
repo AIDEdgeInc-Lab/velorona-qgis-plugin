@@ -1,14 +1,28 @@
 [general]
 name=Velorona
-qgisMinimumVersion=3.22
+qgisMinimumVersion=4.0
 qgisMaximumVersion=4.99
 description=Telecom link evidence, inside QGIS. Explore -> Select -> Analyze -> Evidence -> Export.
-version=0.2.0
+version=1.0.0
 author=AID Edge Inc.
 email=sara.khosravi.ds@gmail.com
-about=Velorona for QGIS -- Telecom link evidence, inside QGIS. 1. Explore -- Load public telecom infrastructure and your own data. 2. Select -- Choose a site, link, or two endpoints. 3. Analyze -- Run path clearance, microwave weather exposure, or satellite geometry. 4. Evidence -- See what is observed, what is calculated, and what is inferred. 5. Export -- Take the evidence with you as a structured CSV/GeoJSON result. Three analysis engines, all reused unmodified: Terrestrial Path Clearance (aei_link_clearance), Microwave Weather Exposure (aei_mw_exposure), Satellite/Earth-Space look angles (skyfield/SGP4). Requires aei-microwave-link-exposure, aei-link-clearance, and skyfield to be installed in QGIS's own Python environment.
-tracker=https://github.com/AIDEdgeInc-Lab/aei-microwave-link-exposure/issues
+about=Velorona for QGIS -- Telecom link evidence, inside QGIS. 1. Explore -- Load public telecom infrastructure and your own data. 2. Select -- Choose a site, link, or two endpoints. 3. Analyze -- Run path clearance, microwave weather exposure, or satellite geometry. 4. Evidence -- See what is observed, what is calculated, and what is inferred. 5. Export -- Take the evidence with you as a structured CSV/GeoJSON result. Three analysis engines, all reused unmodified: Terrestrial Path Clearance (aei_link_clearance), Microwave Weather Exposure (aei_mw_exposure), Satellite/Earth-Space look angles (skyfield/SGP4). Requires aei-microwave-link-exposure, aei-link-clearance, aei-geo-features, and skyfield to be installed in QGIS's own Python environment.
+changelog=1.0.0 - First production release. The ISED Fixed Service and SatNOGS ground-station
+    snapshots are bundled with the plugin, so Explore no longer depends on files outside the plugin
+    directory. Qt6/PyQt6 hardening: the Results Dock and both analysis parameter dialogs used
+    PyQt5-only idioms that raised AttributeError on first use under QGIS 4, and a checker
+    (tools/check_qt6_enums.py) now guards that whole class of defect. Viewport performance: the live
+    tower/cellular queries are debounced, skipped entirely while their layers are hidden,
+    deduplicated per viewport, and served from a bounded session cache with negative caching, so
+    returning to an already-visited extent costs no network. The initial extent is derived from the
+    terrestrial home layers instead of the global space layers. Plugin unload is idempotent and
+    cleans its own analysis overlays while leaving loaded public data in place.
+    0.2.0 - Experimental local development plugin.
+; No Velorona-specific repository or issue tracker exists yet. Both are
+; required by plugins.qgis.org and must be set before submission; they are
+; left unset rather than pointed at an unrelated project's tracker.
+tracker=
 repository=
-experimental=True
+experimental=False
 category=Plugins
 hasProcessingProvider=no
