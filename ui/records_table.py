@@ -198,20 +198,46 @@ class VeloronaRecordsTable(QWidget):
         super().__init__(parent)
         self._layers = {}       # source_key -> QgsVectorLayer
         self._current_key = None
+        # The authoritative active operator, set by set_active_operator()
+        # rather than read back off self.licensee_combo.currentData(): the
+        # combo only reflects a filter that was CHOSEN THROUGH IT, and
+        # plugin.set_licensee_filter() is not exclusively driven by the
+        # combo's own signal (multi-record export and other callers can also
+        # set it). Reading the combo directly would leave the empty-state
+        # message wrong -- or silent -- for any filter applied that way.
+        self._active_operator = ""
         self._syncing = False
 
         self.dataset_combo = QComboBox(self)
-        # Licensee filter for the Fixed Service sites. The list is built from
-        # the loaded records -- no operator is hard-coded -- and choosing one
-        # filters the existing layer, so the map clusters and this table show
-        # the same subset without any new request.
+        # Operator filter across every layer that carries a 'licensee' field
+        # (Fixed Service sites, Fixed Service links, Cellular sites -- see
+        # layer_helpers.OPERATOR_SOURCE_KEYS). The list is built from the
+        # loaded records -- no operator is hard-coded -- and choosing one
+        # filters those layers in place, so the map clusters, this table and
+        # any selection/export see the same subset without a new request.
+        #
+        # Visible from the moment this widget is constructed, i.e. as soon as
+        # the Velorona dock opens -- never hidden behind picking a particular
+        # dataset tab, the way it used to be (shown only when Fixed Service
+        # sites happened to be selected). It starts disabled, with an empty
+        # list, until populate_licensees() has real counts to show; disabled
+        # communicates "not ready yet" without making the control disappear
+        # and reappear as the operator switches tabs.
+        self.operator_label = QLabel("Operator", self)
         self.licensee_combo = QComboBox(self)
         self.licensee_combo.setEditable(True)
         self.licensee_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        self.licensee_combo.lineEdit().setPlaceholderText("Filter by licensee...")
+        self.licensee_combo.lineEdit().setPlaceholderText("Filter by operator...")
         self.licensee_combo.setToolTip(
-            "Show only this licensee's Fixed Service site records. Counts are record counts.")
-        self.licensee_combo.setVisible(False)
+            "Show only this operator's records across Fixed Service sites, Fixed Service "
+            "links and Cellular sites. Counts are record counts.")
+        self.licensee_combo.setEnabled(False)
+        self.licensee_combo.addItem("Load Public Data to populate", "")
+        # Web Map parity: "N operator(s) from currently-loaded data"
+        # (aei-link-clearance/web/app.js: refreshOperatorDropdown()).
+        self.operator_hint = QLabel("", self)
+        self.operator_hint.setObjectName("veloronaOperatorHint")
+        self.operator_hint.setVisible(False)
         self.search_edit = QLineEdit(self)
         self.search_edit.setPlaceholderText("Search records...")
         self.search_edit.setClearButtonEnabled(True)
@@ -241,12 +267,14 @@ class VeloronaRecordsTable(QWidget):
         top = QHBoxLayout()
         top.addWidget(self.dataset_combo, 1)
         top.addWidget(self.search_edit, 2)
-        licensee_row = QHBoxLayout()
-        licensee_row.addWidget(self.licensee_combo, 1)
+        operator_row = QHBoxLayout()
+        operator_row.addWidget(self.operator_label)
+        operator_row.addWidget(self.licensee_combo, 1)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(6, 6, 6, 6)
         layout.addLayout(top)
-        layout.addLayout(licensee_row)
+        layout.addLayout(operator_row)
+        layout.addWidget(self.operator_hint)
         layout.addWidget(self.view, 1)
         layout.addWidget(self.status_label)
 
@@ -283,28 +311,45 @@ class VeloronaRecordsTable(QWidget):
         self.model.load(self._layers.get(key), key)
         self.view.resizeColumnsToContents()
         self._update_status()
-        # Only the Fixed Service sites carry a licensee worth filtering on.
-        self.licensee_combo.setVisible(key == layer_helpers.SOURCE_FIXED_SITES)
+        # The Operator combo itself stays visible and enabled regardless of
+        # which dataset tab is showing: it is a map-wide filter (Fixed
+        # Service sites, Fixed Service links and Cellular sites all filter
+        # together, see plugin.set_licensee_filter), not a per-tab control.
 
     def populate_licensees(self, counts) -> None:
-        """Fills the filter from the licensee values actually present in the
-        loaded records, most records first."""
+        """Fills the filter from the operator values actually present in the
+        loaded records (Fixed Service sites, Fixed Service links, Cellular
+        sites combined -- see plugin._operator_counts()), most records
+        first, and enables the control now that it has something real to
+        offer."""
         current = self.licensee_combo.currentData()
         self.licensee_combo.blockSignals(True)
         self.licensee_combo.clear()
         total = sum(counts.values())
-        self.licensee_combo.addItem(f"All licensees ({total:,} records)", "")
+        self.licensee_combo.addItem(f"All operators ({total:,} records)", "")
         for name, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
             self.licensee_combo.addItem(f"{name} ({count:,})", name)
         index = self.licensee_combo.findData(current) if current else 0
         self.licensee_combo.setCurrentIndex(max(0, index))
         self.licensee_combo.blockSignals(False)
+        self.licensee_combo.setEnabled(bool(counts))
+        self.operator_hint.setText(f"{len(counts):,} operator(s) from currently-loaded data.")
+        self.operator_hint.setVisible(bool(counts))
 
     def _on_licensee_changed(self, _index):
         self.licenseeChanged.emit(self.licensee_combo.currentData() or "")
 
     def current_source_key(self) -> str:
         return self._current_key or ""
+
+    def set_active_operator(self, licensee: str) -> None:
+        """Records which operator is actually applied right now, so the
+        empty-state message stays correct regardless of whether this filter
+        came from the combo or from elsewhere (plugin.set_licensee_filter()
+        is called wherever the active filter changes, not only from
+        _on_licensee_changed below)."""
+        self._active_operator = licensee or ""
+        self._update_status()
 
     def refresh_current(self) -> None:
         """Rebuild the visible dataset from its layer (used after the viewport
@@ -320,8 +365,22 @@ class VeloronaRecordsTable(QWidget):
     def _update_status(self):
         total = self.model.rowCount()
         shown = self.proxy.rowCount()
+        operator = self._active_operator
         if total == 0:
-            self.status_label.setText("No records in this dataset yet.")
+            # Distinguish "nothing loaded yet" from "the Operator filter
+            # legitimately matches nothing here" -- a blank table with no
+            # explanation reads as broken, not as an accurate empty result.
+            # Only datasets the Operator filter actually applies to
+            # (layer_helpers.OPERATOR_SOURCE_KEYS) get the filter-specific
+            # message; Towers/Satellites/Ground Stations carry no licensee
+            # field, so an active filter chosen while viewing Fixed Service
+            # never gets blamed for an unrelated dataset being unloaded.
+            if operator and self._current_key in layer_helpers.OPERATOR_SOURCE_KEYS:
+                self.status_label.setText(
+                    f"No records match operator “{operator}” in this dataset. "
+                    f"Clear the Operator filter to see everything.")
+            else:
+                self.status_label.setText("No records in this dataset yet.")
         elif shown == total:
             self.status_label.setText(f"{total:,} records")
         else:

@@ -140,6 +140,7 @@ def widget_stylesheet(dark: bool = True) -> str:
         border: 1px solid {BORDER}; border-radius: 6px;
     }}
     QLabel#veloronaRecordsStatus {{ color: {TEXT_FAINT}; font-size: 10.5px; padding: 2px; }}
+    QLabel#veloronaOperatorHint {{ color: {TEXT_FAINT}; font-size: 10px; padding: 0 2px; }}
     QWidget#veloronaHeader {{ background: {BG}; }}
     QLabel#veloronaHeaderLabel {{ color: {TEXT_FAINT}; font-size: 10px;
                                   letter-spacing: 0.1em; text-transform: uppercase; }}
