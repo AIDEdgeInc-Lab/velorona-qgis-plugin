@@ -100,6 +100,8 @@ canvas.destinationCrsChanged.connect(
 from velorona.core import export, inspector  # noqa: E402
 from velorona.core.engines import microwave_exposure, satellite_earth_space, terrestrial  # noqa: E402
 from velorona.core.inspector import feature_to_entry  # noqa: E402
+from aei_mw_exposure import physics as mw_physics  # noqa: E402
+from velorona.ui.param_dialog import ParamDialog  # noqa: E402
 import velorona.plugin as plugin_module  # noqa: E402
 from velorona.plugin import BASEMAP_NAME, VeloronaPlugin  # noqa: E402
 
@@ -1189,6 +1191,87 @@ check("preamble frequencies keep ISED's full published precision",
       "933.5125" in _prec_csv and "85125.0" in _prec_csv)
 check("preamble extent keeps 5 decimal places, matching the source records",
       "-80.49605, 43.05111, -78.39844, 44.09472" in _prec_csv)
+
+# -- Operator inputs must survive into the evidence rows intact --------------
+# Precision is set by whoever produced the number: an input is reproduced
+# exactly, a calculated value is rounded to what its method justifies. These
+# four previously lost precision on ordinary values in ordinary use, inside
+# the typed O/C/I rows -- the one part of the file an operator can check
+# against what they typed.
+for _value, _was in ((0.9599375, "1.0"), (7.25, "7.2"), (30.5, "30"), (32.5, "32")):
+    check(f"an input of {_value} is reproduced exactly, not as {_was}",
+          export._exact(_value) == repr(float(_value)), export._exact(_value))
+check("an ordinary whole value does not gain spurious digits",
+      export._exact(18.0) == "18.0", export._exact(18.0))
+check("no operator-input quantity is rounded in export.py any more",
+      not _re.search(r"(site_[ab]_height_m|frequency_ghz|fade_margin_db):\.[0-9]",
+                    open(os.path.join(PLUGIN_DIR, "core", "export.py")).read()))
+check("lat/lon keep their source-matched :.5f (the rule this generalises)",
+      ":.5f" in open(os.path.join(PLUGIN_DIR, "core", "export.py")).read())
+# Calculated values keep explicit rounding -- they must NOT use _exact().
+check("calculated attenuation is still explicitly rounded, not round-tripped",
+      "predicted_attenuation_db:.2f" in open(os.path.join(PLUGIN_DIR, "core", "export.py")).read())
+check("exposure ratio resolves which side of the fade margin it sits on",
+      "exposure_ratio * 100:.1f" in open(os.path.join(PLUGIN_DIR, "core", "export.py")).read())
+
+# -- Parameter bounds, each with a recorded basis ----------------------------
+for _mod, _name in ((terrestrial, "terrestrial"), (microwave_exposure, "microwave")):
+    for _p in _mod.PARAM_SPEC:
+        if _p["type"] != "float":
+            continue
+        check(f"{_name}: {_p['key']} carries an explicit envelope",
+              _p.get("min") is not None and _p.get("max") is not None,
+              f"{_p.get('min')} to {_p.get('max')}")
+        check(f"{_name}: {_p['key']}'s bound states where it comes from",
+              len(_p.get("basis", "")) > 40)
+        check(f"{_name}: {_p['key']}'s default sits inside its own envelope",
+              _p["min"] <= _p["default"] <= _p["max"], f"{_p['default']}")
+
+check("the microwave frequency bound is the rain model's own tabulated range",
+      (microwave_exposure.PARAM_SPEC[0]["min"], microwave_exposure.PARAM_SPEC[0]["max"])
+      == (mw_physics.MIN_FREQ_GHZ, mw_physics.MAX_FREQ_GHZ),
+      f"{mw_physics.MIN_FREQ_GHZ}-{mw_physics.MAX_FREQ_GHZ} GHz (ITU-R P.838-3)")
+def _basis_is_honest(basis: str) -> bool:
+    """A bound either names where it is derived from, or admits it is an
+    engineering judgment. What it must never do is read as derived without a
+    source."""
+    b = basis.lower()
+    if "not a derived bound" in b or "conservative engineering limit" in b:
+        return True                                    # labelled as judgment
+    return "derived" in b and any(src in b for src in ("itu-r", "raise", "aei_"))
+
+
+check("every bound either names its source or admits it is a judgment call",
+      all(_basis_is_honest(_p["basis"])
+          for _m in (terrestrial, microwave_exposure) for _p in _m.PARAM_SPEC
+          if _p["type"] == "float"),
+      str([(_p["key"], _basis_is_honest(_p["basis"]))
+           for _m in (terrestrial, microwave_exposure) for _p in _m.PARAM_SPEC
+           if _p["type"] == "float"]))
+check("the unbounded 0.1-100000.0 range is gone from the dialog",
+      "setRange(0.1, 100000.0)" not in
+      open(os.path.join(PLUGIN_DIR, "ui", "param_dialog.py")).read())
+
+# The dialog must REFUSE an out-of-range value, never clamp it: a clamped
+# value is a number the operator did not choose, reported back as if they had.
+_dlg = ParamDialog(iface.mainWindow(), "bounds probe",
+                   microwave_exposure.PARAM_SPEC,
+                   {"frequency_ghz": 18.0, "polarization": "V", "fade_margin_db": 32.0})
+check("a valid parameter set reports nothing out of range", not _dlg.out_of_range())
+_dlg._widgets["fade_margin_db"].setValue(100000.0)
+_clamped = _dlg._widgets["fade_margin_db"].value()
+check("the spin box cannot silently clamp an entry onto the limit itself",
+      _clamped != microwave_exposure.PARAM_SPEC[2]["max"], f"clamped to {_clamped:g}")
+_bad = _dlg.out_of_range()
+check("an out-of-range fade margin is detected, not accepted", len(_bad) == 1, str(_bad[:1]))
+check("the refusal names the offending value and its envelope",
+      _bad[0][1] > _bad[0][3] and _bad[0][2] == 0.1 and _bad[0][3] == 100.0)
+check("the refusal carries the basis, not just the numbers", "derived" in _bad[0][4])
+_dlg._widgets["fade_margin_db"].setValue(32.0)
+_dlg._widgets["frequency_ghz"].setValue(0.5)   # below ITU-R P.838-3's floor
+check("a sub-1 GHz frequency is refused for the rain model",
+      len(_dlg.out_of_range()) == 1 and _dlg.out_of_range()[0][2] == mw_physics.MIN_FREQ_GHZ)
+_dlg.deleteLater()
 
 # normal links stay subordinate to the selection in both appearances
 check("normal link ink differs per appearance",

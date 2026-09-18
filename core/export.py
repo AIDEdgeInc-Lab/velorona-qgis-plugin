@@ -88,6 +88,30 @@ def link_feature_to_csv(attrs: dict, site_a_point, site_b_point) -> str:
     return buf.getvalue()
 
 
+def _exact(value) -> str:
+    """An input value reproduced exactly, not rounded.
+
+    Precision is set by whoever produced the number. Lat/lon already follow
+    this rule with ``:.5f`` because ISED publishes 5 decimal places of
+    degrees; this is the same principle for the quantities whose precision is
+    not fixed in advance:
+
+      operator-keyed   ParamDialog accepts 2 decimals, so 7.25 GHz, 30.5 m and
+                       32.5 dB must come back identical -- the operator can
+                       check these against what they typed, and a file that
+                       gets them wrong is not trusted on anything else
+      ISED-derived     frequencies carry up to 5 decimal places in MHz
+                       (959.9375 MHz = 0.9599375 GHz -- 7 in GHz)
+      engine default   a declared constant, not an estimate
+
+    Shortest round-trip rather than a wide fixed format: it cannot truncate,
+    and it does not render an ordinary 18 GHz as 18.00000000. Calculated
+    values do NOT use this -- their precision is justified by the method and
+    by their coarsest input, and they stay explicitly rounded.
+    """
+    return repr(float(value))
+
+
 def _fmt_extent(extent) -> str:
     """WGS84 bounding box as minlon,minlat,maxlon,maxlat -- the same axis order
     QGIS reports and the Web Map's export writes, so the two agree."""
@@ -245,12 +269,12 @@ def _terrestrial_to_csv(result) -> str:
                       observation_input=(f"{site_b_pt.latitude:.5f}, {site_b_pt.longitude:.5f}" if site_b_pt else NOT_DETERMINED)),
         _evidence_row("Site A antenna height", "Observed",
                       "Feature attribute" if result.site_a_height_from_feature else "User, via analysis dialog (default shown, user-confirmed)",
-                      observation_input=f"{result.site_a_height_m:.0f} m"),
+                      observation_input=f"{_exact(result.site_a_height_m)} m"),
         _evidence_row("Site B antenna height", "Observed",
                       "Feature attribute" if result.site_b_height_from_feature else "User, via analysis dialog (default shown, user-confirmed)",
-                      observation_input=f"{result.site_b_height_m:.0f} m"),
+                      observation_input=f"{_exact(result.site_b_height_m)} m"),
         _evidence_row("Frequency", "Observed", "User, via analysis dialog (not sourced from license data)",
-                      observation_input=f"{r.frequency_ghz:.1f} GHz"),
+                      observation_input=f"{_exact(r.frequency_ghz)} GHz"),
         _evidence_row("Ground elevation profile", "Observed", "aei_link_clearance (Open-Meteo Elevation API, Copernicus DEM GLO-90, 90m surface model)",
                       observation_input=f"{len(r.profile)} samples along path"),
         _evidence_row("Path distance", "Calculated", "aei_link_clearance (haversine)",
@@ -299,14 +323,16 @@ def _microwave_to_csv(result) -> str:
         _evidence_row("Rain rate used", "Observed", f"Open-Meteo ({e.source_site_id})",
                       observation_input=f"{e.rain_rate_mm_h:.1f} mm/h", interpretation=e.rain_rate_assumption),
         _evidence_row("Fade margin (link spec)", "Observed", "User, via analysis dialog (not sourced from license data)",
-                      observation_input=f"{link.fade_margin_db:.0f} dB"),
+                      observation_input=f"{_exact(link.fade_margin_db)} dB"),
         _evidence_row("Frequency / polarization", "Observed", "User, via analysis dialog (not sourced from license data)",
-                      observation_input=f"{link.frequency_ghz:.1f} GHz, {link.polarization}"),
+                      observation_input=f"{_exact(link.frequency_ghz)} GHz, {link.polarization}"),
         _evidence_row("Predicted rain attenuation", "Calculated", f"aei_mw_exposure ({att.method})",
-                      observation_input=f"{e.rain_rate_mm_h:.1f} mm/h, {link.frequency_ghz:.1f} GHz, {link.polarization}, {link.length_km:.2f} km",
+                      observation_input=f"{e.rain_rate_mm_h:.1f} mm/h, {_exact(link.frequency_ghz)} GHz, {link.polarization}, {link.length_km:.2f} km",
                       calculated_result=f"{att.predicted_attenuation_db:.2f} dB", interpretation=att.assumption),
         _evidence_row("Exposure ratio", "Calculated", "aei_mw_exposure (predicted attenuation / fade margin)",
-                      calculated_result=f"{e.exposure_ratio * 100:.0f}%"),
+                      calculated_result=f"{e.exposure_ratio * 100:.1f}%"),  # 0.1%: at :.0f,
+                      # 99.6% and 100.4% both printed 100%, erasing which side of
+                      # the fade margin the link sits on -- the one thing this row says
         _evidence_row("Severity", "Inferred", "aei_mw_exposure", interpretation=f"{e.severity.upper()} -- {e.operational_note}"),
         _evidence_row("Hardware condition", "Inferred", "", interpretation=f"{NOT_DETERMINED} -- no hardware telemetry input to this analysis."),
     ]
@@ -428,7 +454,7 @@ def _link_investigation_to_csv(result) -> str:
             _evidence_row("Frequency used for attenuation", "Observed",
                           source if freq_kind == "Observed"
                           else "aei_mw_exposure default -- not published in the ISED Fixed Service extract",
-                          observation_input=f"{link.frequency_ghz:.3f} GHz", interpretation=freq_note),
+                          observation_input=f"{_exact(link.frequency_ghz)} GHz", interpretation=freq_note),
             _evidence_row("Polarization", "Observed",
                           source if pol_kind == "Observed"
                           else "aei_mw_exposure default -- not published in the ISED Fixed Service extract",
@@ -436,14 +462,16 @@ def _link_investigation_to_csv(result) -> str:
             _evidence_row("Fade margin", "Observed",
                           source if fade_kind == "Observed"
                           else "aei_mw_exposure default -- not published in the ISED Fixed Service extract",
-                          observation_input=f"{link.fade_margin_db:.0f} dB", interpretation=fade_note),
+                          observation_input=f"{_exact(link.fade_margin_db)} dB", interpretation=fade_note),
             _evidence_row("Path length", "Calculated", "aei_mw_exposure (haversine)",
                           calculated_result=f"{att.path_length_km:.2f} km"),
             _evidence_row("Predicted rain attenuation", "Calculated", f"aei_mw_exposure ({att.method})",
-                          observation_input=f"{e.rain_rate_mm_h:.1f} mm/h, {link.frequency_ghz:.3f} GHz, {link.polarization}, {att.path_length_km:.2f} km",
+                          observation_input=f"{e.rain_rate_mm_h:.1f} mm/h, {_exact(link.frequency_ghz)} GHz, {link.polarization}, {att.path_length_km:.2f} km",
                           calculated_result=f"{att.predicted_attenuation_db:.2f} dB", interpretation=att.assumption),
             _evidence_row("Exposure ratio", "Calculated", "aei_mw_exposure (predicted attenuation / fade margin)",
-                          calculated_result=f"{e.exposure_ratio * 100:.0f}%"),
+                          calculated_result=f"{e.exposure_ratio * 100:.1f}%"),  # 0.1%: at :.0f,
+                      # 99.6% and 100.4% both printed 100%, erasing which side of
+                      # the fade margin the link sits on -- the one thing this row says
             _evidence_row("Severity", "Inferred", "aei_mw_exposure",
                           interpretation=f"{e.severity.upper()} -- {e.operational_note}"),
             _evidence_row("Hardware condition", "Inferred", "",
