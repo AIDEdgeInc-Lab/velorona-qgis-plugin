@@ -25,6 +25,8 @@ from qgis.core import (
 from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtGui import QColor
 
+from .colors import COLORS_DARK, COLORS_LIGHT
+
 # Marker/line visual weight, matched to the production web map's own
 # values (aei-link-clearance/web/app.js: dotIcon()/addSiteMarker()/
 # addLinkLine()) -- not re-picked from scratch. Sizes/widths are in
@@ -36,13 +38,19 @@ MARKER_ALPHA = 170  # ~67%, out of 255 -- overlapping points show density, not a
 LINE_WIDTH_PX = 0.8
 LINE_ALPHA = 90  # ~35%, matches addLinkLine()'s opacity: 0.35 for fixed-links
 
-# Normal Fixed Service links need a different ink per basemap. Measured against
-# Voyager's cream land, the dark-mode pale blue #99C6F3 reaches only 1.18:1 even
-# at high alpha -- the hue, not the opacity, is the problem. The brand accent at
-# half opacity reaches 1.60:1 while staying far below the selected link's
-# 8.15:1, so the hierarchy selected > connected > normal still holds.
-LINK_INK_DARK = {"color": "#99C6F3", "alpha": 90}
-LINK_INK_LIGHT = {"color": "#5F98D1", "alpha": 128}
+# Normal Fixed Service links need a different ink per basemap, at a lower
+# opacity than the type colour itself, so they never compete with a selected
+# link. The hue is the same one core/colors.py assigns "fixed-links" for that
+# appearance -- previously this borrowed the *fixed-sites* brand-blue hue on
+# light mode specifically because the old fixed-links hex (#99C6F3) measured
+# only 1.18:1 against Voyager even at high alpha; the new fixed-links hue
+# (chosen for the six-type distinctness system, see colors.py) measures
+# 3.52:1 solid, so no borrowing is needed any more. Alpha is unchanged from
+# the original measurement: composited, both stay far below the selected
+# link's 8.15:1 (light) / 15.80:1 (dark), so selected > connected > normal
+# still holds.
+LINK_INK_DARK = {"color": COLORS_DARK["fixed-links"], "alpha": 90}
+LINK_INK_LIGHT = {"color": COLORS_LIGHT["fixed-links"], "alpha": 128}
 
 
 def link_symbol(dark: bool = True) -> QgsLineSymbol:
@@ -142,26 +150,92 @@ CLUSTER_SIZE_EXPRESSION = (
     f"ELSE {CLUSTER_SIZE_LARGE_PX} END"
 )
 
-# Cluster ink for each map appearance, as "r,g,b,a" (alpha out of 255).
+# Cluster ink, as "r,g,b,a" (alpha out of 255), derived from each layer's own
+# type colour rather than one shared accent. The web map's own
+# .marker-cluster-velorona is one shared blue for every clustered layer
+# (aei-link-clearance/web/style.css) -- the six-type distinctness system this
+# module now supports is a Velorona-QGIS-specific requirement (reported
+# directly by an operator running the demo, not a Web Map parity item), so it
+# intentionally diverges from the web map here.
 #
-# Dark is the web map's .marker-cluster-velorona measured rather than eyeballed
-# (aei-link-clearance/web/style.css): the bubble stacks --accent-soft
-# rgba(95,152,209,0.12) under an inner rgba(95,152,209,0.28), which over an
-# opaque backdrop composites to a single 1-(1-0.12)*(1-0.28) = 0.366 alpha of
-# the #5F98D1 accent -- 93/255. Keeping it *translucent* rather than flattening
-# it to a solid hex is the point: the basemap reads through the bubble there,
-# and a cluster is a rendering aid, not an object that occludes the map.
-#
-# The border is the web map's --accent-line rgba(153,198,243,0.24) = 61/255.
-# The ring is soft because of that alpha, not because it is thin -- the web map
-# draws a full 2px border and still reads as a halo.
-#
-# Light has no web map counterpart (it exists for CARTO Voyager). It gets the
-# same treatment -- same translucent accent fill -- with the navy ring at 0.30
-# rather than 0.24, because a dark ring on Voyager's cream land needs slightly
-# more weight than a pale ring on Dark Matter to hold its edge.
-CLUSTER_INK_DARK = {"fill": "95,152,209,93", "stroke": "153,198,243,61", "text": "#F5F7FA"}
-CLUSTER_INK_LIGHT = {"fill": "95,152,209,93", "stroke": "34,75,117,77", "text": "#12242F"}
+# The *treatment* is still the one measured against the web map's CSS:
+# fill = the type colour, blended to a 0.366 composite alpha (93/255) --
+# stacking --accent-soft 0.12 under an inner 0.28 the web map applies to its
+# single shared accent composites to 1-(1-0.12)*(1-0.28) = 0.366 of the base
+# hue; translucent rather than flattened to a solid hex, so the basemap reads
+# through and a cluster stays a rendering aid, not an object that occludes
+# the map. Stroke = the same hue lightened (dark mode, a glow ring) or
+# darkened (light mode, to hold its edge against Voyager's cream) by a fixed
+# amount in CIELab lightness, at the same alphas the earlier single-accent
+# calibration measured: 61/255 (0.24) dark, 77/255 (0.30) light.
+CLUSTER_FILL_ALPHA = 93          # 0.366 -- the web map's stacked composite
+CLUSTER_STROKE_ALPHA_DARK = 61   # 0.24  -- the web map's own --accent-line
+CLUSTER_STROKE_ALPHA_LIGHT = 77  # 0.30  -- held slightly heavier for Voyager
+CLUSTER_STROKE_LIGHTNESS_SHIFT = 30  # CIELab L units, lighten dark / darken light
+CLUSTER_TEXT_DARK = "#F5F7FA"    # basemap-dependent only, not type-dependent --
+CLUSTER_TEXT_LIGHT = "#12242F"   # verified to hold >= 4.5:1 against every type's
+                                  # composited fill in tests/qgis_e2e.py
+
+
+def _hex_to_rgb(hex_color: str):
+    hex_color = hex_color.lstrip("#")
+    return tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def _srgb_to_linear(c: float) -> float:
+    c /= 255.0
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def _linear_to_srgb(c: float) -> float:
+    c = max(0.0, min(1.0, c))
+    return 255 * (12.92 * c if c <= 0.0031308 else 1.055 * c ** (1 / 2.4) - 0.055)
+
+
+def _rgb_to_lab(rgb):
+    r, g, b = (_srgb_to_linear(v) for v in rgb)
+    x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047
+    y = r * 0.2126 + g * 0.7152 + b * 0.0722
+    z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883
+    f = lambda t: t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+    fx, fy, fz = f(x), f(y), f(z)
+    return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
+
+
+def _lab_to_rgb(lab):
+    L, a, b = lab
+    fy = (L + 16) / 116
+    fx, fz = fy + a / 500, fy - b / 200
+    finv = lambda t: t ** 3 if t ** 3 > 0.008856 else (t - 16 / 116) / 7.787
+    x, y, z = finv(fx) * 0.95047, finv(fy), finv(fz) * 1.08883
+    r = x * 3.2406 + y * -1.5372 + z * -0.4986
+    g = x * -0.9689 + y * 1.8758 + z * 0.0415
+    bl = x * 0.0557 + y * -0.2040 + z * 1.0570
+    return tuple(round(_linear_to_srgb(v)) for v in (r, g, bl))
+
+
+def _shift_lightness(hex_color: str, delta_l: float) -> tuple:
+    """hex_color's own hue, lightened (positive delta_l) or darkened
+    (negative), by shifting CIELab L -- a perceptual lightness move, not a
+    naive per-channel blend toward white/black."""
+    L, a, b = _rgb_to_lab(_hex_to_rgb(hex_color))
+    return _lab_to_rgb((max(0.0, min(100.0, L + delta_l)), a, b))
+
+
+def cluster_ink(color_hex: str, dark: bool = True) -> dict:
+    """The fill/stroke/text ink for one layer type's cluster bubble in one
+    map appearance -- see the module-level comment above for the alpha and
+    lightness-shift rationale."""
+    r, g, b = _hex_to_rgb(color_hex)
+    stroke_alpha = CLUSTER_STROKE_ALPHA_DARK if dark else CLUSTER_STROKE_ALPHA_LIGHT
+    shift = CLUSTER_STROKE_LIGHTNESS_SHIFT if dark else -CLUSTER_STROKE_LIGHTNESS_SHIFT
+    sr, sg, sb = _shift_lightness(color_hex, shift)
+    return {
+        "fill": f"{r},{g},{b},{CLUSTER_FILL_ALPHA}",
+        "stroke": f"{sr},{sg},{sb},{stroke_alpha}",
+        "text": CLUSTER_TEXT_DARK if dark else CLUSTER_TEXT_LIGHT,
+    }
+
 
 # Border and count geometry, both in screen pixels so they keep the web map's
 # fixed ratio (a 12px count inside a 32/40/48px disc) instead of drifting apart
@@ -193,6 +267,24 @@ SOURCE_CELLULAR = "cellular"
 SOURCE_SATELLITES = "satellites"
 SOURCE_GROUND_STATIONS = "ground_stations"
 SOURCE_BASEMAP = "basemap"
+
+# Every clustered point layer's source key -> the colour-lookup key
+# core/colors.py uses for it (mostly the same string with a hyphen instead of
+# an underscore; kept explicit rather than derived so a renamed SOURCE_* or
+# COLORS_* key fails loudly instead of silently mismatching).
+CLUSTERED_LAYER_COLOR_KEY = {
+    SOURCE_FIXED_SITES: "fixed-sites",
+    SOURCE_TOWERS: "towers",
+    SOURCE_CELLULAR: "cellular",
+    SOURCE_SATELLITES: "satellites",
+    SOURCE_GROUND_STATIONS: "ground-stations",
+}
+
+# The three layers that carry a 'licensee' field and therefore participate in
+# the Operator filter -- Fixed Service sites and links (ISED) and Cellular
+# sites (ISED via the Esri Canada mirror). Towers, Satellites and Ground
+# Stations do not carry a licensee/operator field at all.
+OPERATOR_SOURCE_KEYS = (SOURCE_FIXED_SITES, SOURCE_FIXED_LINKS, SOURCE_CELLULAR)
 
 
 def mark_velorona_owned(layer, lifecycle: str = LIFECYCLE_PERSISTENT,
@@ -258,15 +350,17 @@ def _point_symbol(color_hex: str) -> QgsMarkerSymbol:
     return symbol
 
 
-def cluster_symbol(dark: bool = True) -> QgsMarkerSymbol:
-    """The Velorona cluster bubble: a restrained accent disc sized by how many
-    records it represents, with the count drawn on top.
+def cluster_symbol(color_hex: str, dark: bool = True) -> QgsMarkerSymbol:
+    """The Velorona cluster bubble for one layer type: a restrained disc in
+    that layer's own colour, sized by how many records it represents, with
+    the count drawn on top.
 
     Same visual language as the web map's .marker-cluster-velorona -- accent
     fill, accent border, bold count -- rather than QGIS's default cluster
     style, and size-capped so a dense region cannot produce a disc that covers
-    the map."""
-    ink = CLUSTER_INK_DARK if dark else CLUSTER_INK_LIGHT
+    the map. Unlike the web map (one shared accent for every cluster), the
+    fill/stroke hue is per layer type -- see cluster_ink()'s docstring."""
+    ink = cluster_ink(color_hex, dark)
 
     disc = QgsSimpleMarkerSymbolLayer.create({
         "name": "circle",
@@ -306,7 +400,7 @@ def _clustered_renderer(color_hex: str, dark: bool = True) -> QgsPointClusterRen
     renderer.setEmbeddedRenderer(embedded)
     renderer.setTolerance(CLUSTER_TOLERANCE_PX)
     renderer.setToleranceUnit(QgsUnitTypes.RenderPixels)
-    renderer.setClusterSymbol(cluster_symbol(dark))
+    renderer.setClusterSymbol(cluster_symbol(color_hex, dark))
     return renderer
 
 

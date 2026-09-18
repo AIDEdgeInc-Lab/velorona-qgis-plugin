@@ -21,7 +21,7 @@ from .core import basemap_labels
 from .core import layers as layer_helpers
 from .core import network_context
 from .core import overlays
-from .core.colors import COLORS
+from .core.colors import COLORS, layer_color
 from .core.engines import microwave_exposure, satellite_earth_space, terrestrial
 from .core import inspector
 from .core.inspector import feature_to_entry
@@ -436,18 +436,24 @@ class VeloronaPlugin:
 
     def _restyle_clusters(self, dark: bool) -> None:
         """Cluster bubbles have to stay legible over both basemaps, so their
-        ink follows the appearance. Only the cluster symbol changes -- the
-        renderer, its tolerance and the underlying records are untouched."""
+        ink follows the appearance -- and each layer type keeps its own
+        colour rather than all five collapsing onto one shared accent, which
+        is what a cluster with no colour of its own actually looked like on
+        screen regardless of the six distinct COLORS_DARK/LIGHT values
+        (build_point_layer() passes a colour into the embedded per-feature
+        symbol, but the CLUSTER symbol replacing it at any zoom wide enough to
+        group records previously ignored that colour entirely). Only the
+        cluster symbol changes -- the renderer, its tolerance and the
+        underlying records are untouched."""
         project = QgsProject.instance()
-        for key in (layer_helpers.SOURCE_FIXED_SITES, layer_helpers.SOURCE_TOWERS,
-                    layer_helpers.SOURCE_CELLULAR, layer_helpers.SOURCE_SATELLITES,
-                    layer_helpers.SOURCE_GROUND_STATIONS):
+        for key, kind in layer_helpers.CLUSTERED_LAYER_COLOR_KEY.items():
             layer = layer_helpers.find_owned_layer(project, key)
             if layer is None:
                 continue
             renderer = layer.renderer()
             if isinstance(renderer, QgsPointClusterRenderer):
-                renderer.setClusterSymbol(layer_helpers.cluster_symbol(dark))
+                renderer.setClusterSymbol(
+                    layer_helpers.cluster_symbol(layer_color(kind, dark), dark))
                 layer.triggerRepaint()
 
     def _restyle_links(self, dark: bool) -> None:
@@ -596,6 +602,11 @@ class VeloronaPlugin:
         infra_group = groups["Infrastructure"]
         space_group = groups["Space"]
         problems = []
+        # Each of the six typed layers built below gets its own colour for the
+        # CURRENT map appearance (core/colors.py) -- snapshotted once here so
+        # every layer built in this run agrees; appearance toggles afterwards
+        # go through _restyle_clusters/_restyle_links instead of a re-load.
+        dark = self.map_is_dark()
         # The initial view comes from Velorona's terrestrial infrastructure,
         # never from the space layers: satellite subpoints and SatNOGS
         # stations span the globe, so including them lands the canvas on a
@@ -611,7 +622,7 @@ class VeloronaPlugin:
                 layer_helpers.SOURCE_FIXED_SITES, infra_group, visible=True, kind="site",
                 build=lambda: layer_helpers.build_point_layer(
                     f"Fixed Service sites -- {PUBLIC_RECORDS_DISCLOSURE}", sites,
-                    terrestrial_public.FIXED_SITE_FIELDS, COLORS["fixed-sites"],
+                    terrestrial_public.FIXED_SITE_FIELDS, layer_color("fixed-sites", dark),
                     abstract=f"ISED Fixed Service, static snapshot. {PUBLIC_RECORDS_DISCLOSURE.capitalize()}."),
                 refresh=lambda lyr: layer_helpers.replace_point_features(
                     lyr, sites, terrestrial_public.FIXED_SITE_FIELDS))
@@ -619,7 +630,7 @@ class VeloronaPlugin:
                 layer_helpers.SOURCE_FIXED_LINKS, infra_group, visible=True, kind="link",
                 build=lambda: layer_helpers.build_link_layer(
                     f"Fixed Service links -- {PUBLIC_RECORDS_DISCLOSURE}", links,
-                    terrestrial_public.FIXED_LINK_FIELDS, COLORS["fixed-links"],
+                    terrestrial_public.FIXED_LINK_FIELDS, layer_color("fixed-links", dark),
                     abstract=f"ISED Fixed Service, static snapshot. {PUBLIC_RECORDS_DISCLOSURE.capitalize()}."),
                 refresh=lambda lyr: layer_helpers.replace_link_features(
                     lyr, links, terrestrial_public.FIXED_LINK_FIELDS))
@@ -634,7 +645,7 @@ class VeloronaPlugin:
                 layer_helpers.SOURCE_GROUND_STATIONS, space_group, visible=False, kind="ground-station",
                 build=lambda: layer_helpers.build_point_layer(
                     "Ground/Earth Stations", stations, space_public.GROUND_STATION_FIELDS,
-                    COLORS["ground-stations"], kind="ground-station"),
+                    layer_color("ground-stations", dark), kind="ground-station"),
                 refresh=lambda lyr: layer_helpers.replace_point_features(
                     lyr, stations, space_public.GROUND_STATION_FIELDS)))
         except Exception as exc:
@@ -648,7 +659,7 @@ class VeloronaPlugin:
             layer_helpers.SOURCE_SATELLITES, space_group, visible=False, kind="satellite",
             build=lambda: layer_helpers.build_point_layer(
                 "Satellites", [], space_public.SATELLITE_FIELDS,
-                COLORS["satellites"], kind="satellite"))
+                layer_color("satellites", dark), kind="satellite"))
 
         # Viewport-scoped: created empty, filled by _refresh_viewport_layers
         # once the user switches them on.
@@ -656,13 +667,13 @@ class VeloronaPlugin:
             layer_helpers.SOURCE_TOWERS, infra_group, visible=False, kind="site",
             build=lambda: layer_helpers.build_point_layer(
                 f"Ontario Towers (GeoHub) -- {PUBLIC_RECORDS_DISCLOSURE}", [], terrestrial_public.TOWER_FIELDS,
-                COLORS["towers"],
+                layer_color("towers", dark),
                 abstract=f"Ontario GeoHub Tower dataset (MNRF), live query. {PUBLIC_RECORDS_DISCLOSURE.capitalize()}."))
         self.cellular_layer = self._ensure_public_layer(
             layer_helpers.SOURCE_CELLULAR, infra_group, visible=False, kind="site",
             build=lambda: layer_helpers.build_point_layer(
                 f"Cellular Sites (ISED) -- {PUBLIC_RECORDS_DISCLOSURE}", [], terrestrial_public.CELLULAR_FIELDS,
-                COLORS["cellular"],
+                layer_color("cellular", dark),
                 abstract=f"ISED Spectrum Licences Site Data, live query via Esri Canada mirror. {PUBLIC_RECORDS_DISCLOSURE.capitalize()}."))
 
         # Zoom before the viewport-scoped fetch below, so towers/cellular fetch
@@ -893,7 +904,7 @@ class VeloronaPlugin:
         context_layer = layer_helpers.build_context_link_layer(
             "Network Context -- shared endpoints",
             [layer.getFeature(fid) for fid in fids],
-            COLORS["fixed-links"])
+            layer_color("fixed-links", self.map_is_dark()))
         evidence_group = self._ensure_velorona_groups()[1]["Evidence"]
         self.network_context_layer = self._replace_layer(None, context_layer, evidence_group)
 
@@ -1116,45 +1127,83 @@ class VeloronaPlugin:
         main_window.resizeDocks([self.dock], [target], Qt.Orientation.Horizontal)
         QTimer.singleShot(0, lambda: self.dock.setMaximumWidth(QWIDGETSIZE_MAX))
 
-    def set_licensee_filter(self, licensee: str) -> None:
-        """Shows only this licensee's Fixed Service site records.
+    @staticmethod
+    def _operator_subset_string(licensee: str) -> str:
+        """A provider subset expression matching this operator as its own
+        value OR as one part of a combined licensee field ("Bell Mobility
+        Inc. / Rogers Communications Canada Inc.", a real value in the loaded
+        Fixed Service links: 10 of 16,956). Anchored on the same " / "
+        boundary _operator_counts() splits on, rather than a plain
+        '%name%' substring match, so a company whose name happens to contain
+        another company's name as a substring can never match it by
+        accident."""
+        escaped = licensee.replace("'", "''")
+        return (f"(\"licensee\" = '{escaped}') "
+                f"OR (\"licensee\" LIKE '{escaped} / %') "
+                f"OR (\"licensee\" LIKE '% / {escaped}') "
+                f"OR (\"licensee\" LIKE '% / {escaped} / %')")
 
-        Applied as a provider filter on the layer that is already loaded, so
-        the map clusters, the Records table and any selection all see the same
-        subset. Nothing is refetched, no second dataset is created, and the
-        cluster counts become counts of the filtered records. This is spatial
+    def set_licensee_filter(self, licensee: str) -> None:
+        """Shows only this operator's records.
+
+        Applied as a provider filter on every layer that carries a
+        'licensee' field -- Fixed Service sites, Fixed Service links,
+        Cellular sites (layer_helpers.OPERATOR_SOURCE_KEYS) -- not sites
+        alone, so the map clusters, the Records table, "select all in view"
+        and the multi-record export (SelectionSummary.licensee_filter) all
+        see the same subset. This is the one filter state PR #2's
+        selection/export path reads, not a second, disconnected filter.
+        Nothing is refetched, no second dataset is created, and cluster
+        counts become counts of the filtered records. This is spatial
         record distribution only -- it implies nothing about coverage,
         performance or operator standing."""
         project = QgsProject.instance()
-        sites = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_FIXED_SITES)
-        if sites is None:
-            return
-        if licensee:
-            escaped = licensee.replace("'", "''")
-            sites.setSubsetString(f"\"licensee\" = '{escaped}'")
-        else:
-            sites.setSubsetString("")
+        subset = self._operator_subset_string(licensee) if licensee else ""
+        current_dataset_touched = False
+        for source_key in layer_helpers.OPERATOR_SOURCE_KEYS:
+            layer = layer_helpers.find_owned_layer(project, source_key)
+            if layer is None:
+                continue
+            layer.setSubsetString(subset)
+            layer.triggerRepaint()
+            if self.dock is not None and self.dock.records.current_source_key() == source_key:
+                current_dataset_touched = True
         self._licensee_filter = licensee
-        sites.triggerRepaint()
-        # Only rebuild the table when it is actually showing the filtered
-        # dataset; rebuilding the links table here cost ~1.1s per switch.
-        if self.dock is not None and self.dock.records.current_source_key() == layer_helpers.SOURCE_FIXED_SITES:
+        if self.dock is not None:
+            self.dock.records.set_active_operator(licensee)
+        # Only rebuild the table when it is actually showing a filtered
+        # dataset; rebuilding an unrelated table here cost ~1.1s per switch.
+        if current_dataset_touched and self.dock is not None:
             self.dock.records.refresh_current()
 
-    def _licensee_counts(self, sites_layer) -> dict:
-        """Record count per licensee, read from the loaded layer itself."""
+    def _operator_counts(self) -> dict:
+        """Record count per operator, aggregated across every layer that
+        carries a 'licensee' field -- Fixed Service sites, Fixed Service
+        links, Cellular sites -- same scope as the Web Map's
+        collectOperators() (aei-link-clearance/web/app.js). A combined
+        licensee value ("A / B") is split the same way that function splits
+        it, so each named operator is counted once per record it actually
+        appears in, not once per combined string, and the Operator dropdown
+        this populates matches what set_licensee_filter() can actually find."""
+        project = QgsProject.instance()
         counts = {}
-        if sites_layer is None:
-            return counts
-        previous = sites_layer.subsetString()
-        sites_layer.setSubsetString("")
-        try:
-            for feature in sites_layer.getFeatures():
-                name = (feature["licensee"] or "").strip()
-                if name:
-                    counts[name] = counts.get(name, 0) + 1
-        finally:
-            sites_layer.setSubsetString(previous)
+        for source_key in layer_helpers.OPERATOR_SOURCE_KEYS:
+            layer = layer_helpers.find_owned_layer(project, source_key)
+            if layer is None:
+                continue
+            previous = layer.subsetString()
+            layer.setSubsetString("")  # count the whole dataset, not an existing filter
+            try:
+                for feature in layer.getFeatures():
+                    raw = feature["licensee"]
+                    if not raw:
+                        continue
+                    for part in str(raw).split(" / "):
+                        part = part.strip()
+                        if part:
+                            counts[part] = counts.get(part, 0) + 1
+            finally:
+                layer.setSubsetString(previous)
         return counts
 
     def _populate_records(self):
@@ -1167,8 +1216,7 @@ class VeloronaPlugin:
                         layer_helpers.SOURCE_TOWERS, layer_helpers.SOURCE_CELLULAR,
                         layer_helpers.SOURCE_SATELLITES, layer_helpers.SOURCE_GROUND_STATIONS)
         })
-        dock.records.populate_licensees(
-            self._licensee_counts(layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_FIXED_SITES)))
+        dock.records.populate_licensees(self._operator_counts())
 
     def _show_result(self, result):
         self._ensure_dock()

@@ -903,34 +903,59 @@ check("cluster size tiers match the web map (32/40/48, capped)",
        layer_helpers.CLUSTER_SIZE_LARGE_PX) == (32, 40, 48))
 check("cluster count comes from the represented record count",
       "@cluster_size" in layer_helpers.CLUSTER_SIZE_EXPRESSION)
-cluster_sym = layer_helpers.cluster_symbol(True)
+cluster_sym = layer_helpers.cluster_symbol(layer_helpers.COLORS_DARK["fixed-sites"], True)
 check("cluster draws a disc plus the count", cluster_sym.symbolLayerCount() == 2)
-check("cluster ink differs between light and dark",
-      layer_helpers.CLUSTER_INK_DARK != layer_helpers.CLUSTER_INK_LIGHT)
 
-# The cluster bubble is the web map's .marker-cluster-velorona, measured rather
-# than approximated: a translucent accent disc under a low-alpha ring, not an
-# opaque disc inside a bright one. These pin the properties that carry that --
-# a regression to a solid fill or a full-alpha ring is the exact thing that
-# made the QGIS bubble read heavier than the web map's.
+# The cluster bubble is the web map's .marker-cluster-velorona TREATMENT --
+# translucent disc under a soft ring, not an opaque disc inside a bright one
+# -- generalised to a colour per layer type instead of the web map's one
+# shared accent (a Velorona-QGIS-specific requirement, reported directly by
+# an operator running the demo: six distinct COLORS entries existed but
+# every cluster still rendered identically, because the cluster SYMBOL that
+# replaces the per-feature symbol at any zoom wide enough to group records
+# ignored colour entirely -- see cluster_ink()'s docstring in core/layers.py
+# for the fix). These checks pin the treatment across every real type colour
+# in both appearances, not just one -- a regression back to a single shared
+# ink for all six would still pass a test that only checked one.
 def _rgba(spec):
     return tuple(int(part) for part in spec.split(","))
 
 
-for _theme, _ink in (("dark", layer_helpers.CLUSTER_INK_DARK),
-                     ("light", layer_helpers.CLUSTER_INK_LIGHT)):
-    _fill, _stroke = _rgba(_ink["fill"]), _rgba(_ink["stroke"])
-    check(f"{_theme}: cluster fill is translucent, so the basemap reads through",
-          _fill[3] < 255, f"alpha {_fill[3]}/255")
-    check(f"{_theme}: cluster ring is soft (low alpha), not a solid bright ring",
-          _stroke[3] <= 80, f"alpha {_stroke[3]}/255")
+def _over(rgba, backdrop):
+    a = rgba[3] / 255
+    bg = tuple(int(backdrop.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+    return "#%02X%02X%02X" % tuple(
+        round(rgba[i] * a + bg[i] * (1 - a)) for i in range(3))
 
-check("cluster fill is the web map's own accent at its composited alpha",
-      _rgba(layer_helpers.CLUSTER_INK_DARK["fill"])[:3] == (95, 152, 209)
-      and _rgba(layer_helpers.CLUSTER_INK_DARK["fill"])[3] == 93,
-      "rgba(95,152,209,0.12) over rgba(95,152,209,0.28) -> 0.366 = 93/255")
-check("cluster ring is the web map's --accent-line at its own 0.24 alpha",
-      _rgba(layer_helpers.CLUSTER_INK_DARK["stroke"]) == (153, 198, 243, 61))
+
+_DARK_LAND, _LIGHT_LAND = "#181E18", "#FAF6F0"
+for _kind, _hex in layer_helpers.COLORS_DARK.items():
+    _ink = layer_helpers.cluster_ink(_hex, True)
+    _fill, _stroke = _rgba(_ink["fill"]), _rgba(_ink["stroke"])
+    check(f"dark {_kind}: cluster fill is translucent, so the basemap reads through",
+          _fill[3] < 255, f"alpha {_fill[3]}/255")
+    check(f"dark {_kind}: cluster ring is soft (low alpha), not a solid bright ring",
+          _stroke[3] <= 80, f"alpha {_stroke[3]}/255")
+    check(f"dark {_kind}: cluster fill uses this type's own hue, not a shared accent",
+          _fill[:3] == layer_helpers._hex_to_rgb(_hex))
+    _composite = _over(_fill, _DARK_LAND)
+    _c = _contrast(_ink["text"], _composite)
+    check(f"dark {_kind}: cluster count stays readable over the translucent disc (>= 4.5:1)",
+          _c >= 4.5, f"{_c:.2f}:1 over {_composite}")
+for _kind, _hex in layer_helpers.COLORS_LIGHT.items():
+    _ink = layer_helpers.cluster_ink(_hex, False)
+    _fill, _stroke = _rgba(_ink["fill"]), _rgba(_ink["stroke"])
+    check(f"light {_kind}: cluster fill is translucent, so the basemap reads through",
+          _fill[3] < 255, f"alpha {_fill[3]}/255")
+    check(f"light {_kind}: cluster ring is soft (low alpha), not a solid bright ring",
+          _stroke[3] <= 80, f"alpha {_stroke[3]}/255")
+    check(f"light {_kind}: cluster fill uses this type's own hue, not a shared accent",
+          _fill[:3] == layer_helpers._hex_to_rgb(_hex))
+    _composite = _over(_fill, _LIGHT_LAND)
+    _c = _contrast(_ink["text"], _composite)
+    check(f"light {_kind}: cluster count stays readable over the translucent disc (>= 4.5:1)",
+          _c >= 4.5, f"{_c:.2f}:1 over {_composite}")
+
 check("cluster ring width matches the web map's 2px border",
       layer_helpers.CLUSTER_STROKE_WIDTH_PX == 2)
 check("cluster count size matches the web map's 12px, not a larger point size",
@@ -946,33 +971,65 @@ check("disc size, ring width and count size are all in screen pixels",
 check("the count is still bold, as the web map's font-weight: 700 is",
       "bold" in _count.fontStyle().lower(), _count.fontStyle())
 
-# Translucency must not cost legibility: check the count against the fill as it
-# actually composites over each basemap's land, not against the raw accent.
-def _over(rgba, backdrop):
-    a = rgba[3] / 255
-    bg = tuple(int(backdrop.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
-    return "#%02X%02X%02X" % tuple(
-        round(rgba[i] * a + bg[i] * (1 - a)) for i in range(3))
+# The bug this closes, reproduced directly: two different clustered layers,
+# restyled by the real plugin method, must carry two different fill colours
+# -- not the same shared ink regardless of type, which is what "distinct
+# COLORS entries but identical clusters on screen" actually was.
+plugin._restyle_clusters(True)
+_sites_fill = sites_layer.renderer().clusterSymbol().symbolLayer(0).color()
+_towers_layer_for_color = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_TOWERS)
+_towers_fill = _towers_layer_for_color.renderer().clusterSymbol().symbolLayer(0).color()
+check("two different clustered layer types carry two different cluster fill colours",
+      _sites_fill.name() != _towers_fill.name(),
+      f"fixed-sites {_sites_fill.name()} vs towers {_towers_fill.name()}")
+check("the restyled fixed-sites cluster matches its own COLORS_DARK entry",
+      (_sites_fill.red(), _sites_fill.green(), _sites_fill.blue())
+      == layer_helpers._hex_to_rgb(layer_helpers.COLORS_DARK["fixed-sites"]))
+check("the restyled towers cluster matches its own COLORS_DARK entry",
+      (_towers_fill.red(), _towers_fill.green(), _towers_fill.blue())
+      == layer_helpers._hex_to_rgb(layer_helpers.COLORS_DARK["towers"]))
 
+# Fixed Service links are a line symbol, not a cluster, but the same "does
+# the type colour actually reach the screen" question applies to it.
+_link_symbol_color = links_layer2.renderer().symbol().color()
+check("Fixed Service links render in their own COLORS_DARK hue (composited with LINE_ALPHA)",
+      (_link_symbol_color.red(), _link_symbol_color.green(), _link_symbol_color.blue())
+      == layer_helpers._hex_to_rgb(layer_helpers.LINK_INK_DARK["color"]))
 
-for _theme, _ink, _land in (("dark", layer_helpers.CLUSTER_INK_DARK, "#181E18"),
-                            ("light", layer_helpers.CLUSTER_INK_LIGHT, "#FAF6F0")):
-    _composite = _over(_rgba(_ink["fill"]), _land)
-    _c = _contrast(_ink["text"], _composite)
-    check(f"{_theme}: cluster count stays readable over the translucent disc (>= 4.5:1)",
-          _c >= 4.5, f"{_c:.2f}:1 over {_composite}")
-
-# licensee filter is built from the data, not hard-coded
+# -- Operator filter: built from the data, applies to every layer that ------
+# -- carries a licensee, empty state, no leakage into export/CRS -----------
 combo = plugin.dock.records.licensee_combo
 options = [combo.itemData(i) for i in range(combo.count())]
-check("licensee list is data-driven, not hard-coded",
+check("operator list is data-driven, not hard-coded",
       combo.count() > 100 and options[0] == "", f"{combo.count()} options")
-check("licensee list offers 'All' first", "All licensees" in combo.itemText(0))
-source_licensees = {(f["licensee"] or "").strip() for f in sites_layer.getFeatures()}
-check("every offered licensee exists in the loaded records",
-      set(o for o in options if o) <= source_licensees)
+check("operator list offers 'All' first", "All operators" in combo.itemText(0))
 
-unfiltered_total = sites_layer.featureCount()
+# The QGIS layer's own 'licensee' field is already a " / "-joined string
+# where a site's raw record names more than one licensee
+# (core/sources/terrestrial_public.py: "licensee": " / ".join(licensees)) --
+# real, common (355 of 956 distinct site licensee strings in the loaded
+# snapshot), not a rare edge case. The offered operator list must be built
+# by splitting those, or a real "Bell Media Inc. / Bell Média Inc." record
+# would offer only the whole combined string as one (wrong) "operator".
+_cellular_layer = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_CELLULAR)
+_source_raw = {(f["licensee"] or "").strip() for f in sites_layer.getFeatures()} | \
+              {(f["licensee"] or "").strip() for f in links_layer2.getFeatures()}
+_source_split = {part.strip() for raw in _source_raw for part in raw.split(" / ") if part.strip()}
+check("every offered operator is a real, split-correct name from the loaded records",
+      set(o for o in options if o) <= _source_split)
+check("a combined licensee string itself is never offered whole as one operator",
+      "Bell Media Inc. / Bell Média Inc." not in set(options))
+
+unfiltered_sites = sites_layer.featureCount()
+unfiltered_links = links_layer2.featureCount()
+# Fetched while unfiltered, so a filter applied later in this block cannot
+# hide the very record these checks need to find again.
+_site_combo_id = next(
+    (f.id() for f in sites_layer.getFeatures()
+     if (f["licensee"] or "") == "Bell Media Inc. / Bell Média Inc."), None)
+_link_combo_id = next(
+    (f.id() for f in links_layer2.getFeatures()
+     if "Bell Média Inc. (CFVM-FM / CIKI-FM)" in (f["licensee"] or "")), None)
 http_calls = {"n": 0}
 _real_get4 = _requests.get
 
@@ -984,40 +1041,101 @@ def _count4(url, *a, **kw):
 
 _requests.get = _count4
 try:
-    expected = {}
-    for name in ("Rogers Communications Canada Inc.", "Bell Mobility Inc."):
-        expected[name] = sum(1 for f in sites_layer.getFeatures()
-                             if (f["licensee"] or "").strip() == name)
+    # Anchored match: exact value, or one " / "-separated part of a combined
+    # value -- the same boundary _operator_counts() splits on, verified
+    # against real combined records rather than a synthetic fixture.
+    def _anchored_count(layer, name):
+        return sum(1 for f in layer.getFeatures()
+                   if name in [p.strip() for p in (f["licensee"] or "").split(" / ")])
+
+    expected_sites = {n: _anchored_count(sites_layer, n)
+                      for n in ("Rogers Communications Canada Inc.", "Bell Mobility Inc.")}
     http_calls["n"] = 0
     plugin.set_licensee_filter("Rogers Communications Canada Inc.")
     qgs.processEvents()
     rogers_count = sites_layer.featureCount()
-    check("Rogers filter shows only Rogers records",
-          rogers_count == expected["Rogers Communications Canada Inc."] < unfiltered_total,
-          f"{rogers_count:,} of {unfiltered_total:,}")
-    check("every visible record belongs to the chosen licensee",
-          all((f["licensee"] or "").strip() == "Rogers Communications Canada Inc."
+    check("Rogers filter shows only Rogers sites (anchored match, not just exact)",
+          rogers_count == expected_sites["Rogers Communications Canada Inc."] < unfiltered_sites,
+          f"{rogers_count:,} of {unfiltered_sites:,}")
+    check("every visible site belongs to the chosen operator",
+          all("Rogers Communications Canada Inc."
+              in [p.strip() for p in (f["licensee"] or "").split(" / ")]
               for f in sites_layer.getFeatures()))
+    check("the same operator filter also narrows Fixed Service links",
+          links_layer2.featureCount() < unfiltered_links, f"{links_layer2.featureCount():,}")
+    check("every visible link belongs to the chosen operator",
+          all("Rogers Communications Canada Inc."
+              in [p.strip() for p in (f["licensee"] or "").split(" / ")]
+              for f in links_layer2.getFeatures()))
+    # Cellular is a live, viewport-scoped layer with no features loaded in
+    # this offline harness -- the filter still has to reach it structurally,
+    # so this checks the subset string it was given, not a feature count.
+    check("the operator filter reaches the Cellular layer too (subset string set)",
+          _cellular_layer is not None and _cellular_layer.subsetString() != "",
+          _cellular_layer.subsetString() if _cellular_layer is not None else None)
 
     plugin.set_licensee_filter("Bell Mobility Inc.")
     qgs.processEvents()
-    check("Bell filter shows only Bell records",
-          sites_layer.featureCount() == expected["Bell Mobility Inc."],
+    check("Bell filter shows only Bell sites",
+          sites_layer.featureCount() == expected_sites["Bell Mobility Inc."],
           f"{sites_layer.featureCount():,}")
+
+    # A real combined-name record, in each layer, used exactly as reported --
+    # filtering by one split part must still surface the record whose whole
+    # licensee field is the combined string. IDs were captured above, before
+    # any filter in this block could hide them.
+    if _site_combo_id is not None:
+        plugin.set_licensee_filter("Bell Media Inc.")
+        qgs.processEvents()
+        check("filtering by one part of a real combined SITE licensee still finds that record",
+              _site_combo_id in {f.id() for f in sites_layer.getFeatures()})
+    else:
+        SKIPPED.append("combined-site-licensee filter check (record not present this run)")
+
+    if _link_combo_id is not None:
+        plugin.set_licensee_filter("Bell Média Inc. (CFVM-FM / CIKI-FM)")
+        qgs.processEvents()
+        check("filtering by a real combined LINK licensee finds its own record",
+              _link_combo_id in {f.id() for f in links_layer2.getFeatures()})
+    else:
+        SKIPPED.append("combined-link-licensee filter check (record not present this run)")
 
     plugin.set_licensee_filter("")
     qgs.processEvents()
-    check("clearing the filter restores every record",
-          sites_layer.featureCount() == unfiltered_total, f"{sites_layer.featureCount():,}")
-    check("licensee switching issues no public-data requests",
+    check("clearing the filter restores every site", sites_layer.featureCount() == unfiltered_sites,
+          f"{sites_layer.featureCount():,}")
+    check("clearing the filter restores every link", links_layer2.featureCount() == unfiltered_links,
+          f"{links_layer2.featureCount():,}")
+    check("operator switching issues no public-data requests",
           http_calls["n"] == 0, f"{http_calls['n']} requests")
 finally:
     _requests.get = _real_get4
 
 check("filtering creates no second dataset",
       layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_FIXED_SITES) is sites_layer)
-check("filtering leaves the links layer alone", links_layer2.subsetString() == "")
 check("filtering does not touch the CRS", project.crs().authid() == "EPSG:3857")
+
+# -- Empty operator match: an explicit message, not a silent blank table ----
+# Force the Records tab to Fixed Service sites first -- this check is about
+# the empty-state MESSAGE, not about whichever tab happened to be showing
+# from earlier in the suite.
+_sites_tab = plugin.dock.records.dataset_combo.findData(layer_helpers.SOURCE_FIXED_SITES)
+plugin.dock.records.dataset_combo.setCurrentIndex(_sites_tab)
+plugin.set_licensee_filter("An Operator That Does Not Exist In This Data")
+qgs.processEvents()
+check("a nonexistent operator legitimately matches zero sites",
+      sites_layer.featureCount() == 0)
+check("the Records tab is really showing Fixed Service sites for this check",
+      plugin.dock.records.current_source_key() == layer_helpers.SOURCE_FIXED_SITES)
+_status_text = plugin.dock.records.status_label.text()
+check("the empty state names the operator, not a generic 'nothing loaded' message",
+      "An Operator That Does Not Exist In This Data" in _status_text, _status_text)
+check("the empty state tells the operator how to recover",
+      "clear" in _status_text.lower(), _status_text)
+plugin.set_licensee_filter("")
+qgs.processEvents()
+check("clearing the empty filter restores every site again",
+      sites_layer.featureCount() == unfiltered_sites)
 
 # clustering must not leak into the evidence model
 check("clustering adds no evidence kind",
@@ -1416,6 +1534,242 @@ check("duplicate removal survives this pass",
 check("geographic coverage is unchanged (same six tiers, same source layers)",
       {t[0] for t in basemap_labels.TIERS} == {"country", "province", "water",
                                                "city-wide", "city", "town"})
+
+print("\n== 24. Operator filter visible from dock creation, before any data ==")
+# A fresh dock, never having gone through load_public_data() -- this is what
+# show_panel()/initGui() produce for an operator who reopens the panel (or
+# opens it for the first time) before ever clicking Load Public Data. The
+# Operator combo must already be there, not hidden behind picking a
+# dataset that does not exist yet.
+_iface2 = FakeIface()
+_iface2.window.show()
+_plugin2 = VeloronaPlugin(_iface2)
+_plugin2._warn = lambda m: None
+_plugin2._error = lambda m: None
+_dock2 = _plugin2._ensure_dock()
+check("the Operator combo exists and is visible the moment the dock is created",
+      _dock2.records.licensee_combo.isVisibleTo(_dock2.records))
+check("the Operator label is visible too, not just the combo",
+      _dock2.records.operator_label.isVisibleTo(_dock2.records))
+check("before Load Public Data, the Operator combo is disabled, not hidden",
+      not _dock2.records.licensee_combo.isEnabled())
+check("before Load Public Data, the Operator hint is not shown",
+      not _dock2.records.operator_hint.isVisible())
+check("the dataset combo has no datasets yet (nothing loaded)",
+      _dock2.records.dataset_combo.count() == 0)
+# Populate it now, exactly as Load Public Data would, and confirm the combo
+# turns on -- this is the ONLY thing that should gate it, not which dataset
+# tab is selected.
+_dock2.records.populate_licensees({"Example Operator Inc.": 3})
+check("populate_licensees() enables the combo once it has real counts",
+      _dock2.records.licensee_combo.isEnabled())
+check("populate_licensees() shows the count hint",
+      _dock2.records.operator_hint.isVisibleTo(_dock2.records)
+      and "1 operator" in _dock2.records.operator_hint.text(),
+      _dock2.records.operator_hint.text())
+_iface2.window.close()
+
+print("\n== 25. Layer-type colour system: measured distinctness ==")
+# core/colors.py's docstring states specific, checkable claims about the six
+# COLORS_DARK/COLORS_LIGHT values: minimum pairwise CIEDE2000 separation
+# after simulating deuteranopia/protanopia/tritanopia, and a contrast floor
+# against each real backdrop. This verifies the DATA actually chosen, not
+# just that cluster_ink()/cluster_symbol() correctly apply whatever colour
+# they are given (section 21 covers that). A future edit that quietly
+# narrows the palette toward near-duplicate hues has to fail one of these,
+# not just "look different enough" to whoever made the change.
+
+
+def _lab(rgb):
+    def lin(v):
+        v /= 255.0
+        return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+    r, g, b = (lin(v) for v in rgb)
+    x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047
+    y = r * 0.2126 + g * 0.7152 + b * 0.0722
+    z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883
+    f = lambda t: t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+    fx, fy, fz = f(x), f(y), f(z)
+    return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
+
+
+def _ciede2000(rgb1, rgb2):
+    import math
+    L1, a1, b1 = _lab(rgb1)
+    L2, a2, b2 = _lab(rgb2)
+    C1, C2 = math.hypot(a1, b1), math.hypot(a2, b2)
+    Cb = (C1 + C2) / 2
+    G = 0.5 * (1 - math.sqrt(Cb ** 7 / (Cb ** 7 + 25 ** 7))) if Cb > 0 else 0
+    a1p, a2p = (1 + G) * a1, (1 + G) * a2
+    C1p, C2p = math.hypot(a1p, b1), math.hypot(a2p, b2)
+    h1 = math.degrees(math.atan2(b1, a1p)) % 360
+    h2 = math.degrees(math.atan2(b2, a2p)) % 360
+    dLp = L2 - L1
+    dCp = C2p - C1p
+    if C1p * C2p == 0:
+        dh = 0
+    elif h2 - h1 > 180:
+        dh = h2 - h1 - 360
+    elif h2 - h1 < -180:
+        dh = h2 - h1 + 360
+    else:
+        dh = h2 - h1
+    dHp = 2 * math.sqrt(C1p * C2p) * math.sin(math.radians(dh) / 2)
+    Lb, Cbp = (L1 + L2) / 2, (C1p + C2p) / 2
+    if C1p * C2p == 0:
+        hb = h1 + h2
+    elif abs(h1 - h2) > 180:
+        hb = (h1 + h2 + 360) / 2 if h1 + h2 < 360 else (h1 + h2 - 360) / 2
+    else:
+        hb = (h1 + h2) / 2
+    T = (1 - 0.17 * math.cos(math.radians(hb - 30)) + 0.24 * math.cos(math.radians(2 * hb))
+        + 0.32 * math.cos(math.radians(3 * hb + 6)) - 0.20 * math.cos(math.radians(4 * hb - 63)))
+    Sl = 1 + (0.015 * (Lb - 50) ** 2) / math.sqrt(20 + (Lb - 50) ** 2)
+    Sc, Sh = 1 + 0.045 * Cbp, 1 + 0.015 * Cbp * T
+    Rt = 0
+    if Cbp > 0:
+        Rt = (-2 * math.sqrt(Cbp ** 7 / (Cbp ** 7 + 25 ** 7))
+             * math.sin(math.radians(60 * math.exp(-((hb - 275) / 25) ** 2))))
+    return math.sqrt((dLp / Sl) ** 2 + (dCp / Sc) ** 2 + (dHp / Sh) ** 2
+                     + Rt * (dCp / Sc) * (dHp / Sh))
+
+
+# Vienot/Brettel/Mollon linear-RGB CVD simulation matrices.
+_CVD_MATS = {
+    "deuteranopia": ((0.625, 0.375, 0.0), (0.70, 0.30, 0.0), (0.0, 0.30, 0.70)),
+    "protanopia": ((0.567, 0.433, 0.0), (0.558, 0.442, 0.0), (0.0, 0.242, 0.758)),
+    "tritanopia": ((0.95, 0.05, 0.0), (0.0, 0.433, 0.567), (0.0, 0.475, 0.525)),
+}
+
+
+def _simulate_cvd(rgb, kind):
+    if kind == "normal":
+        return rgb
+
+    def lin(v):
+        v /= 255.0
+        return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
+    def srgb(v):
+        v = max(0.0, min(1.0, v))
+        return 255 * (12.92 * v if v <= 0.0031308 else 1.055 * v ** (1 / 2.4) - 0.055)
+    r, g, b = (lin(v) for v in rgb)
+    m = _CVD_MATS[kind]
+    out = [m[i][0] * r + m[i][1] * g + m[i][2] * b for i in range(3)]
+    return tuple(srgb(v) for v in out)
+
+
+import itertools as _itertools
+
+_VISION_TYPES = ("normal", "deuteranopia", "protanopia", "tritanopia")
+_MIN_DE_FLOOR = 15.0  # measured achieved: 17.3 dark / 16.9 light -- margin, not the exact value
+
+for _mode, _palette, _land, _contrast_floor in (
+        ("dark", layer_helpers.COLORS_DARK, "#181E18", 4.5),
+        ("light", layer_helpers.COLORS_LIGHT, "#FAF6F0", 2.5)):
+    check(f"{_mode}: all six type colours are distinct hex values",
+          len(set(_palette.values())) == 6, str(_palette))
+    _land_rgb = layer_helpers._hex_to_rgb(_land)
+    for _kind, _hex in _palette.items():
+        _c = _contrast(_hex, _land)
+        check(f"{_mode} {_kind}: solid colour meets the {_contrast_floor}:1 contrast floor "
+             f"against {_land}",
+              _c >= _contrast_floor, f"{_c:.2f}:1")
+    _worst = 999.0
+    _worst_pair = None
+    for _vision in _VISION_TYPES:
+        _sims = {k: _simulate_cvd(layer_helpers._hex_to_rgb(h), _vision)
+                for k, h in _palette.items()}
+        for _a, _b in _itertools.combinations(_sims, 2):
+            _de = _ciede2000(_sims[_a], _sims[_b])
+            if _de < _worst:
+                _worst, _worst_pair = _de, (_vision, _a, _b)
+    check(f"{_mode}: minimum pairwise CIEDE2000 separation across every simulated "
+         f"vision type stays above {_MIN_DE_FLOOR}",
+          _worst >= _MIN_DE_FLOOR, f"{_worst:.1f} ({_worst_pair})")
+
+print("\n== 26. Layer-type colour system: rendered proof ==")
+# The bug this whole feature closes, reproduced end to end: build several
+# clustered layers of different types with the real renderer, render them
+# together with QGIS's own compositor, and read the actual pixels back --
+# not just inspect the symbol objects. Before the fix, every clustered layer
+# rendered the same shared bubble regardless of its own COLORS entry; this
+# is the render-level proof that is no longer true.
+from qgis.core import (QgsFeature, QgsGeometry, QgsMapSettings,  # noqa: E402
+                       QgsMapRendererParallelJob, QgsPointXY as _QgsPointXY,
+                       QgsVectorLayer)
+from qgis.PyQt.QtGui import QColor as _QColor26  # noqa: E402
+import random as _random
+
+_random.seed(11)
+_render_layers = []
+_render_kinds = [("fixed-sites", -79.8), ("satellites", -78.9)]
+for _kind, _lon0 in _render_kinds:
+    _lyr = QgsVectorLayer("Point?crs=EPSG:4326", _kind, "memory")
+    _feats = []
+    for _ in range(40):
+        _f = QgsFeature()
+        _f.setGeometry(QgsGeometry.fromPointXY(
+            _QgsPointXY(_lon0 + _random.gauss(0, 0.02), 43.7 + _random.gauss(0, 0.02))))
+        _feats.append(_f)
+    _lyr.dataProvider().addFeatures(_feats)
+    _lyr.updateExtents()
+    _lyr.setRenderer(layer_helpers._clustered_renderer(layer_helpers.COLORS_DARK[_kind], True))
+    _render_layers.append(_lyr)
+
+_ms = QgsMapSettings()
+_ms.setLayers(_render_layers)
+# Native EPSG:4326, matching the layers themselves -- no reprojection math to
+# get wrong. The extent is the layers' own combined extent, buffered, so
+# every rendered point is guaranteed to be inside frame regardless of the
+# actual coordinates picked above.
+_ms.setDestinationCrs(QgsCoordinateReferenceSystem("EPSG:4326"))
+_ms.setOutputSize(QSize(600, 300))
+_ms.setOutputDpi(96)
+_ms.setBackgroundColor(_QColor26("#181E18"))
+_render_extent = QgsRectangle()
+for _lyr in _render_layers:
+    _render_extent.combineExtentWith(_lyr.extent())
+_render_extent.grow(0.05)
+_ms.setExtent(_render_extent)
+
+_job = QgsMapRendererParallelJob(_ms)
+_job.start()
+_job.waitForFinished()
+_image = _job.renderedImage()
+
+
+def _pixels_matching(image, hex_color, land, tol=30):
+    # The cluster fill is translucent (CLUSTER_FILL_ALPHA/255), by design --
+    # that is what lets the basemap read through it -- so the pixel actually
+    # on screen is the composite of the type hue over the backdrop, not the
+    # raw hex. Comparing against the raw hex would never match anything.
+    rgba = layer_helpers._hex_to_rgb(hex_color) + (layer_helpers.CLUSTER_FILL_ALPHA,)
+    r, g, b = _over_rgb(rgba, land)
+    n = 0
+    for y in range(0, image.height(), 3):      # sampled, not every pixel -- fast enough to stay in CI
+        for x in range(0, image.width(), 3):
+            p = image.pixelColor(x, y)
+            if abs(p.red() - r) + abs(p.green() - g) + abs(p.blue() - b) < tol:
+                n += 1
+    return n
+
+
+def _over_rgb(rgba, backdrop):
+    a = rgba[3] / 255
+    bg = layer_helpers._hex_to_rgb(backdrop)
+    return tuple(round(rgba[i] * a + bg[i] * (1 - a)) for i in range(3))
+
+
+_sites_pixels = _pixels_matching(_image, layer_helpers.COLORS_DARK["fixed-sites"], "#181E18")
+_satellites_pixels = _pixels_matching(_image, layer_helpers.COLORS_DARK["satellites"], "#181E18")
+check("the rendered image actually contains fixed-sites' own cluster colour",
+      _sites_pixels > 0, f"{_sites_pixels} sampled px")
+check("the rendered image actually contains satellites' own cluster colour",
+      _satellites_pixels > 0, f"{_satellites_pixels} sampled px")
+check("fixed-sites and satellites clusters are visually distinct colours on screen, "
+     "not the same shared bubble",
+      layer_helpers.COLORS_DARK["fixed-sites"] != layer_helpers.COLORS_DARK["satellites"])
 
 passed = sum(1 for _, ok, _ in RESULTS if ok)
 for s_ in SKIPPED:
