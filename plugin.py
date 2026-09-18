@@ -920,6 +920,7 @@ class VeloronaPlugin:
             columns=[label for label, _ in columns],
             rows=rows,
             table_limit=SELECTION_TABLE_LIMIT,
+            licensee_filter=self._licensee_filter,
         )
 
     def _on_record_chosen(self, layer, fid, kind):

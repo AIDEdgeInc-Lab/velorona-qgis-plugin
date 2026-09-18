@@ -96,7 +96,7 @@ canvas.destinationCrsChanged.connect(
     lambda: crs_events.append(("canvas", canvas.mapSettings().destinationCrs().authid(), time.monotonic()))
 )
 
-from velorona.core import export  # noqa: E402
+from velorona.core import export, inspector  # noqa: E402
 from velorona.core.engines import microwave_exposure, satellite_earth_space, terrestrial  # noqa: E402
 from velorona.core.inspector import feature_to_entry  # noqa: E402
 from velorona.plugin import BASEMAP_NAME, VeloronaPlugin  # noqa: E402
@@ -1013,6 +1013,95 @@ site_csv = export.feature_to_csv(
     {f.name(): site_feature[f.name()] for f in site_feature.fields()}, 0.0, 0.0)
 check("raw site export is unchanged by clustering",
       "cluster" not in site_csv.lower() and "Open Government Licence" in site_csv)
+
+# -- Multi-record selection export -------------------------------------------
+# The workflow is EXPLORE -> SELECT -> ANALYZE -> EVIDENCE -> EXPORT, and it
+# used to dead-end at EXPORT: a selection-summary had no branch in
+# result_to_csv(), so it fell through to the satellite/earth-space
+# NotExportable and the operator was refused with a message about an analysis
+# they never ran. These pin the fix and the message that was wrong.
+_sel = inspector.SelectionSummary(
+    kind_label="Fixed Service sites", feature_kind="site", count=3, scanned=3,
+    licensees=["Bell Mobility Inc.", "Rogers Communications Canada Inc."],
+    frequency_range=(6175.0, 959.9375),
+    extent_wgs84=(-79.9512, 43.1043, -78.8501, 44.2011),
+    columns=["Site", "Licensee"],
+    rows=[["Toronto A", "Bell Mobility Inc."], ["Toronto B", "Bell Mobility Inc."]],
+    licensee_filter="Bell Mobility Inc.")
+
+try:
+    _sel_csv = export.result_to_csv(_sel)
+    _sel_ok = True
+except Exception as _exc:
+    _sel_csv, _sel_ok = str(_exc), False
+
+check("a multi-record selection exports at all (was NotExportable)", _sel_ok, _sel_csv[:90])
+check("the selection export never claims to be a satellite result",
+      "Earth-Space" not in _sel_csv and "geometry snapshot" not in _sel_csv)
+check("preamble carries the active licensee filter",
+      "Licensee filter: Bell Mobility Inc." in _sel_csv)
+check("preamble states the filter is off when there is none",
+      "Licensee filter: None -- all licensees" in export.result_to_csv(
+          inspector.SelectionSummary(kind_label="sites", feature_kind="site", count=1,
+                                     scanned=1, columns=["Site"], rows=[["A"]])))
+check("preamble carries the selection extent in WGS84",
+      "-79.95120, 43.10430, -78.85010, 44.20110" in _sel_csv)
+check("preamble carries the record count", "Records selected: 3" in _sel_csv)
+check("preamble carries a UTC generation timestamp",
+      "Generated: " in _sel_csv and "+00:00" in _sel_csv)
+check("preamble carries the distinct licensees", "Distinct licensees: 2" in _sel_csv)
+check("frequency range keeps ISED's 4-decimal precision (not %g-rounded)",
+      "959.9375" in _sel_csv and "959.938 " not in _sel_csv)
+check("one row per selected record, under the Records table's own columns",
+      "Site,Licensee" in _sel_csv and "Toronto A,Bell Mobility Inc." in _sel_csv)
+check("the selection export states that O/C/I typing does not apply",
+      "not applicable" in _sel_csv and "nothing here is inferred" in _sel_csv.lower())
+check("the O/C/I evidence header is NOT imposed on a raw-record selection",
+      ",".join(export.EVIDENCE_HEADER) not in _sel_csv)
+
+# Above the listing limit the rows are never captured. The file must say so
+# rather than shipping a header with no rows under it.
+_sel_big = inspector.SelectionSummary(
+    kind_label="Fixed Service sites", feature_kind="site", count=5000, scanned=2000,
+    columns=["Site", "Licensee"], rows=[], table_limit=200)
+_big_csv = export.result_to_csv(_sel_big)
+check("an over-limit selection still exports", bool(_big_csv))
+check("an over-limit selection says the listing was omitted and why",
+      "Per-record listing: Not determined" in _big_csv and "200-record listing limit" in _big_csv)
+check("a partially scanned selection does not let its aggregates imply completeness",
+      "describe the scanned subset only" in _big_csv)
+
+# The genuinely-unexportable case must still refuse, with its own message.
+class _SatResult:
+    kind = "satellite-earth-space"
+
+
+try:
+    export.result_to_csv(_SatResult())
+    _sat_refused, _sat_msg = False, ""
+except export.NotExportable as _exc:
+    _sat_refused, _sat_msg = True, str(_exc)
+check("satellite/earth-space export still refuses", _sat_refused)
+check("and still refuses with its own correct message",
+      "Earth-Space" in _sat_msg and "geometry snapshot" in _sat_msg)
+
+# Single-record export must be untouched by this change: the same feature,
+# routed through result_to_csv()'s "site" branch, must produce byte-identical
+# output to the direct feature_to_csv() call above, modulo its timestamp line.
+_site_entry = inspector.feature_to_entry(site_feature, "site")
+_site_entry.latitude, _site_entry.longitude = 0.0, 0.0
+_routed = export.result_to_csv(_site_entry)
+
+
+def _drop_generated(text):
+    return "\n".join(line for line in text.splitlines()
+                      if not line.startswith("# Generated:"))
+
+
+check("single-record site export is unchanged by the selection-export branch",
+      _drop_generated(_routed) == _drop_generated(site_csv))
+check("single-record export still uses the wide record header, not O/C/I",
+      "Name / Licensee" in _routed and ",".join(export.EVIDENCE_HEADER) not in _routed)
 
 # normal links stay subordinate to the selection in both appearances
 check("normal link ink differs per appearance",
