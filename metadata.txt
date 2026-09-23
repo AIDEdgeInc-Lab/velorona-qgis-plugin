@@ -19,11 +19,9 @@ changelog=1.0.0 - First production release. The ISED Fixed Service and SatNOGS g
     terrestrial home layers instead of the global space layers. Plugin unload is idempotent and
     cleans its own analysis overlays while leaving loaded public data in place.
     0.2.0 - Experimental local development plugin.
-; No Velorona-specific repository or issue tracker exists yet. Both are
-; required by plugins.qgis.org and must be set before submission; they are
-; left unset rather than pointed at an unrelated project's tracker.
-tracker=
-repository=
+tracker=https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/issues
+repository=https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin
+homepage=https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin
 experimental=False
-category=Plugins
+category=Vector
 hasProcessingProvider=no
