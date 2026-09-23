@@ -93,14 +93,29 @@ MAP_APPEARANCE_DARK = "dark"
 MAP_APPEARANCE_LIGHT = "light"
 DEFAULT_MAP_APPEARANCE = MAP_APPEARANCE_DARK
 
-# Selection highlight, measured against the two basemaps rather than chosen by
-# eye. QGIS's default pure yellow scores 17.5:1 on the dark map but only
-# 1.03:1 against Voyager's cream land -- a selected link effectively vanishes
-# on the light map. Velorona's deep brand blue scores 8.15:1 there, so the
-# highlight follows the appearance. Both values are existing brand/QGIS
-# colours; nothing new was invented, and only this project is touched.
-SELECTION_COLOR_DARK = "#FFFF00"
-SELECTION_COLOR_LIGHT = "#224B75"
+# Selection highlight. The values below were originally measured only
+# against the two CARTO basemaps (QGIS's default pure yellow scored 17.5:1 on
+# the dark map, Velorona's brand navy 8.15:1 on the light one) -- but never
+# against the six PR #4 layer-type colours. Measured properly (CIEDE2000
+# across simulated deuteranopia/protanopia/tritanopia): the yellow fell to
+# 4.6 against cellular (#FFBA7C), the navy to 9.3 against satellites
+# (#508167) -- both well below the ~17 the six type colours hold against each
+# other. A plain red/amber separates cleanly from the six types but collides
+# with this product's own severity colours (ui/theme.py OBSTRUCTED #E2594F,
+# MARGINAL #E0A73B) -- a selected feature could read as "obstructed" rather
+# than "selected". These two hold >=10.8 CIEDE2000 against every type colour
+# in every simulated vision type, and >=27/35 against the severity colours.
+#
+# This is now also the halo colour applied per layer via
+# core/layers.py:selection_symbol()/link_selection_symbol() -- see that
+# module's comment for why a per-layer CustomSymbol halo replaced the flat
+# project-wide colour swap this constant used to drive directly. It still
+# sets the project-wide fallback (_apply_selection_color, below) for any
+# layer that isn't one of the six typed ones -- a user's own imported data,
+# for instance -- so the "selected" colour language stays one thing across
+# the whole project, not two.
+SELECTION_COLOR_DARK = layer_helpers.SELECTION_HALO_COLOR_DARK
+SELECTION_COLOR_LIGHT = layer_helpers.SELECTION_HALO_COLOR_LIGHT
 BASEMAP_TILE_URL = "https://tiles-a.basemaps.cartocdn.com/vectortiles/carto.streets/v1/{z}/{x}/{y}.mvt"
 BASEMAP_TILE_MAXZOOM = 14
 
@@ -124,6 +139,14 @@ PROJECT_CRS = QgsCoordinateReferenceSystem("EPSG:3857")
 # a y value roughly twice the height of the world and the canvas lands on a
 # stretched whole-globe view instead of the data.
 WEB_MERCATOR_MAX_LAT = 85.05112878
+
+# A selected point has zero-area extent, so zooming to it literally (see
+# _zoom_to_selection) would either be a no-op pan or an unbounded zoom
+# depending on the mechanism used -- neither shows the point. Padding to a
+# fixed 1km-wide box (500m each direction, in the project's own EPSG:3857
+# metres) reads the halo clearly at a glance while keeping nearby sites/
+# links in view, rather than filling the screen with basemap alone.
+POINT_ZOOM_HALF_WIDTH_M = 500.0
 
 # A single pan or zoom emits extentsChanged several times. The viewport
 # layers are backed by live ArcGIS queries (measured at ~10s for the ISED
@@ -470,9 +493,44 @@ class VeloronaPlugin:
 
     def _apply_selection_color(self, dark: bool) -> None:
         """Keeps the selected feature visible on whichever basemap is active.
-        This is a project property, not a QGIS preference."""
+        This is a project property, not a QGIS preference. It is the
+        fallback for any layer that _apply_selection_symbols() below does not
+        explicitly configure -- a user's own imported data, for instance."""
         QgsProject.instance().setSelectionColor(
             QColor(SELECTION_COLOR_DARK if dark else SELECTION_COLOR_LIGHT))
+
+    def _apply_selection_symbols(self, dark: bool) -> None:
+        """The actual, working selection highlight for the six typed layers:
+        a per-layer CustomSymbol halo (core/layers.py:selection_symbol() /
+        link_selection_symbol()), not the project-wide flat colour swap above.
+
+        This is not a style preference -- it is the only mechanism that shows
+        a selection at all once a feature is grouped into a cluster, verified
+        by direct pixel diff: the project-wide setSelectionColor() path
+        (Qgis.SelectionRenderingMode.Default/CustomColor) produced zero
+        changed pixels for a feature inside an active cluster group, because
+        QgsPointClusterRenderer has no notion of "one of my members is
+        selected" under that mode. Qgis.SelectionRenderingMode.CustomSymbol
+        makes QGIS break the selected feature out of its cluster and draw it
+        individually with this halo -- confirmed for an isolated point, a
+        feature still grouped in a cluster, and the fixed-links line, all
+        three via direct pixel diff, not assumed from documentation."""
+        project = QgsProject.instance()
+        for key, kind in layer_helpers.CLUSTERED_LAYER_COLOR_KEY.items():
+            layer = layer_helpers.find_owned_layer(project, key)
+            if layer is None:
+                continue
+            props = layer.selectionProperties()
+            props.setSelectionRenderingMode(Qgis.SelectionRenderingMode.CustomSymbol)
+            props.setSelectionSymbol(layer_helpers.selection_symbol(layer_color(kind, dark), dark))
+            layer.triggerRepaint()
+
+        links = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_FIXED_LINKS)
+        if links is not None:
+            link_props = links.selectionProperties()
+            link_props.setSelectionRenderingMode(Qgis.SelectionRenderingMode.CustomSymbol)
+            link_props.setSelectionSymbol(layer_helpers.link_selection_symbol(dark))
+            links.triggerRepaint()
 
     def map_is_dark(self) -> bool:
         """Velorona's own map appearance -- deliberately independent of the QGIS
@@ -586,6 +644,41 @@ class VeloronaPlugin:
         canvas.setExtent(combined)
         canvas.refresh()
 
+    def _zoom_to_selection(self, layer) -> None:
+        """Brings the current selection into view -- same WGS84 -> canvas CRS
+        clamp/transform _zoom_to_layers uses, but starting from the selection's
+        own bounding box rather than a whole layer's. zoomToFeatureExtent()'s
+        own docstring says a zero-area extent only pans, never zooms -- true
+        for every single-point selection -- so a degenerate extent is padded
+        to POINT_ZOOM_HALF_WIDTH_M in the projected (metres) space instead; a
+        line or multi-feature selection already has real area and only needs
+        the same margin _zoom_to_layers gives a freshly loaded layer."""
+        extent = layer.boundingBoxOfSelected()
+        if extent is None or extent.isNull():
+            return
+        canvas = self.iface.mapCanvas()
+        canvas_crs = canvas.mapSettings().destinationCrs()
+        if canvas_crs != WGS84:
+            extent = QgsRectangle(
+                max(extent.xMinimum(), -180.0),
+                max(extent.yMinimum(), -WEB_MERCATOR_MAX_LAT),
+                min(extent.xMaximum(), 180.0),
+                min(extent.yMaximum(), WEB_MERCATOR_MAX_LAT),
+            )
+            transform = QgsCoordinateTransform(WGS84, canvas_crs, QgsProject.instance())
+            extent = transform.transformBoundingBox(extent)
+        if extent.width() == 0 and extent.height() == 0:
+            extent = QgsRectangle(
+                extent.xMinimum() - POINT_ZOOM_HALF_WIDTH_M,
+                extent.yMinimum() - POINT_ZOOM_HALF_WIDTH_M,
+                extent.xMaximum() + POINT_ZOOM_HALF_WIDTH_M,
+                extent.yMaximum() + POINT_ZOOM_HALF_WIDTH_M,
+            )
+        else:
+            extent.scale(1.2)
+        canvas.setExtent(extent)
+        canvas.refresh()
+
     def load_public_data(self):
         project = QgsProject.instance()
         # See PROJECT_CRS's comment above -- measured ~2.4x full-redraw speedup
@@ -676,6 +769,14 @@ class VeloronaPlugin:
                 f"Cellular Sites (ISED) -- {PUBLIC_RECORDS_DISCLOSURE}", [], terrestrial_public.CELLULAR_FIELDS,
                 layer_color("cellular", dark),
                 abstract=f"ISED Spectrum Licences Site Data, live query via Esri Canada mirror. {PUBLIC_RECORDS_DISCLOSURE.capitalize()}."))
+
+        # Unlike colour (baked into each layer above via layer_color(kind,
+        # dark) at build time), the selection halo has no equivalent
+        # construction-time path -- it lives on selectionProperties(), set
+        # here once all six typed layers exist. apply_basemap_theme() covers
+        # it again for a later appearance toggle, but that method never runs
+        # on this first load.
+        self._apply_selection_symbols(dark)
 
         # Zoom before the viewport-scoped fetch below, so towers/cellular fetch
         # against the extent the user actually lands on, not whatever the
@@ -887,6 +988,10 @@ class VeloronaPlugin:
             if self.dock is not None:
                 self.dock.show_empty_state()
             return
+        # Brings the selection into view regardless of where it came from --
+        # a map click already has the feature in view, but a dock row click
+        # or a cluster breakout may not.
+        self._zoom_to_selection(layer)
         if count > 1:
             self._show_result(self._summarize_selection(layer, kind, count))
             if self.dock is not None and not self._selecting_from_table and count <= SELECTION_TABLE_LIMIT:

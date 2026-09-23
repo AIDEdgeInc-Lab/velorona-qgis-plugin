@@ -33,10 +33,56 @@ from .colors import COLORS_DARK, COLORS_LIGHT
 # screen pixels (not the QGIS default of millimetres), same reasoning as
 # the web map: fixed visual weight regardless of zoom, so points read as
 # distinct dots instead of overlapping into a solid mass at low zoom.
-MARKER_SIZE_PX = 2.0
+#
+# MARKER_SIZE_PX raised from the web map's original 2.0: QGIS's own click/
+# identify tolerance (QgsMapTool.searchRadiusMM(), a global, QgsSettings-
+# backed value this plugin does not touch) is already generous --
+# Qgis.DEFAULT_SEARCH_RADIUS_MM = 2.0mm, about a 7.6px radius at 96 DPI,
+# independent of symbol size -- so a 2px dot wasn't hard to click because the
+# hit area was too small; the hit area was never the bottleneck. It was hard
+# to SEE where, inside that already-generous zone, to aim. 5.0px keeps the
+# same "distinct dots, not a blob" character at density while being an
+# actual target instead of a near-invisible speck.
+MARKER_SIZE_PX = 5.0
 MARKER_ALPHA = 170  # ~67%, out of 255 -- overlapping points show density, not a blob
 LINE_WIDTH_PX = 0.8
 LINE_ALPHA = 90  # ~35%, matches addLinkLine()'s opacity: 0.35 for fixed-links
+
+# Selection halo -- drawn INSTEAD of the normal symbol only while a feature is
+# selected (Qgis.SelectionRenderingMode.CustomSymbol, applied per layer in
+# plugin.py, not QgsProject's project-wide setSelectionColor()). Because
+# CustomSymbol replaces the whole symbol rather than tinting it, the halo
+# symbol has to reproduce the layer's own coloured dot/line itself plus an
+# added ring -- selection reads as "this one, and it is still a <type>"
+# rather than the previous flat-colour swap, which could only ever show one
+# or the other (measured: selecting a feature erased its type colour
+# entirely, replacing it with a solid block of the selection colour).
+#
+# This is also the only mechanism that makes a selection visible at all for a
+# feature still grouped inside a cluster bubble -- measured directly:
+# QgsProject.setSelectionColor() (the previous mechanism) produced ZERO
+# changed pixels for a feature inside an active cluster group, because the
+# cluster bubble has no notion of "one of my members is selected" under that
+# rendering mode. CustomSymbol mode makes QGIS break the selected feature out
+# of its cluster and draw it individually with this halo -- confirmed by
+# direct pixel diff, not assumed from documentation.
+#
+# Colour: the previous flat SELECTION_COLOR_DARK/LIGHT (#FFFF00 / #224B75, in
+# plugin.py) were measured only against the two CARTO basemaps, never against
+# the six PR #4 type colours -- CIEDE2000 measurement found the yellow falls
+# to 4.6 against cellular (#FFBA7C) under deuteranopia/protanopia, and the
+# navy to 9.3 against satellites (#508167) -- both well below the ~17 bar the
+# six type colours hold against each other. A plain red or amber "fixes" that
+# numerically but collides with this product's own severity colours
+# (ui/theme.py: OBSTRUCTED #E2594F, MARGINAL #E0A73B) -- a selected feature
+# could read as "this is obstructed" rather than "this is selected". These
+# two hold >=10.8 CIEDE2000 against every type colour and every simulated
+# vision type (deuteranopia/protanopia/tritanopia), and >=27/35 against the
+# severity colours, so neither collision recurs.
+SELECTION_HALO_COLOR_DARK = "#A48BDC"
+SELECTION_HALO_COLOR_LIGHT = "#0A1620"
+SELECTION_HALO_SIZE_PX = 11.0   # clearly exceeds the 5px marker without
+SELECTION_HALO_WIDTH_PX = 2.0  # reading as a different, separate object
 
 # Normal Fixed Service links need a different ink per basemap, at a lower
 # opacity than the type colour itself, so they never compete with a selected
@@ -61,6 +107,34 @@ def link_symbol(dark: bool = True) -> QgsLineSymbol:
     symbol.setColor(color)
     symbol.setWidth(LINE_WIDTH_PX)
     symbol.setWidthUnit(QgsUnitTypes.RenderPixels)
+    return symbol
+
+
+def link_selection_symbol(dark: bool = True) -> QgsLineSymbol:
+    """The selected-link symbol for Fixed Service links -- CustomSymbol mode's
+    equivalent of selection_symbol() below, for a line instead of a point.
+    Reproduces the link's own ink at full opacity (so it reads as the same
+    link, not a different colour) plus a wider halo line beneath it."""
+    ink = LINK_INK_DARK if dark else LINK_INK_LIGHT
+    halo_color = SELECTION_HALO_COLOR_DARK if dark else SELECTION_HALO_COLOR_LIGHT
+
+    halo = QgsLineSymbol.createSimple({"line_style": "solid"})
+    halo_col = QColor(halo_color)
+    halo_col.setAlpha(160)
+    halo.setColor(halo_col)
+    halo.setWidth(LINE_WIDTH_PX + SELECTION_HALO_WIDTH_PX * 2)
+    halo.setWidthUnit(QgsUnitTypes.RenderPixels)
+
+    core_line = QgsLineSymbol.createSimple({"line_style": "solid"})
+    core_color = QColor(ink["color"])
+    core_color.setAlpha(255)  # selected link is never the one left translucent
+    core_line.setColor(core_color)
+    core_line.setWidth(LINE_WIDTH_PX)
+    core_line.setWidthUnit(QgsUnitTypes.RenderPixels)
+
+    symbol = QgsLineSymbol()
+    symbol.changeSymbolLayer(0, halo.symbolLayer(0).clone())
+    symbol.appendSymbolLayer(core_line.symbolLayer(0).clone())
     return symbol
 
 
@@ -347,6 +421,29 @@ def _point_symbol(color_hex: str) -> QgsMarkerSymbol:
     symbol.setColor(color)
     symbol.setSize(MARKER_SIZE_PX)
     symbol.setSizeUnit(QgsUnitTypes.RenderPixels)
+    return symbol
+
+
+def selection_symbol(color_hex: str, dark: bool = True) -> QgsMarkerSymbol:
+    """The selected-feature symbol for one of the five clustered point types
+    -- CustomSymbol mode's replacement for _point_symbol(), verified by
+    direct pixel diff (not assumed) to be the only mechanism that shows a
+    selection at all once a feature is grouped into a cluster. See the
+    module-level comment above SELECTION_HALO_COLOR_DARK for the colour
+    measurement and why the previous flat-colour-swap mechanism could not
+    keep the type colour visible while selected."""
+    halo_color = SELECTION_HALO_COLOR_DARK if dark else SELECTION_HALO_COLOR_LIGHT
+    fill = QColor(color_hex)
+    fill.setAlpha(MARKER_ALPHA)
+    symbol = QgsMarkerSymbol.createSimple({
+        "name": "circle",
+        "color": fill.name(QColor.NameFormat.HexArgb),
+        "outline_color": halo_color,
+        "outline_width": str(SELECTION_HALO_WIDTH_PX),
+        "outline_width_unit": "Pixel",
+        "size": str(SELECTION_HALO_SIZE_PX),
+        "size_unit": "Pixel",
+    })
     return symbol
 
 

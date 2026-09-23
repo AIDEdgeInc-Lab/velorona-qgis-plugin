@@ -475,6 +475,64 @@ qgs.processEvents()
 check("clearing selection shows the empty state",
       "Select a Velorona feature" in plugin.dock.browser.toPlainText())
 
+print("\n== 14b. zoom-to-selection ==")
+# Start from a deliberately huge, wrong extent each time, so a passing check
+# is real evidence of a zoom, not a coincidence of wherever the canvas
+# already happened to be. The canvas is restored to its pre-block extent
+# afterwards -- later sections (e.g. 17's "initial extent") assert on it too.
+_extent_before_14b = QgsRectangle(canvas.extent())
+_huge = QgsRectangle(-2.0e7, -2.0e7, 2.0e7, 2.0e7)
+_canvas_crs = canvas.mapSettings().destinationCrs()
+_to_canvas_crs = QgsCoordinateTransform(plugin_module.WGS84, _canvas_crs, project)
+
+canvas.setExtent(QgsRectangle(_huge))
+canvas.refresh()
+qgs.processEvents()
+site_feats2 = list(sites_layer.getFeatures())
+site_feat = site_feats2[5]
+sites_layer.selectByIds([site_feat.id()])
+qgs.processEvents()
+site_extent = canvas.extent()
+site_center_m = _to_canvas_crs.transform(site_feat.geometry().asPoint())
+check("selecting a single site zooms in from the huge starting extent",
+      site_extent.width() < _huge.width(), f"{site_extent.width():.0f} m wide")
+check("a point selection is centred on the feature",
+      abs(site_extent.center().x() - site_center_m.x()) < 1.0
+      and abs(site_extent.center().y() - site_center_m.y()) < 1.0,
+      f"centre off by ({site_extent.center().x() - site_center_m.x():.1f}, "
+      f"{site_extent.center().y() - site_center_m.y():.1f}) m")
+# setExtent() grows whichever axis is needed to match the canvas widget's own
+# aspect ratio, so only the constraining axis (the smaller of the two) comes
+# back at exactly the requested box; the other is legitimately larger. The
+# upper bound (3x) is what rules out an arbitrary/unbounded size, not a bug.
+check("a point selection zooms to the fixed ~1km box (POINT_ZOOM_HALF_WIDTH_M), "
+      "not zero (pan-only) or an arbitrary size",
+      abs(min(site_extent.width(), site_extent.height())
+          - 2 * plugin_module.POINT_ZOOM_HALF_WIDTH_M) < 1.0
+      and max(site_extent.width(), site_extent.height()) < 6 * plugin_module.POINT_ZOOM_HALF_WIDTH_M,
+      f"{site_extent.width():.1f} x {site_extent.height():.1f} m")
+
+sites_layer.removeSelection()
+qgs.processEvents()
+canvas.setExtent(QgsRectangle(_huge))
+canvas.refresh()
+qgs.processEvents()
+link_layer.selectByIds([some_fid])
+qgs.processEvents()
+link_extent = canvas.extent()
+link_feat = next(f for f in link_layer.getFeatures() if f.id() == some_fid)
+link_bbox_m = _to_canvas_crs.transformBoundingBox(link_feat.geometry().boundingBox())
+check("selecting a link (real extent, not a point) also zooms in from the huge starting extent",
+      link_extent.width() < _huge.width(), f"{link_extent.width():.0f} m wide")
+check("a line selection's zoom extent contains the feature's own bounding box with margin",
+      link_extent.xMinimum() <= link_bbox_m.xMinimum() and link_extent.xMaximum() >= link_bbox_m.xMaximum()
+      and link_extent.yMinimum() <= link_bbox_m.yMinimum() and link_extent.yMaximum() >= link_bbox_m.yMaximum())
+link_layer.removeSelection()
+qgs.processEvents()
+canvas.setExtent(_extent_before_14b)
+canvas.refresh()
+qgs.processEvents()
+
 print("\n== 15. Fixed Service link -> weather evidence ==")
 link_layer.selectByIds([some_fid])
 qgs.processEvents()
@@ -539,8 +597,12 @@ check("Velorona workspace CRS is EPSG:3857 under QGIS's own layer-tree behaviour
       project.crs().authid() == "EPSG:3857", project.crs().authid())
 check("canvas follows the workspace CRS",
       canvas.mapSettings().destinationCrs().authid() == "EPSG:3857")
-check("initial extent computed in the workspace CRS, not a world view",
-      1e6 < canvas.extent().width() < 0.6 * 40075016.7, f"{canvas.extent().width():,.0f} m")
+check("canvas extent computed in the workspace CRS, not a world view",
+      # Lower bound loosened from 1e6: by this point in the suite, sections
+      # 6/14/15 have already selected single features, which now (see
+      # _zoom_to_selection) legitimately narrows the canvas to a ~1km-scale
+      # view -- real, intended behaviour, not a degenerate/zero extent.
+      10.0 < canvas.extent().width() < 0.6 * 40075016.7, f"{canvas.extent().width():,.0f} m")
 
 # Satellites are off by default -- CelesTrak must not be contacted at load.
 sat_layer = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_SATELLITES)
@@ -887,8 +949,10 @@ check("selected feature stays visible on the light map",
       light_selection == plugin_module.SELECTION_COLOR_LIGHT.lower(), light_selection)
 check("dark map keeps the high-contrast selection colour",
       dark_selection == plugin_module.SELECTION_COLOR_DARK.lower(), dark_selection)
-check("selection colours are brand or QGIS values, not invented",
-      plugin_module.SELECTION_COLOR_LIGHT == "#224B75")
+check("selection colours are the measured halo values (core/layers.py), not the old flat brand blue",
+      plugin_module.SELECTION_COLOR_LIGHT == layer_helpers.SELECTION_HALO_COLOR_LIGHT
+      and plugin_module.SELECTION_COLOR_DARK == layer_helpers.SELECTION_HALO_COLOR_DARK
+      and plugin_module.SELECTION_COLOR_LIGHT != "#224B75")
 
 check("Velorona still never writes a QGIS setting or switches the UI theme",
       "QgsSettings" not in plugin_source and "setUITheme" not in plugin_source)
@@ -913,6 +977,45 @@ check("cluster count comes from the represented record count",
       "@cluster_size" in layer_helpers.CLUSTER_SIZE_EXPRESSION)
 cluster_sym = layer_helpers.cluster_symbol(layer_helpers.COLORS_DARK["fixed-sites"], True)
 check("cluster draws a disc plus the count", cluster_sym.symbolLayerCount() == 2)
+
+print("\n== 21b. selection halo (CustomSymbol mode) ==")
+# Structural proof that every typed layer actually uses the halo mechanism
+# _apply_selection_symbols() sets up -- not just that the colour constants
+# exist, which the flat CustomColor path would also satisfy.
+_typed_layers = {
+    "fixed-sites": sites_layer,
+    "fixed-links": links_layer2,
+    "towers": plugin.towers_layer,
+    "cellular": plugin.cellular_layer,
+    "satellites": plugin.satellites_layer,
+    "ground-stations": layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_GROUND_STATIONS),
+}
+for _kind, _lyr in _typed_layers.items():
+    _mode = _lyr.selectionProperties().selectionRenderingMode()
+    check(f"{_kind} layer uses CustomSymbol selection rendering, not the flat project colour",
+          _mode == Qgis.SelectionRenderingMode.CustomSymbol, str(_mode))
+    check(f"{_kind} selection symbol is actually configured, not left at the default None",
+          _lyr.selectionProperties().selectionSymbol() is not None)
+
+_halo_now = (layer_helpers.SELECTION_HALO_COLOR_DARK if plugin.map_is_dark()
+             else layer_helpers.SELECTION_HALO_COLOR_LIGHT)
+_site_sym = sites_layer.selectionProperties().selectionSymbol()
+_site_layer0 = _site_sym.symbolLayer(0)
+check("point selection halo keeps the type colour underneath, at the same marker alpha",
+      _site_layer0.color().alpha() == layer_helpers.MARKER_ALPHA)
+check("point selection halo is clearly larger than the plain marker, not the same size",
+      _site_sym.size() == layer_helpers.SELECTION_HALO_SIZE_PX > layer_helpers.MARKER_SIZE_PX)
+check("point selection halo outline is the measured halo colour, not the type colour itself",
+      _site_layer0.strokeColor().name().upper() == _halo_now.upper())
+
+_link_sel_sym = links_layer2.selectionProperties().selectionSymbol()
+check("link selection symbol is a halo-plus-core two-layer symbol, not a flat colour swap",
+      _link_sel_sym.symbolLayerCount() == 2)
+check("selected link keeps its own colour at full opacity on top of the halo",
+      _link_sel_sym.symbolLayer(1).color().alpha() == 255)
+
+check("marker size was deliberately raised for discoverability, not left at the old 2px",
+      layer_helpers.MARKER_SIZE_PX == 5.0)
 
 # The cluster bubble is the web map's .marker-cluster-velorona TREATMENT --
 # translucent disc under a soft ring, not an opaque disc inside a bright one
