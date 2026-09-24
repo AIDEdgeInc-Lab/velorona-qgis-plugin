@@ -3,12 +3,16 @@ name=Velorona
 qgisMinimumVersion=4.0
 qgisMaximumVersion=4.99
 description=Telecom link evidence, inside QGIS. Explore -> Select -> Analyze -> Evidence -> Export.
-version=1.0.1
+version=1.1.0
 author=AID Edge Inc.
 email=sara.khosravi.ds@gmail.com
 license=GPL-2.0-or-later
 about=Velorona for QGIS -- Telecom link evidence, inside QGIS. 1. Explore -- Load public telecom infrastructure and your own data. 2. Select -- Choose a site, link, or two endpoints. 3. Analyze -- Run path clearance, microwave weather exposure, or satellite geometry. 4. Evidence -- See what is observed, what is calculated, and what is inferred. 5. Export -- Take the evidence with you as a structured CSV/GeoJSON result. Three analysis engines, all reused unmodified: Terrestrial Path Clearance (aei_link_clearance), Microwave Weather Exposure (aei_mw_exposure), Satellite/Earth-Space look angles (skyfield/SGP4). Requires aei-microwave-link-exposure, aei-link-clearance, aei-geo-features, and skyfield to be installed in QGIS's own Python environment.
-changelog=1.0.0 - First production release. The ISED Fixed Service and SatNOGS ground-station
+changelog=1.1.0 - Missing-dependency guard. If aei-link-clearance, aei-microwave-link-exposure, aei-geo-features
+    or skyfield is not installed in QGIS's Python, the plugin now loads and shows a message-bar and log
+    entry naming what to install, instead of failing with an import traceback. Adds requirements.txt
+    listing the required packages (aei-link-clearance is now published on PyPI).
+    1.0.0 - First production release. The ISED Fixed Service and SatNOGS ground-station
     snapshots are bundled with the plugin, so Explore no longer depends on files outside the plugin
     directory. Qt6/PyQt6 hardening: the Results Dock and both analysis parameter dialogs used
     PyQt5-only idioms that raised AttributeError on first use under QGIS 4, and a checker

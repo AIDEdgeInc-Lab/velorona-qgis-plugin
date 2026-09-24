@@ -1,6 +1,6 @@
 # Velorona for QGIS
 
-**Velorona QGIS Plugin 1.0.0** — Telecom link evidence, inside QGIS.
+**Velorona QGIS Plugin 1.1.0** — Telecom link evidence, inside QGIS.
 
 ## Explore → Select → Analyze → Evidence → Export
 
@@ -89,13 +89,13 @@ preference that affects every plugin and project.
 ## Install
 
 Velorona is distributed via the project's GitHub Release, not the QGIS
-Plugin Repository. Download `velorona-1.0.0.zip` from the
-[v1.0.0 release](https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/releases/tag/v1.0.0),
+Plugin Repository. Download `velorona-1.1.0.zip` from the
+[v1.1.0 release](https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/releases/tag/v1.1.0),
 then in QGIS: Plugins → Manage and Install Plugins → Install from ZIP, and
 pick that file.
 
 ## Status
 
-Version 1.0.0. Packaged and clean-profile install tested for QGIS 4.x.
+Version 1.1.0. Packaged and clean-profile install tested for QGIS 4.x.
 Distributed via GitHub Release; not yet submitted to the QGIS Plugin
 Repository.
