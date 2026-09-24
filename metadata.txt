@@ -3,12 +3,17 @@ name=Velorona
 qgisMinimumVersion=4.0
 qgisMaximumVersion=4.99
 description=Telecom link evidence, inside QGIS. Explore -> Select -> Analyze -> Evidence -> Export.
-version=1.1.0
+version=1.1.1
 author=AID Edge Inc.
 email=sara.khosravi.ds@gmail.com
 license=GPL-2.0-or-later
 about=Velorona for QGIS -- Telecom link evidence, inside QGIS. 1. Explore -- Load public telecom infrastructure and your own data. 2. Select -- Choose a site, link, or two endpoints. 3. Analyze -- Run path clearance, microwave weather exposure, or satellite geometry. 4. Evidence -- See what is observed, what is calculated, and what is inferred. 5. Export -- Take the evidence with you as a structured CSV/GeoJSON result. Three analysis engines, all reused unmodified: Terrestrial Path Clearance (aei_link_clearance), Microwave Weather Exposure (aei_mw_exposure), Satellite/Earth-Space look angles (skyfield/SGP4). Requires aei-microwave-link-exposure, aei-link-clearance, aei-geo-features, and skyfield to be installed in QGIS's own Python environment.
-changelog=1.1.0 - Missing-dependency guard. If aei-link-clearance, aei-microwave-link-exposure, aei-geo-features
+changelog=1.1.1 - Static-analysis fixes for the QGIS plugin repository scan: narrowed two broad
+    exception handlers in the satellite source (CelesTrak requests now catch only requests errors;
+    element-set parsing catches only ValueError/ZeroDivisionError, so unexpected errors surface in
+    the satellite status message instead of being skipped), replaced two lambda assignments with
+    named functions, and renamed an ambiguous loop variable. No other functional changes.
+    1.1.0 - Missing-dependency guard. If aei-link-clearance, aei-microwave-link-exposure, aei-geo-features
     or skyfield is not installed in QGIS's Python, the plugin now loads and shows a message-bar and log
     entry naming what to install, instead of failing with an import traceback. Adds requirements.txt
     listing the required packages (aei-link-clearance is now published on PyPI).

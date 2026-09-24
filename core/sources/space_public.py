@@ -98,8 +98,8 @@ def fetch_celestrak_satellites() -> Dict[str, Tuple[str, str, str]]:
             text = _fetch_celestrak_group_tle(group)
         except requests.exceptions.ConnectionError:
             break     # host unreachable -- the other groups are the same host
-        except Exception:
-            continue  # this group alone (404, rate-limit, bad payload); others may work
+        except requests.exceptions.RequestException:
+            continue  # this group alone (HTTP error, rate-limit, timeout); others may work
         lines = [ln for ln in text.splitlines() if ln.strip()]
         for i in range(0, len(lines) - 2, 3):
             name, line1, line2 = lines[i].strip(), lines[i + 1], lines[i + 2]
@@ -119,8 +119,8 @@ def build_satellite_records(elements: Dict[str, Tuple[str, str, str]], when: dat
             geocentric = sat.at(t)
             subpoint = geocentric.subpoint()
             period_minutes = (2 * 3.141592653589793) / sat.model.no_kozai
-        except Exception:
-            continue  # a malformed/decayed element set -- skip, don't crash the layer
+        except (ValueError, ZeroDivisionError):
+            continue  # a malformed element set (unparsable, or zero mean motion) -- skip, don't crash the layer
         altitude_km = subpoint.elevation.km
         records.append({
             "id": f"sat-{norad_id}",

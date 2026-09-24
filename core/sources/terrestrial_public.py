@@ -170,18 +170,18 @@ def load_fixed_service_snapshot(path: str = FIXED_SERVICE_SNAPSHOT_PATH) -> Tupl
         }
 
     links = []
-    for l in raw["links"]:
-        site_a = sites_by_id.get(l["site_a_id"])
-        site_b = sites_by_id.get(l["site_b_id"])
+    for link in raw["links"]:
+        site_a = sites_by_id.get(link["site_a_id"])
+        site_b = sites_by_id.get(link["site_b_id"])
         if not site_a or not site_b:
             continue
         links.append({
-            "id": f"ised-fixed-link-{l['authorization_number']}",
+            "id": f"ised-fixed-link-{link['authorization_number']}",
             "source": SOURCE_ISED_FIXED,
-            "authorization_number": l["authorization_number"],
-            "licensee": l.get("licensee"),
-            "in_service_date": l.get("in_service_date"),
-            "frequencies_mhz": ", ".join(str(v) for v in l.get("frequencies_mhz", [])),
+            "authorization_number": link["authorization_number"],
+            "licensee": link.get("licensee"),
+            "in_service_date": link.get("in_service_date"),
+            "frequencies_mhz": ", ".join(str(v) for v in link.get("frequencies_mhz", [])),
             "site_a": site_a, "site_b": site_b,
             "coverage": "National (Canada-wide) -- snapshot, not a live query",
         })

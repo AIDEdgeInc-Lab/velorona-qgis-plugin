@@ -271,7 +271,10 @@ def _rgb_to_lab(rgb):
     x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047
     y = r * 0.2126 + g * 0.7152 + b * 0.0722
     z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883
-    f = lambda t: t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+
+    def f(t):
+        return t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+
     fx, fy, fz = f(x), f(y), f(z)
     return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
 
@@ -280,7 +283,10 @@ def _lab_to_rgb(lab):
     L, a, b = lab
     fy = (L + 16) / 116
     fx, fz = fy + a / 500, fy - b / 200
-    finv = lambda t: t ** 3 if t ** 3 > 0.008856 else (t - 16 / 116) / 7.787
+
+    def finv(t):
+        return t ** 3 if t ** 3 > 0.008856 else (t - 16 / 116) / 7.787
+
     x, y, z = finv(fx) * 0.95047, finv(fy), finv(fz) * 1.08883
     r = x * 3.2406 + y * -1.5372 + z * -0.4986
     g = x * -0.9689 + y * 1.8758 + z * 0.0415
