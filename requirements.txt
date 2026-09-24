@@ -1,0 +1,6 @@
+# Python packages Velorona needs, installed into QGIS's own Python (see README).
+# QGIS itself does not read this file; it is here so the requirement is discoverable.
+aei-link-clearance
+aei-microwave-link-exposure>=0.1.4
+aei-geo-features
+skyfield
