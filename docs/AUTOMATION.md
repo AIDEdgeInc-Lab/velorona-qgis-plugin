@@ -1,6 +1,13 @@
 # Velorona automation: batch workflows, run history, comparison
 
-Status: first vertical slice, Terrestrial Path Clearance only. Branch `feat/automation-workflow-runs`, not released.
+Status: Terrestrial Path Clearance only. Branch `feat/automation-workflow-runs`, not released.
+
+**Update:** the workflow/run logic described below no longer lives in this repository. It is the product-neutral package
+`aei-workflow-runner` (`aei_workflow`), also used by the headless `velorona-run` CLI for unattended scheduled runs. This plugin keeps only
+the QGIS parts (`core/automation/qgis_task.py`, `ui/automation_dialog.py`), bundles the package into the release zip under `_vendor/`
+(`tools/package.sh`), takes the same per-workflow lock as the CLI so both can share one store folder, and works without Velorona Web
+or the CLI installed. Design, contract and scheduling docs are in the aei-workflow-runner repository. The module table below names the old
+locations; read `core/automation/*` as `aei_workflow/*`.
 
 ## What it does
 

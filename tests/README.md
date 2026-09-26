@@ -4,7 +4,7 @@
 |---|---|---|
 | `test_viewport_cache.py` | no | Viewport cache: TTL, negative caching, LRU eviction, bound, key separation |
 | `qgis_e2e.py` | yes | Real plugin through a real `QgsProject`/`QgsMapCanvas`: CRS, extent, layers, basemap, render, pan/zoom, inspector, dock, engines, exports, Qt6 idioms, ownership markers, unload lifecycle |
-| `test_automation_*.py`, `automation_support.py`, `fixtures/` | no (needs the aei_* libraries) | Batch workflows: CSV validation against the library schema, multi-link and partial-failure runs, retries, cancellation, checkpoints, run store, backup/restore, comparison, result package, schema back-compat |
+| (moved) | - | The workflow/run unit tests now live in the aei-workflow-runner repository next to the code they test. `run_qgis_tests.sh` finds that repository beside this one (or via `AEI_WORKFLOW_SRC`). |
 | `qgis_automation_e2e.py` | yes | Batch-run dialog on a real QgsTask: GUI responsiveness, progress, cancel, outage, reopen, compare, export (GeoJSON loads in QGIS), backup/restore, plugin lifecycle. `VELORONA_LIVE=1` adds one run against the live elevation service |
 | `benchmark_viewport.py` | yes | Load / render / navigation timings, HTTP counts, canvas-refresh counts |
 
