@@ -43,6 +43,33 @@ tar -C "$PLUGIN" -cf - \
     --exclude='CONTRIBUTING.md' \
     . | tar -C "$STAGE/$NAME" -xf -
 
+# Bundle the shared workflow core (aei-workflow-runner, Apache-2.0) so the zip runs the exact version it was tested with and needs no
+# pip install. Set AEI_WORKFLOW_SRC to the repository checkout (default: a sibling directory). A dirty checkout is refused, so the
+# recorded commit always describes the bytes that ship; ALLOW_DIRTY_VENDOR=1 overrides that for local experiments only.
+CORE="${AEI_WORKFLOW_SRC:-}"
+if [ -z "$CORE" ]; then
+    for cand in "$PLUGIN/../aei-workflow-runner" "$PLUGIN/../../aei-workflow-runner"; do
+        [ -d "$cand/src/aei_workflow" ] && CORE="$(cd "$cand" && pwd)" && break
+    done
+fi
+if [ -z "$CORE" ] || [ ! -d "$CORE/src/aei_workflow" ]; then
+    echo "aei-workflow-runner not found; set AEI_WORKFLOW_SRC to its repository checkout" >&2
+    exit 1
+fi
+if [ -n "$(git -C "$CORE" status --porcelain 2>/dev/null)" ] && [ "${ALLOW_DIRTY_VENDOR:-}" != "1" ]; then
+    echo "aei-workflow-runner has uncommitted changes; commit them (or set ALLOW_DIRTY_VENDOR=1 for a throwaway build)" >&2
+    exit 1
+fi
+mkdir -p "$STAGE/$NAME/_vendor"
+tar -C "$CORE/src" -cf - --exclude='__pycache__' --exclude='*.py[cod]' aei_workflow | tar -C "$STAGE/$NAME/_vendor" -xf -
+cp "$CORE/LICENSE" "$STAGE/$NAME/_vendor/aei_workflow/LICENSE"
+CORE_VERSION="$(sed -n 's/^__version__ = "\(.*\)"/\1/p' "$CORE/src/aei_workflow/__init__.py")"
+{
+    echo "aei-workflow-runner $CORE_VERSION"
+    echo "commit: $(git -C "$CORE" rev-parse HEAD 2>/dev/null || echo unknown)"
+    echo "license: Apache-2.0 (see LICENSE)"
+} > "$STAGE/$NAME/_vendor/aei_workflow/VENDORED.txt"
+
 (cd "$STAGE" && zip -qr9 "$ZIP" "$NAME")
 rm -rf "$STAGE"
 

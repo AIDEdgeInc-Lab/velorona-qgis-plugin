@@ -37,3 +37,20 @@ def test_requirements_txt_matches_requirements_list():
     with open(path) as f:
         declared = [l.strip() for l in f if l.strip() and not l.startswith("#")]
     assert declared == [pip for _, pip in dependencies.REQUIREMENTS]
+
+
+def test_shared_core_is_reported_when_absent_and_never_suggested_to_pip(monkeypatch):
+    monkeypatch.setattr(dependencies, "_is_installed", lambda name: name != "aei_workflow")
+    monkeypatch.setattr(dependencies, "_shared_core_present", lambda: False)
+    missing = dependencies.missing_requirements()
+    assert missing == ["aei-workflow-runner"]
+    msg = dependencies.install_message(missing, detail="No module named 'aei_workflow'")
+    assert "release builds" in msg and "pip install aei-workflow-runner" not in msg and "-e path/to/aei-workflow-runner" in msg
+
+
+def test_a_bundled_core_counts_as_present(monkeypatch, tmp_path):
+    monkeypatch.setattr(dependencies, "_is_installed", lambda name: name != "aei_workflow")
+    plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(dependencies.__file__)))
+    vendored = os.path.join(plugin_root, "_vendor", "aei_workflow")
+    monkeypatch.setattr(dependencies.os.path, "isdir", lambda p: p == vendored)
+    assert dependencies.missing_requirements() == []

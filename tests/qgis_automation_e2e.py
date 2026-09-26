@@ -29,9 +29,10 @@ import importlib  # noqa: E402
 plugin_mod = importlib.import_module(f"{PKG}.plugin")
 dialog_mod = importlib.import_module(f"{PKG}.ui.automation_dialog")
 qtask = importlib.import_module(f"{PKG}.core.automation.qgis_task")
-inputs = importlib.import_module(f"{PKG}.core.automation.inputs")
-engine = importlib.import_module(f"{PKG}.core.automation.engine")
-store_mod = importlib.import_module(f"{PKG}.core.automation.store")
+importlib.import_module(f"{PKG}.core.automation")   # puts the bundled aei_workflow on sys.path, as the plugin does
+inputs = importlib.import_module("aei_workflow.inputs")
+engine = importlib.import_module("aei_workflow.engine")
+store_mod = importlib.import_module("aei_workflow.store")
 terrestrial = importlib.import_module(f"{PKG}.core.engines.terrestrial")
 from aei_link_clearance import terrain  # noqa: E402
 
@@ -229,7 +230,7 @@ check("status line says FAILED", "FAILED" in dlg2.status.text())
 # -- 7. real engine + real analysis through the task, with terrain stub ---------------------------------
 print("== real aei_link_clearance through WorkflowTask ==")
 terrain.get_elevations = lambda pts, timeout=15.0: [100.0] * len(pts)
-wf = importlib.import_module(f"{PKG}.core.automation.workflow").new_workflow("direct", workflow_id="direct1")
+wf = importlib.import_module("aei_workflow.workflow").new_workflow("direct", workflow_id="direct1")
 val = inputs.validate_links_csv(open(write_csv("one.csv", GOOD.splitlines()[0]), encoding="utf-8").read())
 task = qtask.WorkflowTask(wf, val, {"name": "one.csv", "sha256": "0" * 64}, store_mod.RunStore(STORE))
 got = []
@@ -306,6 +307,47 @@ plugin.show_automation()
 check("show_automation reuses one dialog", first_dialog is plugin.automation_dialog and first_dialog.isVisible())
 plugin.unload()
 check("unload closes and releases the dialog", plugin.automation_dialog is None)
+
+# -- 12. one store shared with the headless CLI ------------------------------------------------------------------------
+print("== shared store with velorona-run ==")
+from datetime import datetime, timezone  # noqa: E402
+service = importlib.import_module("aei_workflow.service")
+locking = importlib.import_module("aei_workflow.locking")
+bounds_mod = importlib.import_module("aei_workflow.bounds")
+check("plugin PARAM_SPEC is the shared bounds object (no second copy)", terrestrial.PARAM_SPEC is bounds_mod.TERRESTRIAL_PARAM_SPEC)
+SHARED = os.path.join(TMP, "shared-store")
+sstore = service.open_store(SHARED)
+cli_wf = importlib.import_module("aei_workflow.workflow").new_workflow(
+    "Nightly (CLI)", workflow_id="cli-nightly", input_path=os.path.join(TMP, "one.csv"),
+    schedule={"kind": "daily", "at": "02:00", "grace_minutes": 30}, tz="America/Toronto", execution={"retry_delay_s": 0, "max_attempts": 1})
+service.install_workflow(sstore, cli_wf)
+t0 = datetime(2026, 9, 29, 12, tzinfo=timezone.utc)
+service.tick(sstore, t0)
+service.tick(sstore, datetime(2026, 10, 2, 15, tzinfo=timezone.utc))          # machine was off: 3 occurrences missed
+dlg4 = dialog_mod.AutomationDialog(None, store_root=SHARED)
+statuses = [dlg4.history_table.item(r, 2).text() for r in range(dlg4.history_table.rowCount())]
+check("a history written by the CLI (3 missed occurrences) opens in the QGIS dialog", statuses == ["missed"] * 3, str(statuses))
+check("the CLI's scheduled workflow is listed for QGIS", dlg4.workflow_combo.findText("Nightly (CLI)") > 0)
+
+# a run left 'running' by the CLI, with a LIVE holder: opening QGIS must not relabel it
+dead = json.loads(json.dumps(sstore.load_run(sstore.list_runs()[0][0]["run_id"])))
+dead.update(run_id="live-elsewhere", status="running", finished_at=None)
+sstore.save_run(dead)
+with locking.WorkflowLock(SHARED, "cli-nightly"):
+    dlg5 = dialog_mod.AutomationDialog(None, store_root=SHARED)
+    check("QGIS leaves a run alone while another process holds the workflow lock", sstore.load_run("live-elsewhere")["status"] == "running")
+    # ... and a QGIS run of the same workflow is refused instead of overlapping
+    terrain.get_elevations = lambda pts, timeout=15.0: [100.0] * len(pts)
+    clash = qtask.WorkflowTask(cli_wf, val, {"name": "one.csv", "sha256": "0" * 64}, sstore)
+    res = []
+    clash.run_finished.connect(res.append)
+    QgsApplication.taskManager().addTask(clash)
+    pump(until=lambda: bool(res) or clash.status() in (clash.TaskStatus.Complete, clash.TaskStatus.Terminated), timeout=15)
+    pump(0.3)
+    check("a QGIS run is refused while the CLI's lock is held, with a clear reason, and creates no run",
+          clash.run_record is None and "already running" in (clash.error or "") and len(sstore.list_runs("cli-nightly")[0]) == 4, str(clash.error))
+dlg6 = dialog_mod.AutomationDialog(None, store_root=SHARED)
+check("once nothing holds the lock, opening QGIS recovers the dead run as interrupted", sstore.load_run("live-elsewhere")["status"] == "interrupted")
 
 # -- optional live check -------------------------------------------------------------------------------------------
 if os.environ.get("VELORONA_LIVE") == "1":

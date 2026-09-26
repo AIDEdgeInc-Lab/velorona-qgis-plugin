@@ -1,6 +1,6 @@
 """Automation dialog: saved workflows, background batch runs, run history, comparison, export.
 
-QGIS-native widgets only. All analysis and storage logic lives in core.automation; this file wires
+QGIS-native widgets only. All analysis and storage logic lives in the shared aei_workflow package; this file wires
 it to widgets and to a QgsTask, and owns no analysis logic of its own.
 """
 
@@ -14,12 +14,15 @@ from qgis.PyQt.QtWidgets import (
     QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget, QComboBox,
 )
 
-from ..core.automation import compare as compare_mod
-from ..core.automation import inputs, report
+from ..core import automation as _automation  # noqa: F401  (puts the bundled aei_workflow on sys.path)
 from ..core.automation.qgis_task import WorkflowTask, default_store_root
-from ..core.automation.schema import SchemaError
-from ..core.automation.store import RunStore, StoreError
-from ..core.automation.workflow import new_workflow, touch
+
+from aei_workflow import compare as compare_mod  # noqa: E402
+from aei_workflow import inputs, report  # noqa: E402
+from aei_workflow.schema import SchemaError  # noqa: E402
+from aei_workflow.service import recover_dead_runs  # noqa: E402
+from aei_workflow.store import RunStore, StoreError  # noqa: E402
+from aei_workflow.workflow import new_workflow, touch, validate_workflow  # noqa: E402
 
 RESULT_COLUMNS = ["Link", "Status", "Line of sight", "Clearance ratio", "Note"]
 
@@ -70,7 +73,8 @@ class AutomationDialog(QDialog):
         self.status.setWordWrap(True)
         lay.addWidget(self.status)
 
-        recovered = self.store.recover_interrupted()
+        # Safe on a folder shared with `velorona-run`: a workflow whose run is live (lock held) is left alone.
+        recovered = recover_dead_runs(self.store)
         if recovered:
             self._say(f"{len(recovered)} earlier run(s) did not finish and are now marked 'interrupted'; "
                       "their completed links were kept.")
@@ -244,7 +248,6 @@ class AutomationDialog(QDialog):
         wf["params"] = {"k_factor": kwargs["k_factor"], "n_samples": kwargs["n_samples"]}
         wf["execution"] = {**wf["execution"], **kwargs["execution"]}
         wf["output"]["retain_runs"] = kwargs["retain_runs"]
-        from ..core.automation.workflow import validate_workflow
         return validate_workflow(wf)
 
     def _save_workflow(self) -> bool:

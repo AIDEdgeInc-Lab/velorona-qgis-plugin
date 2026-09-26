@@ -24,7 +24,16 @@ if [ ! -x "$QGISPY" ]; then
 fi
 
 export QGIS_PREFIX_PATH="$QGIS_APP/Contents/MacOS"
-export PYTHONPATH="$RES/python3.12:$RES/python3.12/lib-dynload:$RES/python3.12/site-packages"
+# The shared workflow core (aei-workflow-runner). A release zip bundles it under _vendor/; from a source checkout it is found
+# next to this repository, or via AEI_WORKFLOW_SRC (the checkout's src folder).
+CORE_SRC="${AEI_WORKFLOW_SRC:+$AEI_WORKFLOW_SRC/src}"
+if [ -z "$CORE_SRC" ]; then
+    for cand in "$(dirname "$(dirname "$(cd "$(dirname "$0")" && pwd)")")/aei-workflow-runner/src" \
+                "$(dirname "$(dirname "$(dirname "$(cd "$(dirname "$0")" && pwd)")")")/aei-workflow-runner/src"; do
+        [ -d "$cand/aei_workflow" ] && CORE_SRC="$cand" && break
+    done
+fi
+export PYTHONPATH="${CORE_SRC:+$CORE_SRC:}$RES/python3.12:$RES/python3.12/lib-dynload:$RES/python3.12/site-packages"
 export DYLD_FRAMEWORK_PATH="$QGIS_APP/Contents/Frameworks"
 export PROJ_DATA="$RES/qgis/proj"
 export PROJ_LIB="$PROJ_DATA"
@@ -46,6 +55,7 @@ for m in aei_link_clearance aei_mw_exposure aei_geo_features; do
     src="$("$QGISPY" -c "import $m, os; print(os.path.dirname($m.__file__))" 2>/dev/null | tail -1)"
     [ -d "$src" ] && ln -s "$src" "$LIBS/$m"
 done
+[ -n "$CORE_SRC" ] && ln -s "$CORE_SRC/aei_workflow" "$LIBS/aei_workflow"
 
 echo "== unit tests (no QGIS needed) =="
 /usr/bin/env -u DYLD_FRAMEWORK_PATH PYTHONPATH="$LIBS" python3 -m pytest "$HERE" -q

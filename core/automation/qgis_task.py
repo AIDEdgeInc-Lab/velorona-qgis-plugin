@@ -1,6 +1,6 @@
 """QGIS integration for the automation core: background task, storage location, version discovery.
 
-The task runs core.automation.runner.execute on a QgsTask worker thread, so the QGIS interface stays
+The task runs aei_workflow.runner.execute on a QgsTask worker thread, so the QGIS interface stays
 responsive and the run appears in QGIS's own Task Manager (with its own cancel button). The worker
 touches no QGIS objects and no widgets: it emits Qt signals, which Qt delivers to the GUI thread.
 """
@@ -13,8 +13,9 @@ import time
 from qgis.core import Qgis, QgsApplication, QgsTask
 from qgis.PyQt.QtCore import pyqtSignal
 
-from . import engine
-from .runner import execute
+from aei_workflow import engine
+from aei_workflow.locking import LockHeld, WorkflowLock
+from aei_workflow.runner import execute
 
 CHECKPOINT_INTERVAL_S = 2.0
 
@@ -57,6 +58,13 @@ class WorkflowTask(QgsTask):
         self.error = None
 
     def run(self) -> bool:
+        # The same one-run-per-workflow lock the `velorona-run` CLI takes, so a run started here and a scheduled run in the
+        # same store folder can never overlap.
+        try:
+            lock = WorkflowLock(self._store.root, self._workflow["workflow_id"]).acquire()
+        except LockHeld as exc:
+            self.error = f"This workflow is already running from another process: {exc.reason}"
+            return False
         try:
             self.run_record = execute(
                 self._workflow, self._validation, self._analyzer, source=self._source, versions=self._versions,
@@ -65,6 +73,8 @@ class WorkflowTask(QgsTask):
         except Exception as exc:  # anything execute() itself could not absorb
             self.error = f"{type(exc).__name__}: {exc}"
             return False
+        finally:
+            lock.release()
         # A canceled or partly failed run is still a valid, saved record; only an unusable one is False.
         return True
 
