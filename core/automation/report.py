@@ -31,6 +31,18 @@ RESULT_HEADER = ["link_id", "source_row", "status", "distance_km", "first_fresne
                  "warnings", "error", "analyzed_at", "explanation"]
 
 
+def _engine_text(engine: dict, sep: str = ", ") -> str:
+    return sep.join(f"{name} {version or 'unknown'}" for name, version in engine.items())
+
+
+def _implementation_text(versions: dict) -> str:
+    """Runs written by Velorona Map name their implementation; a plugin run does not, and is the default."""
+    if versions.get("implementation"):
+        build = versions.get("velorona_map_build")
+        return f"{versions['implementation']}" + (f", build {build}" if build else "")
+    return f"Velorona plugin {versions.get('velorona_plugin') or 'unknown'}"
+
+
 def _f(value, places):
     return "" if value is None else f"{value:.{places}f}"
 
@@ -43,8 +55,7 @@ def _preamble(run: dict) -> list:
         f"Run: {run['run_id']}  Workflow: {run['workflow_name']} ({run['workflow_id']})  Status: {run['status']}",
         f"Started: {run['started_at']}  Finished: {run.get('finished_at')}",
         f"Input file: {run['input'].get('source_name')}  sha256: {run['input'].get('sha256')}",
-        f"Engine: aei-link-clearance {engine.get('aei-link-clearance')}, aei-geo-features {engine.get('aei-geo-features')}; "
-        f"Velorona plugin {v.get('velorona_plugin')}",
+        f"Engine: {_engine_text(engine)}; {_implementation_text(v)}",
         "Parameters: " + ", ".join(f"{k}={v}" for k, v in run["workflow_snapshot"]["params"].items()),
         "Terrain: " + "; ".join(s["name"] for s in run["provenance"]["data_sources"]),
         "Not a reconstruction of past conditions; see report.md for assumptions and limitations.",
@@ -142,8 +153,8 @@ def report_md(run: dict) -> str:
     L.append("- Historical replay: **not supported** by this data source.")
     L += ["", "## Assumptions and limitations", ""] + [f"- {t}" for t in run["assumptions_and_limitations"]]
     L += ["", "## Versions", "",
-          f"- Velorona plugin {v.get('velorona_plugin')} · QGIS {v.get('qgis')} · Python {v.get('python')}",
-          f"- aei-link-clearance {eng.get('aei-link-clearance')} · aei-geo-features {eng.get('aei-geo-features')}",
+          f"- {_implementation_text(v)} · QGIS {v.get('qgis') or 'n/a'} · Python {v.get('python') or 'n/a'}",
+          f"- engine: {_engine_text(eng, ' · ')}",
           f"- run schema {v.get('run_schema')} · workflow schema {v.get('workflow_schema')}", "",
           "## Results", "", "| Link | Status | LOS | Ratio | Clearance (m) | Required (m) | Distance (km) | Notes |",
           "|---|---|---|---|---|---|---|---|"]
