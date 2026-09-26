@@ -37,12 +37,26 @@ echo "== unscoped Qt enum / removed-idiom check =="
 /usr/bin/env -u PYTHONPATH -u DYLD_FRAMEWORK_PATH python3 "$PLUGIN/tools/check_qt6_enums.py"
 
 echo
+# The automation unit tests call the pure-Python aei_* libraries. QGIS's Python has them but no pytest,
+# and the system Python has pytest but not the libraries, so expose only those three packages (not
+# QGIS's whole site-packages, which is built for a different Python) to the system pytest.
+LIBS="$(mktemp -d)"
+trap 'rm -rf "$LIBS"' EXIT
+for m in aei_link_clearance aei_mw_exposure aei_geo_features; do
+    src="$("$QGISPY" -c "import $m, os; print(os.path.dirname($m.__file__))" 2>/dev/null | tail -1)"
+    [ -d "$src" ] && ln -s "$src" "$LIBS/$m"
+done
+
 echo "== unit tests (no QGIS needed) =="
-/usr/bin/env -u PYTHONPATH -u DYLD_FRAMEWORK_PATH python3 -m pytest "$HERE" -q
+/usr/bin/env -u DYLD_FRAMEWORK_PATH PYTHONPATH="$LIBS" python3 -m pytest "$HERE" -q
 
 echo
 echo "== QGIS end-to-end runtime test =="
 "$QGISPY" "$HERE/qgis_e2e.py"
+
+echo
+echo "== QGIS automation (batch runs) runtime test =="
+"$QGISPY" "$HERE/qgis_automation_e2e.py"
 
 if [ "$1" = "--bench" ]; then
     echo

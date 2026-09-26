@@ -19,10 +19,7 @@ import os
 import shutil
 import zipfile
 
-from .schema import (
-    RUN_SCHEMA, RUN_SCHEMA_VERSION, STATUS_INTERRUPTED, STATUS_RUNNING, WORKFLOW_SCHEMA,
-    WORKFLOW_SCHEMA_VERSION, SchemaError, check_document, valid_id,
-)
+from .schema import RUN_SCHEMA, RUN_SCHEMA_VERSION, STATUS_INTERRUPTED, STATUS_RUNNING, check_document, valid_id
 from .workflow import utc_now, validate_workflow
 
 BACKUP_FORMAT = "velorona.backup"

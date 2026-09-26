@@ -200,6 +200,7 @@ class VeloronaPlugin:
     def __init__(self, iface):
         self.iface = iface
         self.dock = None
+        self.automation_dialog = None
         self.actions = []
         self.layer_group = None
         self.towers_layer = None
@@ -253,6 +254,12 @@ class VeloronaPlugin:
             "Select exactly one Ground/Earth Station feature and one Satellite feature.",
             self.run_satellite,
         )
+        self.action_automation = self._make_action(
+            "Automate: Batch Path Clearance Runs",
+            "Import a links CSV, save the settings as a workflow, run every link in the background, and "
+            "keep a local history of runs you can reopen, compare and export.",
+            self.show_automation,
+        )
         self.action_show_dock = self._make_action(
             "Show Velorona Panel",
             "Reopens the Velorona Records / Results panel if it was closed.",
@@ -269,6 +276,15 @@ class VeloronaPlugin:
         QgsProject.instance().readProject.connect(self._check_stale_project_crs)
         self._project_read_connected = True
         self._check_stale_project_crs()
+
+    def show_automation(self):
+        """Opens the one batch-run dialog (workflows, background runs, history, comparison)."""
+        if self.automation_dialog is None:
+            from .ui.automation_dialog import AutomationDialog
+            self.automation_dialog = AutomationDialog(self.iface.mainWindow())
+        self.automation_dialog.show()
+        self.automation_dialog.raise_()
+        self.automation_dialog.activateWindow()
 
     def show_panel(self):
         """Reopens the one Velorona dock. QGIS also lists it under View >
@@ -303,6 +319,11 @@ class VeloronaPlugin:
         return action
 
     def unload(self):
+        if self.automation_dialog is not None:
+            self.automation_dialog.shutdown()
+            self.automation_dialog.close()
+            self.automation_dialog.deleteLater()
+            self.automation_dialog = None
         for action in self.actions:
             self.iface.removePluginMenu(MENU_NAME, action)
             self.iface.removeToolBarIcon(action)

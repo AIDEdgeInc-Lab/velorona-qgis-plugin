@@ -9,6 +9,9 @@
         manifest.json      SHA-256 of every other file
 
 results.csv, links.geojson and report.md are outputs, not inputs: they are not claimed to re-import.
+links.geojson is the GIS-facing file (tested: loads in QGIS as a line layer with every result as an
+attribute). results.csv follows the Evidence-CSV convention of '#' preamble lines, so it is for
+spreadsheets and people; OGR reads those lines as the header, so do not load it into QGIS as a table.
 """
 
 from __future__ import annotations
