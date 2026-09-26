@@ -1,0 +1,76 @@
+name: Suggest a public data source
+description: Point us to a public, licensed telecom or satellite dataset from your country.
+title: "[Data source] <country>: <dataset name>"
+labels: ["data-source"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping expand Velorona beyond Canada. We can only use **public data with a licence
+        or terms of use that allow reuse**. Please don't submit private operator data or anything you
+        received under a confidentiality agreement. Every suggestion is reviewed before anything is added.
+  - type: input
+    id: country
+    attributes:
+      label: Country
+      placeholder: e.g. France
+    validations:
+      required: true
+  - type: dropdown
+    id: infrastructure_type
+    attributes:
+      label: Infrastructure type
+      options:
+        - Telecom sites
+        - Microwave links
+        - Satellite
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: source_url
+    attributes:
+      label: Source URL
+      description: Where the dataset (or its download/API page) is published.
+      placeholder: https://
+    validations:
+      required: true
+  - type: input
+    id: license_url
+    attributes:
+      label: Licence / terms URL
+      description: The page stating the licence or terms of use for this dataset.
+      placeholder: https://
+    validations:
+      required: true
+  - type: input
+    id: publisher
+    attributes:
+      label: Publisher
+      description: The organisation that publishes the data (e.g. the national spectrum regulator).
+    validations:
+      required: true
+  - type: input
+    id: update_frequency
+    attributes:
+      label: Update frequency
+      placeholder: e.g. monthly, weekly, one-off snapshot, unknown
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else we should know?
+      description: Format (CSV, GeoJSON, API...), coverage, known gaps.
+  - type: input
+    id: contributor_name
+    attributes:
+      label: Your name
+      description: Optional. Only used for credit if you tick the box below.
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Credit and data terms
+      options:
+        - label: You may credit me publicly by the name above on the Velorona contributors list.
+          required: false
+        - label: To the best of my knowledge this is public data that may be reused under the linked licence or terms, and it is not private operator data.
+          required: true

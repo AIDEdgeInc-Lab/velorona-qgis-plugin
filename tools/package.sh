@@ -25,8 +25,8 @@ ZIP="$DIST/${NAME}-${VERSION}.zip"
 rm -rf "$STAGE" "$ZIP"
 mkdir -p "$STAGE/$NAME"
 
-# Runtime content only. tests/, tools/ and the internal SESSION_HANDOFF.md
-# are development-only; caches and
+# Runtime content only. tests/, tools/, the internal SESSION_HANDOFF.md and the
+# GitHub community files (.github/, CONTRIBUTING.md) are development-only; caches and
 # build output never ship.
 tar -C "$PLUGIN" -cf - \
     --exclude='.git' \
@@ -39,6 +39,8 @@ tar -C "$PLUGIN" -cf - \
     --exclude='tests' \
     --exclude='tools' \
     --exclude='SESSION_HANDOFF.md' \
+    --exclude='.github' \
+    --exclude='CONTRIBUTING.md' \
     . | tar -C "$STAGE/$NAME" -xf -
 
 (cd "$STAGE" && zip -qr9 "$ZIP" "$NAME")
