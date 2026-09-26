@@ -25,6 +25,8 @@ qgs = QgsApplication([], True)
 qgs.initQgis()
 
 RESULTS = []
+# Explore, three Analyze actions, Automate (batch runs), Show Panel. The Automate action was added with the batch-run feature.
+EXPECTED_ACTIONS = 6
 
 
 def check(name, ok, detail=""):
@@ -102,7 +104,7 @@ plugin._warn = lambda m: warnings.append(m)
 plugin._error = lambda m: warnings.append("ERROR: " + m)
 plugin.initGui()
 check("plugin enables without traceback", True)
-check("toolbar/menu actions registered", len(plugin.actions) == 5,
+check("toolbar/menu actions registered", len(plugin.actions) == EXPECTED_ACTIONS,
       f"{len(plugin.actions)} actions: {[a.text() for a in plugin.actions]}")
 check("no duplicate action labels",
       len({a.text() for a in plugin.actions}) == len(plugin.actions))
@@ -193,10 +195,23 @@ plugin2 = velorona.classFactory(iface)
 plugin2._warn = lambda m: warnings.append(m)
 plugin2.initGui()
 check("plugin re-enables without traceback", True)
-check("no duplicate actions after re-enable", len(plugin2.actions) == 5
-      and len({a.text() for a in plugin2.actions}) == 5, f"{len(plugin2.actions)} actions")
+check("no duplicate actions after re-enable", len(plugin2.actions) == EXPECTED_ACTIONS
+      and len({a.text() for a in plugin2.actions}) == EXPECTED_ACTIONS, f"{len(plugin2.actions)} actions")
 plugin2.unload()
 check("second unload is clean", True)
+
+print("\n== the release zip carries its own shared core ==")
+import aei_workflow  # noqa: E402
+vendored = os.path.join(PLUGINS, "velorona", "_vendor", "aei_workflow")
+check("aei_workflow is imported from the plugin's own _vendor folder (no core repo on sys.path)",
+      os.path.dirname(os.path.abspath(aei_workflow.__file__)) == vendored, aei_workflow.__file__)
+check("the vendored core records the commit it was built from",
+      os.path.exists(os.path.join(vendored, "VENDORED.txt")) and "commit:" in open(os.path.join(vendored, "VENDORED.txt")).read())
+from aei_workflow.cli import main as runner_main  # noqa: E402
+check("the headless runner entry point loads from the installed plugin (no GUI needed)", runner_main(["schedule-template", "--kind", "cron", "--store", "/tmp/x"]) == 0)
+from velorona.core.engines import terrestrial as _terr  # noqa: E402
+import aei_workflow.bounds as _bounds  # noqa: E402
+check("the installed plugin's parameter spec is the vendored shared bounds", _terr.PARAM_SPEC is _bounds.TERRESTRIAL_PARAM_SPEC)
 
 passed = sum(1 for _, ok, _ in RESULTS if ok)
 print(f"\n===== clean-install smoke: {passed}/{len(RESULTS)} passed =====")
