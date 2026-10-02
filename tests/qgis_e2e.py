@@ -958,8 +958,7 @@ check("Velorona still never writes a QGIS setting or switches the UI theme",
       "QgsSettings" not in plugin_source and "setUITheme" not in plugin_source)
 
 print("\n== 21. Fixed Service site clustering and licensee filter ==")
-from qgis.core import (QgsPointClusterRenderer, QgsSingleSymbolRenderer,  # noqa: E402
-                       QgsUnitTypes)
+from qgis.core import QgsPointClusterRenderer, QgsSingleSymbolRenderer  # noqa: E402
 
 sites_layer = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_FIXED_SITES)
 links_layer2 = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_FIXED_LINKS)
@@ -1078,7 +1077,7 @@ check("cluster count size matches the web map's 12px, not a larger point size",
 _disc, _count = cluster_sym.symbolLayer(0), cluster_sym.symbolLayer(1)
 check("disc size, ring width and count size are all in screen pixels",
       _disc.sizeUnit() == _disc.strokeWidthUnit() == _count.sizeUnit()
-      == QgsUnitTypes.RenderPixels)
+      == Qgis.RenderUnit.Pixels)
 check("the count is still bold, as the web map's font-weight: 700 is",
       "bold" in _count.fontStyle().lower(), _count.fontStyle())
 
@@ -1558,10 +1557,10 @@ for _dark, _url, _label in (
         # an extreme colour) to leave the map completely unchanged.
         _ddp = _sl.dataDefinedProperties()
         check(f"{_label}: {_st.layerName()} data-defined fill colour is neutralised",
-              not _ddp.isActive(_SL.PropertyFillColor)
-              or _ddp.property(_SL.PropertyFillColor).expressionString() == "",
+              not _ddp.isActive(_SL.Property.FillColor)
+              or _ddp.property(_SL.Property.FillColor).expressionString() == "",
               "checked via evaluated value below")
-        _ctx_val = _ddp.value(_SL.PropertyFillColor, __import__("qgis.core", fromlist=["QgsExpressionContext"]).QgsExpressionContext(), _target)
+        _ctx_val = _ddp.value(_SL.Property.FillColor, __import__("qgis.core", fromlist=["QgsExpressionContext"]).QgsExpressionContext(), _target)
         check(f"{_label}: {_st.layerName()} data-defined property now evaluates to the target",
               _ctx_val == _target or (hasattr(_ctx_val, "name") and _ctx_val.name() == _target.name()),
               str(_ctx_val))
