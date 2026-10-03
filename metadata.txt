@@ -3,12 +3,15 @@ name=Velorona
 qgisMinimumVersion=4.0
 qgisMaximumVersion=4.99
 description=Telecom link evidence, inside QGIS. Explore -> Select -> Analyze -> Evidence -> Export.
-version=1.1.2
+version=1.1.3
 author=AID Edge Inc.
 email=sara.khosravi.ds@gmail.com
 license=GPL-2.0-or-later
 about=Velorona for QGIS -- Telecom link evidence, inside QGIS. 1. Explore -- Load public telecom infrastructure and your own data. 2. Select -- Choose a site, link, or two endpoints. 3. Analyze -- Run path clearance, microwave weather exposure, or satellite geometry. 4. Evidence -- See what is observed, what is calculated, and what is inferred. 5. Export -- Take the evidence with you as a structured CSV/GeoJSON result. Three analysis engines, all reused unmodified: Terrestrial Path Clearance (aei_link_clearance), Microwave Weather Exposure (aei_mw_exposure), Satellite/Earth-Space look angles (skyfield/SGP4). Requires aei-microwave-link-exposure, aei-link-clearance, aei-geo-features, and skyfield to be installed in QGIS's own Python environment.
-changelog=1.1.2 - Qt6 compatibility fixes for the QGIS plugin repository scan: scoped enum names
+changelog=1.1.3 - Data correction. The bundled Canada Fixed Service snapshot had one site (Regina, SK, ised-fixed-50.41056,-104.61722) whose
+    station role was stored as the literal text "TX" with quote characters; it is now TX. Nothing else changed: 24,859 sites and 16,956 links,
+    same ids and order, ISED file of 2026-09-01. No code change.
+    1.1.2 - Qt6 compatibility fixes for the QGIS plugin repository scan: scoped enum names
     (Qgis.RenderUnit.Pixels, QgsSymbolLayer.Property.*, QgsMapBoxGlStyleConverter.Result.Success) and
     QMetaType.Type field-spec annotations in place of QVariant.Type. No functional changes.
     1.1.1 - Static-analysis fixes for the QGIS plugin repository scan: narrowed two broad
