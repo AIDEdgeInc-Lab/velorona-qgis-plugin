@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Iterable, List, Sequence, Tuple
 
 from qgis.core import (
+    Qgis,
     QgsFeature,
     QgsField,
     QgsFontMarkerSymbolLayer,
@@ -19,10 +20,9 @@ from qgis.core import (
     QgsSimpleMarkerSymbolLayer,
     QgsSingleSymbolRenderer,
     QgsSymbolLayer,
-    QgsUnitTypes,
     QgsVectorLayer,
 )
-from qgis.PyQt.QtCore import QVariant
+from qgis.PyQt.QtCore import QMetaType
 from qgis.PyQt.QtGui import QColor
 
 from .colors import COLORS_DARK, COLORS_LIGHT
@@ -106,7 +106,7 @@ def link_symbol(dark: bool = True) -> QgsLineSymbol:
     symbol = QgsLineSymbol.createSimple({"line_style": "solid"})
     symbol.setColor(color)
     symbol.setWidth(LINE_WIDTH_PX)
-    symbol.setWidthUnit(QgsUnitTypes.RenderPixels)
+    symbol.setWidthUnit(Qgis.RenderUnit.Pixels)
     return symbol
 
 
@@ -123,14 +123,14 @@ def link_selection_symbol(dark: bool = True) -> QgsLineSymbol:
     halo_col.setAlpha(160)
     halo.setColor(halo_col)
     halo.setWidth(LINE_WIDTH_PX + SELECTION_HALO_WIDTH_PX * 2)
-    halo.setWidthUnit(QgsUnitTypes.RenderPixels)
+    halo.setWidthUnit(Qgis.RenderUnit.Pixels)
 
     core_line = QgsLineSymbol.createSimple({"line_style": "solid"})
     core_color = QColor(ink["color"])
     core_color.setAlpha(255)  # selected link is never the one left translucent
     core_line.setColor(core_color)
     core_line.setWidth(LINE_WIDTH_PX)
-    core_line.setWidthUnit(QgsUnitTypes.RenderPixels)
+    core_line.setWidthUnit(Qgis.RenderUnit.Pixels)
 
     symbol = QgsLineSymbol()
     symbol.changeSymbolLayer(0, halo.symbolLayer(0).clone())
@@ -171,7 +171,7 @@ def retint_basemap_vegetation(renderer, dark: bool) -> int:
 
     2. Setting the symbol layer's static color was not enough on its own.
        QgsMapBoxGlStyleConverter preserves CARTO's zoom-interpolated colour
-       stops as *data-defined* PropertyFillColor/PropertyStrokeColor
+       stops as *data-defined* Property.FillColor/Property.StrokeColor
        expressions, which QGIS evaluates instead of the static colour at paint
        time. Confirmed directly: landcover, park, landuse and building all
        carry active data-defined fill/stroke properties, while the one
@@ -199,9 +199,9 @@ def retint_basemap_vegetation(renderer, dark: bool) -> int:
             if hasattr(layer, "setStrokeColor"):
                 layer.setStrokeColor(QColor(target))
             if hasattr(layer, "setDataDefinedProperty"):
-                layer.setDataDefinedProperty(QgsSymbolLayer.PropertyFillColor,
+                layer.setDataDefinedProperty(QgsSymbolLayer.Property.FillColor,
                                              QgsProperty.fromValue(QColor(target)))
-                layer.setDataDefinedProperty(QgsSymbolLayer.PropertyStrokeColor,
+                layer.setDataDefinedProperty(QgsSymbolLayer.Property.StrokeColor,
                                              QgsProperty.fromValue(QColor(target)))
         style.setSymbol(symbol.clone())
         touched += 1
@@ -407,7 +407,7 @@ def layer_lifecycle(layer) -> str:
 PUBLIC_RECORDS_DISCLOSURE = "public infrastructure records, not a coverage guarantee"
 
 
-def _build_fields(field_specs: Sequence[Tuple[str, QVariant.Type]]) -> List[QgsField]:
+def _build_fields(field_specs: Sequence[Tuple[str, QMetaType.Type]]) -> List[QgsField]:
     return [QgsField(name, qtype) for name, qtype in field_specs]
 
 
@@ -426,7 +426,7 @@ def _point_symbol(color_hex: str) -> QgsMarkerSymbol:
     symbol = QgsMarkerSymbol.createSimple({"outline_style": "no"})
     symbol.setColor(color)
     symbol.setSize(MARKER_SIZE_PX)
-    symbol.setSizeUnit(QgsUnitTypes.RenderPixels)
+    symbol.setSizeUnit(Qgis.RenderUnit.Pixels)
     return symbol
 
 
@@ -474,7 +474,7 @@ def cluster_symbol(color_hex: str, dark: bool = True) -> QgsMarkerSymbol:
         "size_unit": "Pixel",
     })
     disc.setDataDefinedProperty(
-        QgsSymbolLayer.PropertySize, QgsProperty.fromExpression(CLUSTER_SIZE_EXPRESSION))
+        QgsSymbolLayer.Property.Size, QgsProperty.fromExpression(CLUSTER_SIZE_EXPRESSION))
 
     count = QgsFontMarkerSymbolLayer.create({
         "font": "Helvetica",
@@ -485,7 +485,7 @@ def cluster_symbol(color_hex: str, dark: bool = True) -> QgsMarkerSymbol:
         "font_style": "Bold",
     })
     count.setDataDefinedProperty(
-        QgsSymbolLayer.PropertyCharacter, QgsProperty.fromExpression("@cluster_size"))
+        QgsSymbolLayer.Property.Character, QgsProperty.fromExpression("@cluster_size"))
 
     symbol = QgsMarkerSymbol()
     symbol.changeSymbolLayer(0, disc)
@@ -502,7 +502,7 @@ def _clustered_renderer(color_hex: str, dark: bool = True) -> QgsPointClusterRen
     renderer = QgsPointClusterRenderer()
     renderer.setEmbeddedRenderer(embedded)
     renderer.setTolerance(CLUSTER_TOLERANCE_PX)
-    renderer.setToleranceUnit(QgsUnitTypes.RenderPixels)
+    renderer.setToleranceUnit(Qgis.RenderUnit.Pixels)
     renderer.setClusterSymbol(cluster_symbol(color_hex, dark))
     return renderer
 
@@ -510,7 +510,7 @@ def _clustered_renderer(color_hex: str, dark: bool = True) -> QgsPointClusterRen
 def build_point_layer(
     name: str,
     records: Iterable[dict],
-    field_specs: Sequence[Tuple[str, QVariant.Type]],
+    field_specs: Sequence[Tuple[str, QMetaType.Type]],
     color_hex: str,
     kind: str = "site",
     abstract: str = None,
@@ -542,7 +542,7 @@ def build_point_layer(
 def build_link_layer(
     name: str,
     links: Iterable[dict],
-    field_specs: Sequence[Tuple[str, QVariant.Type]],
+    field_specs: Sequence[Tuple[str, QMetaType.Type]],
     color_hex: str,
     line_style: str = "solid",
     abstract: str = None,
@@ -573,7 +573,7 @@ def build_link_layer(
     symbol = QgsLineSymbol.createSimple({"line_style": line_style})
     symbol.setColor(color)
     symbol.setWidth(LINE_WIDTH_PX)
-    symbol.setWidthUnit(QgsUnitTypes.RenderPixels)
+    symbol.setWidthUnit(Qgis.RenderUnit.Pixels)
     layer.setRenderer(QgsSingleSymbolRenderer(symbol))
     layer.setCustomProperty(VELORONA_KIND_PROPERTY, "link")
     if abstract:
@@ -581,7 +581,7 @@ def build_link_layer(
     return layer
 
 
-def replace_point_features(layer: QgsVectorLayer, records: Iterable[dict], field_specs: Sequence[Tuple[str, QVariant.Type]]) -> None:
+def replace_point_features(layer: QgsVectorLayer, records: Iterable[dict], field_specs: Sequence[Tuple[str, QMetaType.Type]]) -> None:
     """Clears and repopulates a memory point layer in place -- used for the
     viewport-scoped live layers (towers, cellular) on canvas extentsChanged,
     same refresh-in-place pattern as app.js's refreshLiveLayers()."""
@@ -617,14 +617,14 @@ def build_context_link_layer(name: str, features, color_hex: str) -> QgsVectorLa
     symbol = QgsLineSymbol.createSimple({"line_style": "dash"})
     symbol.setColor(color)
     symbol.setWidth(1.6)
-    symbol.setWidthUnit(QgsUnitTypes.RenderPixels)
+    symbol.setWidthUnit(Qgis.RenderUnit.Pixels)
     layer.setRenderer(QgsSingleSymbolRenderer(symbol))
     layer.setCustomProperty(VELORONA_KIND_PROPERTY, "network-context")
     return layer
 
 
 def replace_link_features(layer: QgsVectorLayer, links: Iterable[dict],
-                          field_specs: Sequence[Tuple[str, QVariant.Type]]) -> None:
+                          field_specs: Sequence[Tuple[str, QMetaType.Type]]) -> None:
     """Clears and repopulates a memory line layer in place, so a re-run of
     Load Public Data refreshes the existing layer instead of adding a second
     one (and keeps whatever visibility/styling the user set)."""

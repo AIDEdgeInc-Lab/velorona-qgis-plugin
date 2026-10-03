@@ -52,6 +52,12 @@ UNSCOPED_ENUM_PATTERNS = [
     r"\bQHeaderView\.(Stretch|ResizeToContents|Fixed|Interactive)\b",
     r"\bQAbstractItemView\.(NoEditTriggers|SingleSelection|NoSelection|SelectRows)\b",
     r"\bQFileDialog\.(AcceptOpen|AcceptSave|Directory|ExistingFile|AnyFile)\b",
+    # QGIS enums the plugin-repository scanner flags even though QGIS 4.2.2 still
+    # resolves the unscoped alias at runtime: use the scoped form.
+    r"\bQgsUnitTypes\.Render\w+\b",
+    r"\bQgsSymbolLayer\.Property[A-Z]\w*\b",
+    r"\bQgsMapBoxGlStyleConverter\.(Success|NoLayerList)\b",
+    r"\bQVariant\.Type\b",
     # Removed PyQt5 idioms -- not enums, but the same class of latent failure:
     # they import fine and raise only when the line runs.
     r"\.exec_\(\)",
@@ -59,10 +65,9 @@ UNSCOPED_ENUM_PATTERNS = [
     r"\bdialog\.(Accepted|Rejected)\b",
 ]
 
-# Deliberately NOT checked: QGIS's own enum classes (QgsUnitTypes,
-# QgsWkbTypes, QgsVertexMarker, ...). Verified against QGIS 4.2.2 / Qt 6.11.1
-# that their unscoped aliases still resolve, so flagging them would be noise.
-# Only Qt/PyQt classes dropped the unscoped form.
+# Other QGIS enum classes (QgsWkbTypes, QgsVertexMarker, ...) are NOT checked:
+# QGIS 4.2.2 / Qt 6.11.1 still resolves their unscoped aliases. Only the QGIS
+# enums listed above are flagged, because the plugin-repository scanner does.
 
 SKIP_DIRS = {".git", "__pycache__", "tools", "tests", "docs", "examples"}
 

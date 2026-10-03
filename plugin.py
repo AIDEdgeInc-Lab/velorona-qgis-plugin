@@ -445,7 +445,7 @@ class VeloronaPlugin:
             return None
 
         converter = QgsMapBoxGlStyleConverter()
-        if converter.convert(resp.text) != QgsMapBoxGlStyleConverter.Success:
+        if converter.convert(resp.text) != QgsMapBoxGlStyleConverter.Result.Success:
             self._warn(f"Could not convert the {BASEMAP_NAME} style: {converter.errorMessage()}")
             return None
         renderer = converter.renderer()
