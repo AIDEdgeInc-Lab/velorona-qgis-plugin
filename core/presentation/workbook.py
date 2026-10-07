@@ -50,7 +50,8 @@ def build_workbook(result, evidence_csv: str, generated_at: Optional[datetime] =
     ctx = context_for(result)
     if ctx is None:
         raise ValueError(f"No operational workbook for result kind {getattr(result, 'kind', None)!r}")
-    generated = (generated_at or datetime.now(timezone.utc)).isoformat()
+    # Readable to the second, with the zone spelled out (not a microsecond ISO string).
+    generated = (generated_at or datetime.now(timezone.utc)).strftime("%Y-%m-%d %H:%M:%S UTC")
     sheets = [
         _summary(result, ctx, generated),
         _link_analysis(ctx),
@@ -97,6 +98,7 @@ def _summary(result, ctx: AskContext, generated: str) -> Sheet:
             ["Required clearance", t.key_facts[2].value, "Minimum required at the tightest point"],
             ["Available clearance", t.key_facts[1].value, "Terrain clearance at the tightest point"],
             ["Clearance margin", t.key_facts[3].value, t.key_facts[3].comparison],
+            ["Plain comparison", t.data["explanation"], "Available vs required clearance at the critical point"],
             ["Critical point", f"{fmt(t.data['critical_distance_from_a_km'])} km from {t.data['site_a_name']}"
              if t.data.get("critical_distance_from_a_km") is not None else NOT_DETERMINED,
              "Lowest Fresnel-zone clearance fraction; not necessarily the fewest metres of clearance"],
@@ -131,7 +133,7 @@ def _summary(result, ctx: AskContext, generated: str) -> Sheet:
         for cav in b.caveats:
             rows.append(["Caveat", cav, ""])
     rows.append(["Note", "Status wording is Velorona's mapping of the engineering result; see DATA DICTIONARY.", ""])
-    return Sheet("SUMMARY", rows, widths=[26, 56, 70], freeze=0)
+    return Sheet("SUMMARY", rows, widths=[26, 56, 70], freeze=4)
 
 
 def _g(value: float) -> str:
@@ -149,7 +151,7 @@ _TERRAIN_ROWS = [
     ("Clearance required", "required_clearance_m", "m", "0.0", "60% of the first Fresnel radius", "Minimum required"),
     ("Clearance margin", "margin_m", "m", "+0.0;-0.0;0.0", "Available minus required", "Positive means room to spare"),
     ("First Fresnel radius", "first_fresnel_radius_m", "m", "0.0", "At the tightest point", "Zone that should stay mostly obstacle-free"),
-    ("Clearance ratio", "clearance_ratio", "x", "0.00", "Available / required (1 = exactly the minimum)", "Technical detail"),
+    ("Clearance ratio", "clearance_ratio", "x", "0.00", "Available / required (1 = exactly the minimum)", "Technical detail. Negative means the terrain is above the line of sight."),
     ("Fresnel zone clear at critical point", "percent_fresnel_clear", "fraction", "0.00", "Clear >= 0.60, marginal >= 0.30", "Technical detail"),
     ("Critical point, distance from Site A", "critical_distance_from_a_km", "km", "0.0", "Where the Fresnel-zone clearance fraction is lowest", CRITICAL_POINT_DEFINITION),
     ("Elevation samples", "samples", "count", "0", "Points along the path", "Open-Meteo Elevation API, Copernicus DEM GLO-90"),

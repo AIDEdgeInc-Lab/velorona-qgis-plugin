@@ -357,6 +357,12 @@ try:
     dock.view_combo.setCurrentIndex(dock.view_combo.findData("evidence"))
     check("Evidence view keeps the Observed / Calculated / Inferred report",
           "Observed" in dock.browser.toPlainText() and "Inferred" in dock.browser.toPlainText())
+    import re as _re2
+    check("Evidence view uses the physical comparison, not the old percentage wording",
+          "available vs" in dock.browser.toPlainText()
+          and not _re2.search(r"\d+%\s+(above|below)\s+(the\s+)?(minimum|standard)", dock.browser.toPlainText()))
+    check("CSV Explanation row has no old percentage wording",
+          not _re2.search(r"\d+%\s+(above|below)\s+(the\s+)?(minimum|standard)", export.result_to_csv(tresult)))
     dock.view_combo.setCurrentIndex(dock.view_combo.findData("summary"))
     dock.ask_input.setText("How much clearance do we have?")
     dock._on_ask()

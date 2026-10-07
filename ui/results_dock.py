@@ -40,6 +40,7 @@ from ..core.export import NotExportable, result_to_csv, result_to_xlsx
 from ..core.presentation import ask as ask_module
 from ..core.export import _precip_note
 from ..core.presentation.model import exact
+from ..core.presentation.terrain import ratio_meaning, ratio_value, terrain_explanation
 from ..core.presentation.workbook import context_for
 from . import charts, operational_view, theme
 from .records_table import VeloronaRecordsTable
@@ -507,9 +508,9 @@ def _render_terrestrial(result) -> str:
         + _field_row("Required clearance", f"{r.required_clearance_m:.1f} m")
         + _field_row("Terrain clearance", f"{r.terrain_clearance_m:.1f} m")
         + _field_row("Obstruction distance", f"{r.obstruction_distance_km:.1f} km" if r.obstruction_distance_km is not None else None)
-        + _field_row("Clearance ratio", f"{r.clearance_ratio:.2f}")
+        + _field_row("Clearance ratio", ratio_value(r), ratio_meaning(r))
     )
-    inferred = _field_row("Status", (r.near_threshold and "NEAR THRESHOLD") or r.los_status.upper()) + _field_row("Explanation", result.explanation)
+    inferred = _field_row("Status", (r.near_threshold and "NEAR THRESHOLD") or r.los_status.upper()) + _field_row("Explanation", terrain_explanation(r))
 
     return (
         f"<div class='kicker'>{'SELECTED-FEATURE ANALYSIS'}</div>"

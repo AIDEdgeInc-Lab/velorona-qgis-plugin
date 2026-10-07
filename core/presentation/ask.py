@@ -15,7 +15,7 @@ from typing import List, Optional
 
 from . import history as hist
 from .model import CLEAR, NO_DATA, Brief, fmt, signed
-from .terrain import CRITICAL_POINT_DEFINITION
+from .terrain import CRITICAL_POINT_DEFINITION, margin_phrase
 from .weather import SELECTION_STATION, STATION_SEARCH_RADIUS_KM, STATION_WINDOW_MINUTES
 
 _RANK_ORDER = ["CLEAR", "NO DATA", "WATCH", "AT RISK", "CRITICAL"]  # same order as model._RANK
@@ -126,10 +126,12 @@ def _status(q, ctx) -> Answer:
 
 def _clearance_sentences(t: Brief) -> str:
     d = t.data
-    word = "above" if d["margin_m"] >= 0 else "below"
-    return (f"Available terrain clearance is {fmt(d['terrain_clearance_m'])} m.\n"
+    return (f"Available terrain clearance is {fmt(d['terrain_clearance_m'])} m"
+            + (f" (negative: the terrain is {fmt(-d['terrain_clearance_m'])} m above the line of sight)"
+               if d["terrain_clearance_m"] < 0 else "") + ".\n"
             f"Required clearance is {fmt(d['required_clearance_m'])} m.\n"
-            f"The margin is {signed(d['margin_m'])} m ({fmt(abs(d['margin_m']))} m {word} the minimum).")
+            f"The margin is {signed(d['margin_m'])} m. "
+            f"{margin_phrase(d['terrain_clearance_m'], d['required_clearance_m'])}.")
 
 
 def _why(q, ctx) -> Answer:

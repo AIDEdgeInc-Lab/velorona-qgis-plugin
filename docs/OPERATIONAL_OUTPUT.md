@@ -145,12 +145,25 @@ two cannot disagree. Sheets that do not apply say so in one line.
    finds a profile where the two differ.
 4. **History** is labelled model-derived, "not station observations", in every view and sheet.
 
+### Resolved in the follow-up pass
+
+5. **Negative clearance ratio is valid, not a defect.** `terrain_clearance_m` is the line-of-sight
+   height minus the curvature-adjusted terrain at the critical point, and the library divides it by
+   the required clearance without clamping. It is below zero exactly when the terrain is above the
+   line of sight; every such case is classed obstructed and shown as CRITICAL. The calculation is
+   unchanged. The wording is now explicit: "Terrain is inside the required clearance envelope by
+   X m (and Y m above the line of sight)", the ratio is labelled "Negative: the terrain is above the
+   line of sight", and the Fresnel-zone share carries the same note.
+6. **Old percentage wording.** The library's `explain()` text ("427% above minimum") is still
+   produced by the engine and is kept only in RAW DATA (`terrain.library_explanation`) for audit.
+   Every human-facing place (Evidence view, CSV, Excel, Ask) now uses one shared sentence:
+   "16.0 m available vs 6.8 m required at the critical point: 9.3 m of margin (2.37× the required
+   minimum)". The CSV exposure ratio reads "5.1% of the fade margin (1.64 dB of 32.0 dB)".
+
 ### Still open (not changed)
 
-- **Negative clearance ratio** when terrain is above the line of sight (e.g. −0.53): consistent
-  but unreadable; shown only under technical detail.
-- **`explain()` wording** ("422% above minimum") still appears as the Evidence view's
-  "Explanation" row and in the CSV; it is library text and the new views do not use it.
+- **Library wording in `operational_note`** (weather severity text) still quotes its own band
+  ("at or above 70% of this link's stated fade margin"). It states its baseline, so it was left alone.
 - **The rain rate comes from the model; the station is corroboration only.** The 2 mm/h
   disagreement convention affects the "do the sources agree" label, not the status. ECCC
   station precipitation is a gauge total and is not split by type either.

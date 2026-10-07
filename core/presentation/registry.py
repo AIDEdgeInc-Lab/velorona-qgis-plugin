@@ -119,6 +119,8 @@ _FIELD_LIST = [
     Field("percent_fresnel_clear", "Fresnel zone clear", "fraction", CALCULATED, "aei_link_clearance", "terrain.los_status", "Available clearance / first Fresnel radius (1.0 = 100%)"),
     Field("los_status", "Line-of-sight class", "class", INFERRED, "aei_link_clearance", "terrain.los_status", "clear / marginal / obstructed"),
     Field("near_threshold", "Near threshold", "flag", INFERRED, "aei_link_clearance", "terrain.near_threshold", "Result could change with another elevation source"),
+    Field("explanation", "Plain comparison", "text", INFERRED, "Velorona presentation of the library result", "status.terrain", "Available vs required clearance in metres, ratio as a multiple"),
+    Field("library_explanation", "Library explain() text", "text", INFERRED, "aei_link_clearance.explain", "", "The library's own one-line wording, kept for audit; it expresses the margin as a percentage"),
     Field("samples", "Elevation samples", "count", OBSERVED, "Open-Meteo Elevation API (Copernicus DEM GLO-90)", "", "Points sampled along the path"),
     Field("critical_distance_from_a_km", "Critical point, distance from Site A", "km", CALCULATED, "aei_link_clearance", "terrain.critical_point", "Where clearance is lowest"),
     Field("critical_latitude", "Critical point latitude", "degrees", CALCULATED, "aei_link_clearance", "terrain.critical_point", "WGS84"),

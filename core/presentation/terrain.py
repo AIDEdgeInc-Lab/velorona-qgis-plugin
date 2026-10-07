@@ -78,6 +78,57 @@ def terrain_status(r) -> tuple:
             "Terrain is well above the required clearance.")
 
 
+def ratio_value(r) -> str:
+    return "unbounded" if math.isinf(r.clearance_ratio) else f"{r.clearance_ratio:.2f}×"
+
+
+def ratio_meaning(r) -> str:
+    """What the ratio means at this value. Negative is valid, not an error: the
+    library divides clearance by the requirement without clamping, so it is below
+    zero exactly when the terrain is above the line of sight."""
+    if r.terrain_clearance_m < 0:
+        return ("Negative: the terrain is above the line of sight, so there is no clearance at all "
+                "(1× would be exactly the minimum)")
+    if r.clearance_ratio < 1:
+        return "Below 1×: less clearance than the required minimum (1× is exactly the minimum)"
+    return "1× is exactly the minimum"
+
+
+def margin_phrase(available: float, required: float) -> str:
+    """Margin in words. A negative margin means the terrain intrudes into the
+    clearance the link needs; when clearance itself is negative it is above the line of sight."""
+    margin = available - required
+    if margin >= 0:
+        return f"{fmt(margin)} m above the minimum"
+    text = f"Terrain is inside the required clearance envelope by {fmt(-margin)} m"
+    if available < 0:
+        text += f" and {fmt(-available)} m above the line of sight"
+    return text
+
+
+def terrain_explanation(r) -> str:
+    """The sentence shown wherever the library's explain() used to be shown: a
+    direct physical comparison, with the ratio as a multiple and no percentages.
+    The library's own explain() text is still produced and kept in the data."""
+    if not r.profile:
+        return "Elevation data could not be retrieved for this path."
+    avail, req = r.terrain_clearance_m, r.required_clearance_m
+    ratio = ratio_value(r)
+    if avail < 0:
+        text = (f"Terrain is {fmt(-avail)} m above the line of sight at the critical point; {fmt(req)} m of "
+                f"clearance is required, so the path is short by {fmt(req - avail)} m.")
+    elif avail < req:
+        text = (f"{fmt(avail)} m available vs {fmt(req)} m required at the critical point: short by "
+                f"{fmt(req - avail)} m (available is {ratio} the required minimum).")
+    else:
+        text = (f"{fmt(avail)} m available vs {fmt(req)} m required at the critical point: {fmt(avail - req)} m "
+                f"of margin ({ratio} the required minimum).")
+    if r.near_threshold:
+        text += (f" A difference of about {fmt(ELEVATION_UNCERTAINTY_M, 0)} m in elevation could change the "
+                 f"result; verify with a survey before relying on it.")
+    return text
+
+
 def terrain_brief(result) -> Brief:
     """`result` is a TerrestrialAnalysisResult (duck-typed)."""
     r = result.result
@@ -91,24 +142,25 @@ def terrain_brief(result) -> Brief:
     if crit is not None:
         where = f"{fmt(crit.distance_from_a_km)} km from {result.site_a_name}"
 
-    side = "above" if margin >= 0 else "below"
     key_facts = [
         Fact("Path", f"{fmt(r.distance_km)} km", f"Analysis frequency {exact(r.frequency_ghz)} GHz", "Link distance"),
         Fact("Clearance available", f"{fmt(available)} m",
-             f"at the critical point{', ' + where if where else ''}", "Terrain clearance at the point with the lowest Fresnel-zone clearance fraction"),
+             f"at the critical point{', ' + where if where else ''}"
+             + (f"; negative means the terrain is {fmt(-available)} m above the line of sight" if available < 0 else ""),
+             "Terrain clearance at the point with the lowest Fresnel-zone clearance fraction"),
         Fact("Clearance required", f"{fmt(required)} m", "60% of the first Fresnel zone at that point", "Minimum required"),
-        Fact("Margin", f"{signed(margin)} m", f"{fmt(abs(margin))} m {side} the minimum",
+        Fact("Margin", f"{signed(margin)} m", margin_phrase(available, required),
              "Positive means there is room to spare"),
     ]
-    ratio_text = "unbounded" if math.isinf(r.clearance_ratio) else f"{r.clearance_ratio:.2f}×"
     technical = [
         Fact("Critical point", where or NOT_DETERMINED, "lowest Fresnel-zone clearance fraction", CRITICAL_POINT_DEFINITION),
-        Fact("Clearance ratio", ratio_text, "available / required clearance", "1× is exactly the minimum"),
+        Fact("Clearance ratio", ratio_value(r), "available / required clearance", ratio_meaning(r)),
         Fact("First Fresnel radius", f"{fmt(r.first_fresnel_radius_m)} m", "at the tightest point",
              "Radius of the zone that should stay mostly free of obstacles"),
-        Fact("Fresnel zone clear", f"{r.percent_fresnel_clear * 100:.0f}%",
+        Fact("Fresnel zone clear", f"{r.percent_fresnel_clear * 100:.0f}% of the first Fresnel radius",
              f"clear ≥{CLEAR_THRESHOLD * 100:.0f}%, marginal ≥{OBSTRUCTED_THRESHOLD * 100:.0f}%",
-             "Share of the first Fresnel radius that is clear at the tightest point"),
+             "Negative means the terrain is above the line of sight" if r.percent_fresnel_clear < 0
+             else "Share of the first Fresnel radius that is clear at the critical point"),
         Fact("Bearing", f"{fmt(r.bearing_deg)}°", "from Site A to Site B"),
         Fact("Effective earth radius factor k", exact(r.k_factor), "standard atmosphere (ITU-R P.530 median)"),
         Fact("Antenna height A", f"{exact(result.site_a_height_m)} m", _origin(result.site_a_height_from_feature)),
@@ -150,6 +202,8 @@ def terrain_brief(result) -> Brief:
             "critical_longitude": crit.longitude if crit else None,
             "site_a_name": result.site_a_name, "site_b_name": result.site_b_name,
             "profile": profile_rows(r),
+            "explanation": terrain_explanation(r),
+            "library_explanation": getattr(result, "explanation", ""),
         },
     )
 

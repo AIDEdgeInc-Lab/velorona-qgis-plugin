@@ -22,6 +22,8 @@ import csv
 import io
 from datetime import datetime, timezone
 
+from .presentation.terrain import ratio_meaning, ratio_value, terrain_explanation
+
 EVIDENCE_HEADER = ["Evidence", "Type", "Source", "Observation-Input", "Calculated result", "Interpretation"]
 
 NOT_DETERMINED = "Not determined"
@@ -248,6 +250,17 @@ def result_to_csv(result) -> str:
     )
 
 
+def _ratio_note(r) -> str:
+    """The ratio with its meaning; the bare number alone is not interpretable."""
+    return f"{ratio_value(r)} the required minimum. {ratio_meaning(r)}."
+
+
+def _exposure_text(e) -> str:
+    """Exposure ratio with its baseline and the dB it stands for."""
+    return (f"{e.exposure_ratio * 100:.1f}% of the fade margin "
+            f"({e.attenuation.predicted_attenuation_db:.2f} dB of {_exact(e.link.fade_margin_db)} dB)")
+
+
 def result_to_xlsx(result) -> bytes:
     """The operational workbook for a terrain / weather / link result. Its
     EVIDENCE sheet is read back from result_to_csv(), so the two exports share
@@ -307,10 +320,11 @@ def _terrestrial_to_csv(result) -> str:
             interpretation=("" if r.obstruction_distance_km is not None else "Not applicable -- link is not obstructed"),
         ),
         _evidence_row("Clearance ratio", "Calculated", "aei_link_clearance (terrain clearance / required clearance)",
-                      calculated_result=f"{r.clearance_ratio:.3f}"),
+                      calculated_result=f"{r.clearance_ratio:.3f}", interpretation=_ratio_note(r)),
         _evidence_row("Line-of-sight status", "Inferred", "aei_link_clearance",
                       interpretation=("NEAR THRESHOLD" if r.near_threshold else r.los_status.upper())),
-        _evidence_row("Explanation", "Inferred", "aei_link_clearance (explain())", interpretation=result.explanation),
+        _evidence_row("Explanation", "Inferred", "Velorona presentation of the aei_link_clearance result",
+                      interpretation=terrain_explanation(r)),
     ]
     for row in rows:
         writer.writerow(row)
@@ -344,7 +358,7 @@ def _microwave_to_csv(result) -> str:
                       observation_input=f"{e.rain_rate_mm_h:.1f} mm/h, {_exact(link.frequency_ghz)} GHz, {link.polarization}, {link.length_km:.2f} km",
                       calculated_result=f"{att.predicted_attenuation_db:.2f} dB", interpretation=att.assumption),
         _evidence_row("Exposure ratio", "Calculated", "aei_mw_exposure (predicted attenuation / fade margin)",
-                      calculated_result=f"{e.exposure_ratio * 100:.1f}%"),  # 0.1%: at :.0f,
+                      calculated_result=_exposure_text(e)),  # 0.1%: at :.0f,
                       # 99.6% and 100.4% both printed 100%, erasing which side of
                       # the fade margin the link sits on -- the one thing this row says
         _evidence_row("Severity", "Inferred", "aei_mw_exposure", interpretation=f"{e.severity.upper()} -- {e.operational_note}"),
@@ -505,7 +519,7 @@ def _link_investigation_to_csv(result) -> str:
                           observation_input=f"{e.rain_rate_mm_h:.1f} mm/h, {_exact(link.frequency_ghz)} GHz, {link.polarization}, {att.path_length_km:.2f} km",
                           calculated_result=f"{att.predicted_attenuation_db:.2f} dB", interpretation=att.assumption),
             _evidence_row("Exposure ratio", "Calculated", "aei_mw_exposure (predicted attenuation / fade margin)",
-                          calculated_result=f"{e.exposure_ratio * 100:.1f}%"),  # 0.1%: at :.0f,
+                          calculated_result=_exposure_text(e)),  # 0.1%: at :.0f,
                       # 99.6% and 100.4% both printed 100%, erasing which side of
                       # the fade margin the link sits on -- the one thing this row says
             _evidence_row("Severity", "Inferred", "aei_mw_exposure",
