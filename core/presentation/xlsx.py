@@ -12,12 +12,13 @@ from __future__ import annotations
 import re
 import zipfile
 from dataclasses import dataclass
-from io import BytesIO
 from html import escape as _html_escape
-from typing import Any, List, Optional, Sequence, Tuple
+from io import BytesIO
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
 
 def escape(text: str) -> str:
-    """XML text escaping of & < > (same result as xml.sax.saxutils.escape)."""
+    """Escape & < > for XML text (the same result the standard library's SAX escape gives)."""
     return _html_escape(text, quote=False)
 
 
