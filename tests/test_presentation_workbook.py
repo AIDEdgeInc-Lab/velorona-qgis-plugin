@@ -11,7 +11,8 @@ from test_presentation_weather import _history
 from core.export import NotExportable, result_to_csv, result_to_xlsx
 from core.presentation import registry
 from core.presentation.workbook import raw_rows
-from core.presentation.xlsx import Cell, Sheet, header, read_workbook, sheet_name, write_workbook
+from core.presentation.xlsx import Cell, Sheet, header, sheet_name, write_workbook
+from xlsx_reader import read_workbook
 
 SHEETS = ["SUMMARY", "LINK ANALYSIS", "WEATHER", "WEATHER HISTORY", "ELEVATION-TERRAIN", "EVIDENCE", "RAW DATA",
           "DATA DICTIONARY"]

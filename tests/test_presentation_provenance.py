@@ -16,7 +16,7 @@ from core.presentation.history import parse_history
 from core.presentation.terrain import CRITICAL_POINT_DEFINITION, terrain_brief
 from core.presentation.weather import exposure_brief
 from core.presentation.workbook import raw_rows, context_for
-from core.presentation.xlsx import read_workbook
+from xlsx_reader import read_workbook
 from core.sources.open_meteo_rain import TypedPrecipitationProvider
 
 SITE = MicrowaveSite(id="S", name="S", latitude=A[0], longitude=A[1], provenance=Provenance.USER_PROVIDED)

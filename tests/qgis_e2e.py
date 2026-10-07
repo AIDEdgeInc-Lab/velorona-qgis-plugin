@@ -337,7 +337,8 @@ print("\n== 8b. operational output: Summary / Details / Ask / Excel (live result
 try:
     from velorona.core.presentation import ask as _ask  # noqa: E402
     from velorona.core.presentation.workbook import context_for  # noqa: E402
-    from velorona.core.presentation.xlsx import read_workbook  # noqa: E402
+    sys.path.insert(0, os.path.join(PLUGIN_DIR, "tests"))
+    from xlsx_reader import read_workbook  # noqa: E402
 
     dock = plugin.dock
     dock.show_result(tresult)

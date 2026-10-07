@@ -12,7 +12,7 @@ from core.export import result_to_csv, result_to_xlsx
 from core.presentation import terrain as T
 from core.presentation.ask import AskContext, ask
 from core.presentation.model import CRITICAL
-from core.presentation.xlsx import read_workbook
+from xlsx_reader import read_workbook
 
 OLD_WORDING = re.compile(r"\d+%\s+(above|below)\s+(the\s+)?(minimum|standard)", re.I)
 
