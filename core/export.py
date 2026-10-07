@@ -1,6 +1,8 @@
 """Evidence export -- canonical long-format table (one row per evidence
 item): Evidence | Type | Source | Observation-Input | Calculated result |
-Interpretation, Type in {Observed, Calculated, Inferred}. Every value
+Interpretation, Type in {Observed, Model-derived, Calculated, Inferred}. Observed is
+a measurement (station, radar-as-estimated is typed Observed with its estimate
+note); Model-derived is a weather-model value such as Open-Meteo. Every value
 comes from the existing engine result objects (aei_link_clearance /
 aei_mw_exposure), unmodified -- this module only serializes what's
 already there. See docs/EVIDENCE_EXPORT_AUDIT.md for the gap analysis
@@ -246,6 +248,18 @@ def result_to_csv(result) -> str:
     )
 
 
+def result_to_xlsx(result) -> bytes:
+    """The operational workbook for a terrain / weather / link result. Its
+    EVIDENCE sheet is read back from result_to_csv(), so the two exports share
+    one source of rows."""
+    from .presentation.workbook import build_workbook, context_for
+    if context_for(result) is None:
+        raise NotExportable(
+            "An Excel workbook is available for terrain clearance, weather exposure and Fixed Service link "
+            "results. Single records and selections export as CSV; satellite geometry is not exported.")
+    return build_workbook(result, result_to_csv(result))
+
+
 def _terrestrial_to_csv(result) -> str:
     r = result.result
     site_a_pt = r.profile[0] if r.profile else None
@@ -320,8 +334,8 @@ def _microwave_to_csv(result) -> str:
     writer.writerow(EVIDENCE_HEADER)
 
     rows = [
-        _evidence_row("Rain rate used", "Observed", f"Open-Meteo ({e.source_site_id})",
-                      observation_input=f"{e.rain_rate_mm_h:.1f} mm/h", interpretation=e.rain_rate_assumption),
+        _evidence_row("Rain rate used", "Model-derived", f"Open-Meteo weather model ({e.source_site_id})",
+                      observation_input=f"{e.rain_rate_mm_h:.1f} mm/h", interpretation=_rain_note(e, getattr(result, "precipitation", {}))),
         _evidence_row("Fade margin (link spec)", "Observed", "User, via analysis dialog (not sourced from license data)",
                       observation_input=f"{_exact(link.fade_margin_db)} dB"),
         _evidence_row("Frequency / polarization", "Observed", "User, via analysis dialog (not sourced from license data)",
@@ -337,14 +351,34 @@ def _microwave_to_csv(result) -> str:
         _evidence_row("Hardware condition", "Inferred", "", interpretation=f"{NOT_DETERMINED} -- no hardware telemetry input to this analysis."),
     ]
 
-    rows.extend(_representativeness_rows(result.representativeness))
+    rows.extend(_representativeness_rows(result.representativeness, getattr(result, "precipitation", {})))
 
     for row in rows:
         writer.writerow(row)
     return buf.getvalue()
 
 
-def _representativeness_rows(representativeness) -> list:
+def _precip_note(p) -> str:
+    """What the model precipitation value is, and what was left out of it."""
+    if p is None:
+        return ""
+    if p.type_unknown:
+        return ("Total precipitation: the source did not report rain/snow separately, so this may include snow. "
+                "Not confirmed as rain.")
+    note = f"Liquid rain only ({p.basis})."
+    if p.has_frozen:
+        note += (f" Not counted as rain: frozen precipitation (about {p.frozen_mm:.2f} mm water equivalent"
+                 + (f", snowfall {p.snowfall_cm:.2f} cm" if p.snowfall_cm else "") + ").")
+    return note
+
+
+def _rain_note(e, precipitation) -> str:
+    p = (precipitation or {}).get(e.source_site_id)
+    note = _precip_note(p)
+    return (e.rain_rate_assumption + (" " + note if note else ""))
+
+
+def _representativeness_rows(representativeness, precipitation=None) -> list:
     """Per-endpoint weather evidence rows, shared by the standalone microwave
     export and the Fixed Service link investigation export so the two cannot
     disagree about what the weather evidence said."""
@@ -367,10 +401,12 @@ def _representativeness_rows(representativeness) -> list:
                                        interpretation="No station reported within the last 90 minutes within the search radius used here."))
 
         if rep.model_observation is not None:
-            rows.append(_evidence_row(f"Model precipitation ({site_label})", "Observed", rep.model_observation.source,
-                                       observation_input=f"{rep.model_observation.rain_rate_mm_h:.1f} mm/h"))
+            rows.append(_evidence_row(f"Model precipitation ({site_label})", "Model-derived",
+                                       f"{rep.model_observation.source} (weather model, not a station measurement)",
+                                       observation_input=f"{rep.model_observation.rain_rate_mm_h:.1f} mm/h at {rep.model_observation.timestamp}",
+                                       interpretation=_precip_note((precipitation or {}).get(rep.site.id))))
         else:
-            rows.append(_evidence_row(f"Model precipitation ({site_label})", "Observed", "Open-Meteo",
+            rows.append(_evidence_row(f"Model precipitation ({site_label})", "Model-derived", "Open-Meteo weather model",
                                        observation_input=NOT_DETERMINED))
 
         if rep.radar_observation is not None:
@@ -435,7 +471,7 @@ def _link_investigation_to_csv(result) -> str:
 
     if result.exposure is None:
         rows.append(_evidence_row(
-            "Weather evidence", "Observed", "Open-Meteo / ECCC", observation_input=NOT_DETERMINED,
+            "Weather evidence", "Model-derived", "Open-Meteo weather model", observation_input=NOT_DETERMINED,
             interpretation=(result.weather_error or "Live weather services were unavailable for this link.")))
     else:
         e = result.exposure.exposure
@@ -445,8 +481,8 @@ def _link_investigation_to_csv(result) -> str:
         pol_kind, pol_note = origins.get("polarization", ("Observed", ""))
         fade_kind, fade_note = origins.get("fade_margin_db", ("Observed", ""))
         rows += [
-            _evidence_row("Rain rate used", "Observed", f"Open-Meteo ({e.source_site_id})",
-                          observation_input=f"{e.rain_rate_mm_h:.1f} mm/h", interpretation=e.rain_rate_assumption),
+            _evidence_row("Rain rate used", "Model-derived", f"Open-Meteo weather model ({e.source_site_id})",
+                          observation_input=f"{e.rain_rate_mm_h:.1f} mm/h", interpretation=_rain_note(e, getattr(result.exposure, "precipitation", {}))),
             # Type stays in the canonical Observed/Calculated/Inferred vocabulary;
             # whether a parameter came from the public record or is an engine
             # assumption is carried in Source, the same convention the standalone
@@ -477,7 +513,7 @@ def _link_investigation_to_csv(result) -> str:
             _evidence_row("Hardware condition", "Inferred", "",
                           interpretation=f"{NOT_DETERMINED} -- no hardware telemetry input to this analysis."),
         ]
-        rows.extend(_representativeness_rows(result.exposure.representativeness))
+        rows.extend(_representativeness_rows(result.exposure.representativeness, getattr(result.exposure, "precipitation", {})))
 
     for row in rows:
         writer.writerow(row)

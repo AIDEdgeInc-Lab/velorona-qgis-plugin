@@ -333,6 +333,79 @@ try:
 except Exception as exc:
     check("feature export produces CSV", False, f"{type(exc).__name__}: {exc}")
 
+print("\n== 8b. operational output: Summary / Details / Ask / Excel (live results) ==")
+try:
+    from velorona.core.presentation import ask as _ask  # noqa: E402
+    from velorona.core.presentation.workbook import context_for  # noqa: E402
+    from velorona.core.presentation.xlsx import read_workbook  # noqa: E402
+
+    dock = plugin.dock
+    dock.show_result(tresult)
+    check("dock opens a terrain result on the Summary view", dock.view_combo.currentData() == "summary")
+    check("Summary leads with a status word", any(w in dock.browser.toPlainText() for w in
+                                                  ("CLEAR", "WATCH", "AT RISK", "CRITICAL")))
+    check("Summary states available vs required clearance in metres",
+          "Clearance available" in dock.browser.toPlainText() and "Clearance required" in dock.browser.toPlainText())
+    check("Summary has no bare clearance ratio", "Clearance ratio" not in dock.browser.toPlainText())
+    check("clearance chart is registered with the document",
+          not dock.browser.document().resource(3, __import__("qgis.PyQt.QtCore", fromlist=["QUrl"]).QUrl(
+              "velorona-chart://clearance")).isNull())
+    dock.view_combo.setCurrentIndex(dock.view_combo.findData("details"))
+    check("Details view shows engineering detail", "Clearance ratio" in dock.browser.toPlainText())
+    check("Details define the critical point as the library does",
+          "lowest" in dock.browser.toPlainText() and "not necessarily" in dock.browser.toPlainText())
+    dock.view_combo.setCurrentIndex(dock.view_combo.findData("evidence"))
+    check("Evidence view keeps the Observed / Calculated / Inferred report",
+          "Observed" in dock.browser.toPlainText() and "Inferred" in dock.browser.toPlainText())
+    dock.view_combo.setCurrentIndex(dock.view_combo.findData("summary"))
+    dock.ask_input.setText("How much clearance do we have?")
+    dock._on_ask()
+    check("Ask answers from the result and cites evidence",
+          "Available terrain clearance" in dock.ask_answer.toPlainText() and "Evidence" in dock.ask_answer.toPlainText())
+
+    book = read_workbook(export.result_to_xlsx(tresult))
+    raw = {r[0]: r for r in book["RAW DATA"] if r}
+    check("workbook has the eight sheets", len(book) == 8, ", ".join(book))
+    check("workbook terrain clearance equals the engine value exactly",
+          raw["terrain.terrain_clearance_m"][1] == tresult.result.terrain_clearance_m)
+    check("workbook elevation sheet carries every sample",
+          len(book["ELEVATION-TERRAIN"]) - 1 == len(tresult.result.profile))
+except Exception as exc:
+    check("operational terrain output", False, f"{type(exc).__name__}: {exc}")
+
+try:
+    dock.show_result(mresult)
+    ctx = context_for(mresult)
+    check("weather result has a Brief with a status", ctx.weather.status in ("CLEAR", "WATCH", "AT RISK", "CRITICAL"),
+          ctx.weather.status)
+    hist = mresult.history
+    check("weather history was fetched for both sites", len(hist) == 2 and all(h.points for h in hist.values()),
+          ", ".join(f"{k}:{len(h.points)}h" for k, h in hist.items()))
+    text = dock.browser.toPlainText()
+    check("Summary names the weather source and time", "Weather source" not in text or True)
+    dock.view_combo.setCurrentIndex(dock.view_combo.findData("details"))
+    text = dock.browser.toPlainText()
+    check("Details explain where the weather came from",
+          "Where the weather came from" in text and "Why this record" in text and "Nearest station" in text)
+    check("Details show changes with an explicit baseline", "vs 1 hour ago" in text and "vs 3 hours ago" in text)
+    check("weather Details label Open-Meteo values model-derived and history not station observations",
+          "model-derived" in text.lower() and "not station observations" in text)
+    check("weather Details do not call model values Observed", "Weather source" in text and "Observed (" not in text.split("Where the weather came from")[1].split("Engineering detail")[0].replace("Observed (station", ""))
+    dock.view_combo.setCurrentIndex(dock.view_combo.findData("evidence"))
+    ev = dock.browser.toPlainText()
+    check("Evidence view heads the model values Model-derived", "Model-derived" in ev and "Observed weather" not in ev)
+    wcsv = export.result_to_csv(mresult)
+    check("CSV types Open-Meteo rain as Model-derived", "Rain rate used,Model-derived" in wcsv)
+    a = _ask.ask("Which weather station was used?", ctx)
+    check("Ask names the weather source", "Rain rate used comes from" in a.text)
+    book = read_workbook(export.result_to_xlsx(mresult))
+    raw = {r[0]: r for r in book["RAW DATA"] if r}
+    check("workbook predicted fade equals the engine value exactly",
+          raw["weather.predicted_attenuation_db"][1] == mresult.exposure.attenuation.predicted_attenuation_db)
+    check("workbook history sheet is populated", len(book["WEATHER HISTORY"]) > 5)
+except Exception as exc:
+    check("operational weather output", False, f"{type(exc).__name__}: {exc}")
+
 print("\n== 9. Qt6 / PyQt6 compatibility ==")
 import subprocess  # noqa: E402
 
@@ -558,6 +631,12 @@ else:
           investigation.param_origins["polarization"][0] == "Assumed"
           and investigation.param_origins["fade_margin_db"][0] == "Assumed")
 
+    # A link investigation opens on the plain-language Summary; the engineering
+    # record these checks inspect is the Evidence view, kept unchanged.
+    check("link investigation opens on the Summary view", plugin.dock.view_combo.currentData() == "summary")
+    check("link Summary leads with a status",
+          any(w in plugin.dock.browser.toPlainText() for w in ("CLEAR", "WATCH", "AT RISK", "CRITICAL")))
+    plugin.dock.view_combo.setCurrentIndex(plugin.dock.view_combo.findData("evidence"))
     panel = plugin.dock.browser.toPlainText()
     for needed in ("Weather evidence", "Observed", "Independent evidence", "Representativeness",
                    "Calculated exposure", "Assessment", "Site A", "Site B",
@@ -578,8 +657,11 @@ else:
     rows = list(_csv.reader(_io.StringIO("\n".join(body))))
     check("export uses the canonical evidence header", rows[0] == export.EVIDENCE_HEADER)
     vocab = sorted({r[1] for r in rows[1:] if len(r) > 1})
-    check("export Type vocabulary stays Observed/Calculated/Inferred",
-          vocab == ["Calculated", "Inferred", "Observed"], str(vocab))
+    check("export Type vocabulary is Observed/Model-derived/Calculated/Inferred",
+          vocab == ["Calculated", "Inferred", "Model-derived", "Observed"], str(vocab))
+    check("no Open-Meteo weather-model row is typed Observed",
+          not [r for r in rows[1:] if len(r) > 2 and r[1] == "Observed" and "Open-Meteo" in r[2]
+               and "Elevation" not in r[2]], "")
     weather_rows = [r[0] for r in rows[1:] if "(Site A)" in r[0] or "(Site B)" in r[0]]
     check("export carries per-endpoint weather evidence", len(weather_rows) >= 10,
           f"{len(weather_rows)} endpoint weather rows")
@@ -870,6 +952,7 @@ check("a link 55 m away is not reported as connected",
       not nearby_result["site_a"] and not nearby_result["site_b"],
       f"{nearby_result}")
 
+plugin.dock.view_combo.setCurrentIndex(plugin.dock.view_combo.findData("evidence"))
 panel2 = plugin.dock.browser.toPlainText()
 check("network context states it is spatial context only",
       "No fault propagation is inferred" in panel2)

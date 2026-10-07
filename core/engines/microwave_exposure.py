@@ -11,10 +11,12 @@ from typing import Dict
 
 from aei_mw_exposure import LinkExposure, MicrowaveLink, MicrowaveSite, Provenance, calculate_exposure
 from aei_mw_exposure.providers import eccc
-from aei_mw_exposure.providers.open_meteo import OpenMeteoProvider
 from aei_mw_exposure.representativeness import WeatherRepresentativeness, assess_representativeness
 
 from ..features import feature_id_name, feature_to_latlon
+from ..presentation import history as weather_history
+from ..presentation import precip
+from ..sources.open_meteo_rain import TypedPrecipitationProvider
 
 # See terrestrial.py's PARAM_SPEC note. The frequency bound here is stronger
 # than the terrestrial one: it is the rain model's own tabulated validity
@@ -44,6 +46,11 @@ class MicrowaveAnalysisResult:
     exposure: LinkExposure
     representativeness: Dict[str, WeatherRepresentativeness]
     weather_errors: Dict[str, str] = field(default_factory=dict)
+    # Hourly model history per site id, for "what changed" comparisons. It is
+    # context only: nothing in calculate_exposure() reads it.
+    history: Dict[str, weather_history.WeatherHistory] = field(default_factory=dict)
+    # How each site's precipitation was split into liquid rain and the rest.
+    precipitation: Dict[str, precip.Precipitation] = field(default_factory=dict)
 
 
 def build_params(entries) -> dict:
@@ -100,7 +107,8 @@ def endpoint_site(latitude, longitude, site_id, name, source) -> MicrowaveSite:
 def analyze_sites(site_a: MicrowaveSite, site_b: MicrowaveSite, params: dict,
                   link_provenance: Provenance = Provenance.USER_PROVIDED,
                   link_source: str = "Velorona QGIS plugin -- link parameters entered by user",
-                  link_id: str = None) -> MicrowaveAnalysisResult:
+                  link_id: str = None, history_fetcher=weather_history.fetch_weather_history,
+                  provider=None) -> MicrowaveAnalysisResult:
     """The shared exposure + representativeness pass. Both the two-selected-
     sites path and the Fixed Service link path end up here, so there is one
     calculation, not two."""
@@ -115,7 +123,7 @@ def analyze_sites(site_a: MicrowaveSite, site_b: MicrowaveSite, params: dict,
         source=link_source,
     )
 
-    provider = OpenMeteoProvider()
+    provider = TypedPrecipitationProvider() if provider is None else provider
     weather_errors: Dict[str, str] = {}
     weather_by_site = {}
     for site in (site_a, site_b):
@@ -161,9 +169,17 @@ def analyze_sites(site_a: MicrowaveSite, site_b: MicrowaveSite, params: dict,
             )
         representativeness[site.id] = rep
 
+    histories = {}
+    for site in (site_a, site_b):
+        try:
+            histories[site.id] = history_fetcher(site.id, site.latitude, site.longitude)
+        except Exception as exc:  # optional context -- say so, never fabricate a trend
+            weather_errors[f"{site.id} (weather history)"] = f"No history available: {exc}"
+
     return MicrowaveAnalysisResult(
         kind="microwave-exposure", exposure=exposure,
-        representativeness=representativeness, weather_errors=weather_errors,
+        representativeness=representativeness, weather_errors=weather_errors, history=histories,
+        precipitation=dict(getattr(provider, "precipitation", {})),
     )
 
 
