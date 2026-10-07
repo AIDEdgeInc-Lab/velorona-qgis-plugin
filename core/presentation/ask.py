@@ -121,7 +121,8 @@ def _status(q, ctx) -> Answer:
             lines.append(b.reason if len(briefs) == 1 else "")
             lines += [f"{f.label}: {f.value}" for f in b.key_facts if f.label != "Path"]
         evidence += _short_evidence(b)
-    return Answer("\n".join([lead] + [l for l in lines if l]), evidence)
+    body = [line for line in lines if line]
+    return Answer("\n".join([lead] + body), evidence)
 
 
 def _clearance_sentences(t: Brief) -> str:

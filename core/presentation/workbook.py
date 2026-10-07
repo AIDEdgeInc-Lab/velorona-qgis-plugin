@@ -274,9 +274,9 @@ def _evidence(evidence_csv: str) -> Sheet:
     """The CSV export's own table, so the two cannot disagree. Preamble lines
     (starting with '#') are provenance and are kept above the table."""
     lines = list(io.StringIO(evidence_csv))
-    pre = [[l[1:].strip()] for l in lines if l.startswith("#") and l[1:].strip()]
+    pre = [[line[1:].strip()] for line in lines if line.startswith("#") and line[1:].strip()]
     # A quoted field can span lines, so the table part is parsed as a whole.
-    table = [r for r in csv.reader(io.StringIO("".join(l for l in lines if not l.startswith("#")))) if r]
+    table = [r for r in csv.reader(io.StringIO("".join(line for line in lines if not line.startswith("#")))) if r]
     rows = pre + [[]] + ([header(*table[0])] + table[1:] if table else [])
     return Sheet("EVIDENCE", rows, widths=[40, 12, 44, 30, 22, 80])
 
