@@ -186,3 +186,12 @@ two cannot disagree. Sheets that do not apply say so in one line.
   every field, calculation and status; ELEVATION-TERRAIN has every sample.
 - Non-technical reader: no ratio, Fresnel radius or percentage is needed to read the Summary.
   The ratio sits under Details → Engineering detail, next to what it means.
+
+## 7. 1.1.4 static-analysis cleanups (no functional change)
+
+- Flake8 E741: the ambiguous loop variable `l` in `core/presentation/ask.py` and `core/presentation/workbook.py`
+  is now `line`. No behaviour, wording, calculation or workbook content changed.
+- Bandit B314/B405/B406: `read_workbook()` (a reader used only by the tests) moved from
+  `core/presentation/xlsx.py` to `tests/xlsx_reader.py`, so the shipped package contains no XML parsing.
+  The writer's XML escaping uses `html.escape(quote=False)`, which returns the same text; the workbooks are
+  identical part for part.
