@@ -350,6 +350,7 @@ def _microwave_to_csv(result) -> str:
     rows = [
         _evidence_row("Rain rate used", "Model-derived", f"Open-Meteo weather model ({e.source_site_id})",
                       observation_input=f"{e.rain_rate_mm_h:.1f} mm/h", interpretation=_rain_note(e, getattr(result, "precipitation", {}))),
+        *_precip_rows((getattr(result, "precipitation", None) or {}).get(e.source_site_id)),
         _evidence_row("Fade margin (link spec)", "Observed", "User, via analysis dialog (not sourced from license data)",
                       observation_input=f"{_exact(link.fade_margin_db)} dB"),
         _evidence_row("Frequency / polarization", "Observed", "User, via analysis dialog (not sourced from license data)",
@@ -376,14 +377,29 @@ def _precip_note(p) -> str:
     """What the model precipitation value is, and what was left out of it."""
     if p is None:
         return ""
-    if p.type_unknown:
-        return ("Total precipitation: the source did not report rain/snow separately, so this may include snow. "
-                "Not confirmed as rain.")
-    note = f"Liquid rain only ({p.basis})."
+    note = f"Liquid rain only ({p.basis}); class {p.precip_class}."
     if p.has_frozen:
         note += (f" Not counted as rain: frozen precipitation (about {p.frozen_mm:.2f} mm water equivalent"
-                 + (f", snowfall {p.snowfall_cm:.2f} cm" if p.snowfall_cm else "") + ").")
+                 + (f", snowfall {p.snowfall_cm:.2f} cm" if p.snowfall_cm else "") + "). Shown as a separate signal; it does not change the status.")
+    if p.has_freezing:
+        note += f" Freezing precipitation is reported (WMO code {p.weather_code}); it is not quantified by the rain model and is not counted as rain."
     return note
+
+
+def _precip_rows(p) -> list:
+    """Evidence rows for the precipitation class and the mm -> mm/h conversion (empty when no typed precipitation is available)."""
+    if p is None:
+        return []
+    f = lambda v, d=2: NOT_DETERMINED if v is None else f"{v:.{d}f}"
+    return [
+        _evidence_row("Precipitation class", "Inferred", "Open-Meteo rain / showers / snowfall fields and WMO weather_code",
+                      observation_input=f"rain {f(p.rain_mm)} mm, showers {f(p.showers_mm)} mm, snowfall {f(p.snowfall_cm)} cm, weather_code {p.weather_code if p.weather_code is not None else NOT_DETERMINED}",
+                      calculated_result=p.precip_class,
+                      interpretation="Only rain and showers feed the rain-attenuation model. Snow, freezing and mixed precipitation are never counted as rain."),
+        _evidence_row("Rain-rate conversion", "Calculated", "Open-Meteo reports millimetres accumulated over `interval` seconds",
+                      observation_input=f"{p.liquid_mm:.2f} mm over {p.interval_s:.0f} s", calculated_result=f"{p.rate_mm_h:.2f} mm/h",
+                      interpretation="rate = mm x 3600 / interval"),
+    ]
 
 
 def _rain_note(e, precipitation) -> str:
@@ -497,6 +513,7 @@ def _link_investigation_to_csv(result) -> str:
         rows += [
             _evidence_row("Rain rate used", "Model-derived", f"Open-Meteo weather model ({e.source_site_id})",
                           observation_input=f"{e.rain_rate_mm_h:.1f} mm/h", interpretation=_rain_note(e, getattr(result.exposure, "precipitation", {}))),
+            *_precip_rows((getattr(result.exposure, "precipitation", None) or {}).get(e.source_site_id)),
             # Type stays in the canonical Observed/Calculated/Inferred vocabulary;
             # whether a parameter came from the public record or is an engine
             # assumption is carried in Source, the same convention the standalone

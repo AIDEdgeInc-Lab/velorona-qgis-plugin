@@ -128,9 +128,10 @@ def weather_stage(fx):
     e = res.exposure; att = e.attenuation
     p = res.precipitation.get(e.source_site_id)
     return {
-        "precip": {"rate_mm_h": e.rain_rate_mm_h, "basis": p.basis if p else None, "class": p.basis if p else None, "driver_site": e.source_site_id,
-                   "total_mm": p.total_mm if p else None, "rain_mm": p.rain_mm if p else None, "showers_mm": p.showers_mm if p else None,
-                   "snowfall_cm": p.snowfall_cm if p else None, "frozen_mm": p.frozen_mm if p else None, "has_frozen": p.has_frozen if p else None},
+        "precip": {"rate_mm_h": e.rain_rate_mm_h, "basis": p.basis if p else None, "class": p.precip_class if p else None, "flags": list(p.flags) if p else [],
+                   "driver_site": e.source_site_id, "total_mm": p.total_mm if p else None, "rain_mm": p.rain_mm if p else None,
+                   "showers_mm": p.showers_mm if p else None, "snowfall_cm": p.snowfall_cm if p else None, "frozen_mm": p.frozen_mm if p else None,
+                   "has_frozen": p.has_frozen if p else None},
         "exposure": {"path_km": att.path_length_km, "specific_attenuation_db_km": att.specific_attenuation_db_km,
                      "effective_path_km": att.effective_path_length_km, "attenuation_db": att.predicted_attenuation_db,
                      "ratio": e.exposure_ratio, "severity": e.severity, "fade_margin_db": e.link.fade_margin_db,

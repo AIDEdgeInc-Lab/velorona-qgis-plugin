@@ -84,7 +84,8 @@ def _site_weather(rep, label: str, point, p=None) -> SiteWeather:
         radar_rain_mm_h=radar.rain_rate_mm_h if radar else None,
         representativeness=LEVEL_TEXT.get(rep.level, rep.level),
         representativeness_note=rep.note,
-        precip_total_mm_h=p.total_mm if p else None, precip_basis=p.basis if p else "",
+        precip_total_mm_h=(p.total_mm * 3600.0 / p.interval_s) if (p and p.total_mm is not None) else None,
+        precip_basis=p.basis if p else "",
     )
 
 
@@ -172,12 +173,12 @@ def exposure_brief(mw, param_origins: Optional[dict] = None, weather_error: Opti
         p = (getattr(mw, "precipitation", None) or {}).get(site.id)
         if p is None:
             continue
-        if p.type_unknown:
-            caveats.append(f"{site.name}: the weather source did not report rain and snow separately; the rain rate used is "
-                           f"TOTAL precipitation and may include snow.")
-        elif p.has_frozen:
-            caveats.append(f"{site.name}: frozen precipitation (about {fmt(p.frozen_mm, 2)} mm water equivalent) is present "
-                           f"and is not counted as rain. Total precipitation {fmt(p.total_mm, 2)} mm/h, rain used {fmt(p.rate_mm_h, 2)} mm/h.")
+        if p.has_frozen:
+            caveats.append(f"{site.name}: frozen precipitation (about {fmt(p.frozen_mm, 2)} mm water equivalent) is present and is not counted "
+                           f"as rain. It is a separate signal and does not change the status. Rain used: {fmt(p.rate_mm_h, 2)} mm/h.")
+        if p.has_freezing:
+            caveats.append(f"{site.name}: freezing precipitation is reported (WMO code {p.weather_code}); the rain model does not quantify it "
+                           f"and it is not counted as rain.")
     assumed = [k.replace("_", " ") for k, (kind, _) in origins.items() if kind == "Assumed"]
     if assumed:
         caveats.append("Assumed rather than published: " + ", ".join(assumed)

@@ -15,7 +15,6 @@ from aei_mw_exposure.providers.open_meteo import OPEN_METEO_URL, SOURCE, OpenMet
 from aei_mw_exposure.weather import WeatherObservation
 
 from ..presentation import precip
-from ..validation import NoDataError, interval_reason
 
 
 class TypedPrecipitationProvider(OpenMeteoProvider):
@@ -31,14 +30,11 @@ class TypedPrecipitationProvider(OpenMeteoProvider):
             get = requests.get
         resp = get(OPEN_METEO_URL, params={
             "latitude": site.latitude, "longitude": site.longitude,
-            "current": "precipitation,rain,showers,snowfall,temperature_2m,wind_speed_10m",
+            "current": "precipitation,rain,showers,snowfall,weather_code,temperature_2m,wind_speed_10m",
             "timezone": "auto",
         }, timeout=self.timeout)
         resp.raise_for_status()
         current = resp.json()["current"]
-        reason = interval_reason(current.get("interval"))
-        if reason:
-            raise NoDataError("weather", [reason])
         p = precip.classify(current)
         self.precipitation[site.id] = p
         return WeatherObservation(

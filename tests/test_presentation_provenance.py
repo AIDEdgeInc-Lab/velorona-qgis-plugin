@@ -18,6 +18,7 @@ from core.presentation.weather import exposure_brief
 from core.presentation.workbook import raw_rows, context_for
 from xlsx_reader import read_workbook
 from core.sources.open_meteo_rain import TypedPrecipitationProvider
+from core.validation import NoDataError
 
 SITE = MicrowaveSite(id="S", name="S", latitude=A[0], longitude=A[1], provenance=Provenance.USER_PROVIDED)
 
@@ -38,24 +39,25 @@ def _rate(current):
 
 def test_rain_only():
     rate, p = _rate({"precipitation": 2.4, "rain": 2.4, "showers": 0.0, "snowfall": 0.0})
-    assert rate == 2.4 and not p.has_frozen and p.basis == precip.BASIS_SPLIT
+    assert rate == pytest.approx(2.4 * 4) and not p.has_frozen and p.basis == precip.BASIS_SPLIT     # P8: mm over 900 s -> mm/h is x4
+    assert p.precip_class == "RAIN"
 
 
 def test_snow_only_is_not_rain():
-    rate, p = _rate({"precipitation": 0.30, "rain": 0.0, "showers": 0.0, "snowfall": 0.21})
-    assert rate == 0.0
+    rate, p = _rate({"precipitation": 0.30, "rain": 0.0, "showers": 0.0, "snowfall": 2.1})      # 2.1 cm / 7 = 0.30 mm water equivalent
+    assert rate == 0.0 and p.precip_class == "SNOW"
     assert p.has_frozen and p.frozen_mm == pytest.approx(0.30) and p.total_mm == 0.30
 
 
 def test_mixed_rain_and_snow_counts_only_the_liquid_part():
-    rate, p = _rate({"precipitation": 1.8, "rain": 1.0, "showers": 0.5, "snowfall": 0.21})
-    assert rate == pytest.approx(1.5)           # rain + showers
+    rate, p = _rate({"precipitation": 1.8, "rain": 1.0, "showers": 0.5, "snowfall": 2.1})
+    assert rate == pytest.approx(1.5 * 4) and p.precip_class == "MIXED"           # (rain + showers) x4
     assert p.frozen_mm == pytest.approx(0.3) and p.has_frozen
 
 
 def test_showers_are_liquid_rain():
     rate, p = _rate({"precipitation": 0.8, "rain": 0.0, "showers": 0.8, "snowfall": 0.0})
-    assert rate == 0.8 and not p.has_frozen
+    assert rate == pytest.approx(0.8 * 4) and not p.has_frozen and p.precip_class == "SHOWERS"
 
 
 def test_zero_rain_with_nonzero_total_and_type_reported_is_zero_rain():
@@ -63,15 +65,30 @@ def test_zero_rain_with_nonzero_total_and_type_reported_is_zero_rain():
     assert rate == 0.0
 
 
-def test_type_not_reported_is_total_precipitation_and_labelled_so():
-    rate, p = _rate({"precipitation": 0.6})      # source gives no rain/showers split
-    assert rate == 0.6 and p.type_unknown and p.basis == precip.BASIS_TOTAL
-    assert p.frozen_mm == 0.0                    # unknown is not asserted as snow either
+def test_type_not_reported_is_no_data_not_rain():
+    """P7: unknown never silently becomes rain. This used to be total precipitation used as rain, with a label."""
+    with pytest.raises(NoDataError, match="type not reported"):
+        _rate({"precipitation": 0.6})            # source gives no rain/showers split
 
 
-def test_nothing_reported():
-    rate, p = _rate({})
-    assert rate == 0.0 and p.basis == precip.BASIS_NONE
+def test_nothing_reported_is_no_data():
+    with pytest.raises(NoDataError):
+        _rate({})
+
+
+def test_freezing_is_flagged_and_never_substituted_by_the_total():
+    rate, p = _rate({"precipitation": 1.2, "rain": 0.0, "showers": 0.0, "snowfall": 0.0, "weather_code": 67})
+    assert p.precip_class == "FREEZING" and rate == 0.0 and "freezing_unquantified" in p.flags and p.has_freezing
+    rate, p = _rate({"precipitation": 1.2, "rain": 1.2, "weather_code": 66})
+    assert p.precip_class == "FREEZING" and rate == pytest.approx(1.2 * 4)
+
+
+@pytest.mark.parametrize("interval,mult", [(900, 4.0), (3600, 1.0), (1800, 2.0)])
+def test_conversion_is_3600_over_interval(interval, mult):
+    provider = TypedPrecipitationProvider(get=lambda url, params, timeout: type("R", (), {
+        "raise_for_status": lambda s: None,
+        "json": lambda s: {"current": {"time": "t", "interval": interval, "rain": 1.0, "showers": 0.0, "precipitation": 1.0}}})())
+    assert provider.get_current(SITE).rain_rate_mm_h == pytest.approx(mult)
 
 
 def test_the_library_provider_does_have_the_defect(monkeypatch):
@@ -97,24 +114,22 @@ def test_hourly_history_excludes_snow_and_includes_showers():
 
 def test_snow_is_called_out_in_the_brief_csv_and_workbook():
     res = weather_result()
-    res.precipitation = {"A": precip.classify({"precipitation": 0.3, "rain": 0.0, "showers": 0.0, "snowfall": 0.2}),
-                         "B": precip.classify({"precipitation": 0.0, "rain": 0.0, "showers": 0.0, "snowfall": 0.0})}
+    res.precipitation = {"A": precip.classify({"interval": 900, "precipitation": 0.3, "rain": 0.0, "showers": 0.0, "snowfall": 2.1}),   # 2.1 cm = 0.3 mm w.e.
+                         "B": precip.classify({"interval": 900, "precipitation": 0.0, "rain": 0.0, "showers": 0.0, "snowfall": 0.0})}
     b = exposure_brief(res)
-    assert any("not counted as rain" in c for c in b.caveats)
+    assert any("not counted as rain" in c and "does not change the status" in c for c in b.caveats)
     text = result_to_csv(res)
-    assert "Not counted as rain" in text
+    assert "Not counted as rain" in text and "Precipitation class" in text and "Rain-rate conversion" in text
     wb = read_workbook(result_to_xlsx(res))
     weather = {r[0]: r for r in wb["WEATHER"] if r}
-    assert "frozen" in str(weather["Precipitation basis"][1]) or "rain + showers" in str(weather["Precipitation basis"][1])
-    assert weather["Total precipitation, model (mm/h)"][1] == 0.3
+    assert "rain + showers" in str(weather["Precipitation basis"][1])
+    assert weather["Total precipitation, model (mm/h)"][1] == pytest.approx(0.3 * 4)       # mm over 900 s -> mm/h
 
 
-def test_unknown_type_is_never_labelled_rain():
-    res = weather_result()
-    res.precipitation = {"A": precip.classify({"precipitation": 0.6}), "B": precip.classify({"precipitation": 0.0})}
-    b = exposure_brief(res)
-    assert any("TOTAL precipitation" in c for c in b.caveats)
-    assert "may include snow" in result_to_csv(res)
+def test_unknown_type_is_no_data_never_labelled_rain():
+    """P7: the source gave no rain/showers split -> NO DATA. (It used to be total precipitation used as rain with a caveat.)"""
+    with pytest.raises(NoDataError, match="type not reported"):
+        precip.classify({"interval": 900, "precipitation": 0.6})
 
 
 # ---- 1. model values are Model-derived everywhere --------------------------
