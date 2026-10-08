@@ -340,5 +340,38 @@
   "polarization",
   "terrain",
   "weather"
- ]
+ ],
+ "expected": {
+  "schema": "velorona.parity-expected/1",
+  "spec": "0.3",
+  "curvature": "canonical (bulge subtracted from clearance, P11)",
+  "terrain": {
+   "status": "NO DATA",
+   "no_data": "null/NaN/non-numeric elevation (R5)"
+  },
+  "weather": {
+   "status": "CLEAR",
+   "no_data": null,
+   "attenuation_db": 0.0,
+   "ratio": 0.0,
+   "fade_margin_db": 32.0,
+   "precip": {
+    "class": "NONE",
+    "flags": [],
+    "rate_mm_h": 0.0,
+    "liquid_mm": 0.0
+   },
+   "status_without_r1": "CLEAR"
+  },
+  "overall": "NO DATA"
+ },
+ "pre_correction": {
+  "curvature": "legacy (bulge added to clearance)",
+  "terrain": {
+   "status": "NO DATA",
+   "no_data": "null/NaN/non-numeric elevation (R5)"
+  },
+  "intended_class_when_built": null
+ },
+ "inputs_sha256": "a786afbe637669744b6c881526a718c7f173c0d5b4090663159dc4f670569e24"
 }

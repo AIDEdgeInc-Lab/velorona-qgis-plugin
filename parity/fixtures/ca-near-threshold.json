@@ -338,5 +338,57 @@
   "polarization",
   "terrain",
   "weather"
- ]
+ ],
+ "expected": {
+  "schema": "velorona.parity-expected/1",
+  "spec": "0.3",
+  "curvature": "canonical (bulge subtracted from clearance, P11)",
+  "terrain": {
+   "status": "CRITICAL",
+   "no_data": null,
+   "distance_km": 38.052601974455165,
+   "critical_index": 24,
+   "available_m": -28.83168123370288,
+   "required_m": 12.706808822606993,
+   "margin_m": -41.538490056309875,
+   "ratio": -2.2689946497351667,
+   "percent_fresnel_clear": -1.3613967898411001,
+   "fresnel_radius_m": 21.17801470434499,
+   "near_threshold": false
+  },
+  "weather": {
+   "status": "CLEAR",
+   "no_data": null,
+   "attenuation_db": 0.0,
+   "ratio": 0.0,
+   "fade_margin_db": 32.0,
+   "precip": {
+    "class": "NONE",
+    "flags": [],
+    "rate_mm_h": 0.0,
+    "liquid_mm": 0.0
+   },
+   "status_without_r1": "CLEAR"
+  },
+  "overall": "CRITICAL"
+ },
+ "pre_correction": {
+  "curvature": "legacy (bulge added to clearance)",
+  "terrain": {
+   "status": "WATCH",
+   "no_data": null,
+   "distance_km": 38.052601974455165,
+   "critical_index": 24,
+   "available_m": 13.765559233702888,
+   "required_m": 12.706808822606993,
+   "margin_m": 1.058750411095895,
+   "ratio": 1.0833215031308447,
+   "percent_fresnel_clear": 0.6499929018785069,
+   "fresnel_radius_m": 21.17801470434499,
+   "near_threshold": true
+  },
+  "intended_class_when_built": "WATCH"
+ },
+ "label_note": "The fixture id/tags describe the class this profile had under the pre-correction convention (WATCH). Under the canonical convention its terrain status is CRITICAL. The id is kept stable on purpose; do not read it as the current class.",
+ "inputs_sha256": "516a564ef94a871d14bbe93623cebb729245bf56b3f7d50d2407c7b4e436c6af"
 }

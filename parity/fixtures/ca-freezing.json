@@ -336,5 +336,58 @@
   "polarization",
   "terrain",
   "weather"
- ]
+ ],
+ "expected": {
+  "schema": "velorona.parity-expected/1",
+  "spec": "0.3",
+  "curvature": "canonical (bulge subtracted from clearance, P11)",
+  "terrain": {
+   "status": "CLEAR",
+   "no_data": null,
+   "distance_km": 0.811746619420491,
+   "critical_index": 24,
+   "available_m": 1.2451647695820895,
+   "required_m": 0.5059665250084131,
+   "margin_m": 0.7391982445736764,
+   "ratio": 2.4609627476074336,
+   "percent_fresnel_clear": 1.4765776485644602,
+   "fresnel_radius_m": 0.8432775416806885,
+   "near_threshold": true
+  },
+  "weather": {
+   "status": "CRITICAL",
+   "no_data": null,
+   "attenuation_db": 2.5,
+   "ratio": 1.437,
+   "fade_margin_db": 1.74,
+   "precip": {
+    "class": "FREEZING",
+    "flags": [
+     "freezing"
+    ],
+    "rate_mm_h": 4.8,
+    "liquid_mm": 1.2
+   },
+   "status_without_r1": "CRITICAL"
+  },
+  "overall": "CRITICAL"
+ },
+ "pre_correction": {
+  "curvature": "legacy (bulge added to clearance)",
+  "terrain": {
+   "status": "CLEAR",
+   "no_data": null,
+   "distance_km": 0.811746619420491,
+   "critical_index": 24,
+   "available_m": 1.2645492304178845,
+   "required_m": 0.5059665250084131,
+   "margin_m": 0.7585827054094714,
+   "ratio": 2.4992744933014253,
+   "percent_fresnel_clear": 1.499564695980855,
+   "fresnel_radius_m": 0.8432775416806885,
+   "near_threshold": true
+  },
+  "intended_class_when_built": null
+ },
+ "inputs_sha256": "4953bfe6af0d71faec4cf11cae7360d88aecfaad90a74be500e4610a0d248064"
 }
