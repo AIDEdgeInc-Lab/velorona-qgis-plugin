@@ -395,7 +395,9 @@ def _precip_rows(p) -> list:
     """Evidence rows for the precipitation class and the mm -> mm/h conversion (empty when no typed precipitation is available)."""
     if p is None:
         return []
-    f = lambda v, d=2: NOT_DETERMINED if v is None else f"{v:.{d}f}"
+
+    def f(v, d=2):
+        return NOT_DETERMINED if v is None else f"{v:.{d}f}"
     return [
         _evidence_row("Precipitation class", "Inferred", "Open-Meteo rain / showers / snowfall fields and WMO weather_code",
                       observation_input=f"rain {f(p.rain_mm)} mm, showers {f(p.showers_mm)} mm, snowfall {f(p.snowfall_cm)} cm, weather_code {p.weather_code if p.weather_code is not None else NOT_DETERMINED}",

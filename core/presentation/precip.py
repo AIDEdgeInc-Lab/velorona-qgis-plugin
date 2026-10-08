@@ -82,20 +82,31 @@ def classify(current: dict) -> Precipitation:
     liquid = (rain or 0.0) + (showers or 0.0)
     frozen = (snow or 0.0) / SNOW_WE_DIVISOR > _EPS
     code = current.get("weather_code")
-    if code in FREEZING_CODES: cls = "FREEZING"
-    elif liquid > _EPS and frozen: cls = "MIXED"
-    elif frozen: cls = "SNOW"
-    elif (rain or 0.0) > _EPS: cls = "RAIN"
-    elif (showers or 0.0) > _EPS: cls = "SHOWERS"
-    else: cls = "NONE"
+    if code in FREEZING_CODES:
+        cls = "FREEZING"
+    elif liquid > _EPS and frozen:
+        cls = "MIXED"
+    elif frozen:
+        cls = "SNOW"
+    elif (rain or 0.0) > _EPS:
+        cls = "RAIN"
+    elif (showers or 0.0) > _EPS:
+        cls = "SHOWERS"
+    else:
+        cls = "NONE"
     flags = []
-    if frozen: flags.append("frozen_present")
+    if frozen:
+        flags.append("frozen_present")
     if cls == "FREEZING":
         flags.append("freezing")
-        if liquid <= _EPS: flags.append("freezing_unquantified")
-    if rain is not None and showers is not None: basis = BASIS_SPLIT
-    elif rain is not None: basis = BASIS_RAIN_ONLY
-    else: basis = BASIS_SHOWERS_ONLY
+        if liquid <= _EPS:
+            flags.append("freezing_unquantified")
+    if rain is not None and showers is not None:
+        basis = BASIS_SPLIT
+    elif rain is not None:
+        basis = BASIS_RAIN_ONLY
+    else:
+        basis = BASIS_SHOWERS_ONLY
     interval = float(current["interval"])
     return Precipitation(total, rain, showers, snow, liquid * 3600.0 / interval, basis, cls, tuple(flags), interval, liquid, code)
 

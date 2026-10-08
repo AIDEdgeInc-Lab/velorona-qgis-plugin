@@ -139,6 +139,14 @@ two cannot disagree. Sheets that do not apply say so in one line.
    HISTORY) and Ask. Station and radar rows keep their own types. The Type vocabulary is now
    Observed / Model-derived / Calculated / Inferred. "Observation time" for a model value is
    "Model value time". Source, timestamp, station-vs-model distinction and selection method are kept.
+   **Five types (1.1.5):** Observed / Model-derived / Calculated / Inferred / **Assumed**. A value the
+   user typed in the analysis dialog (antenna heights, frequency, polarization, fade margin) is
+   **Assumed**, never Observed; a value taken from a record or feature attribute keeps Observed, and a
+   Fixed Service link's weather evidence types each parameter by its origin. **Known interface
+   difference:** the terrain-clearance dialog takes its frequency only from the dialog (default 7.0 GHz;
+   it is never read from a record), so the frequency is typed **Assumed** there even if you type the
+   value ISED published for the link. Velorona Map pre-fills that frequency from the record and types it
+   Observed. This is accepted and documented (`parity/ACCEPTED_INTERFACE_DIVERGENCES.md`).
 3. **Critical point.** Calculation unchanged. Defined wherever it appears: the critical
    (tightest) point is where the **Fresnel-zone clearance fraction** (clearance / first Fresnel
    radius) is lowest, **not necessarily** where absolute clearance in metres is lowest. A test
