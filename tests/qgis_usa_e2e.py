@@ -1,5 +1,5 @@
 """Velorona QGIS plugin -- USA support, end to end in real QGIS (offscreen). NO network: the pack is a SYNTHETIC temp pack (tests/usa_pack_builder.py), the
-elevation edge is faked, and the basemap is stubbed. Everything else is the real plugin: QgsSettings, layers, the Records table, selection,
+elevation edge is faked, and the basemap is stubbed. Everything else is the real plugin: the project entry, layers, the Records table, selection,
 the link-record terrain flow, ParamDialog, exports.
 
 Run with the QGIS Python (see tests/run_qgis_tests.sh for the environment) from a checkout whose directory is named ``velorona``:
@@ -14,17 +14,9 @@ PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(PLUGIN_DIR))
 sys.path.insert(0, os.path.join(PLUGIN_DIR, "tests"))
 
-from qgis.core import QgsApplication, QgsProject, QgsRectangle, QgsSettings, QgsCoordinateReferenceSystem  # noqa: E402
+from qgis.core import QgsApplication, QgsProject, QgsRectangle, QgsCoordinateReferenceSystem  # noqa: E402
 from qgis.gui import QgsMapCanvas, QgsMessageBar  # noqa: E402
 from qgis.PyQt.QtWidgets import QMainWindow  # noqa: E402
-
-# Settings go to a throw-away file: this test must never write the developer's real QGIS profile settings.
-from qgis.PyQt.QtCore import QCoreApplication, QSettings  # noqa: E402
-_settings_dir = tempfile.mkdtemp(prefix="velorona-test-settings-")
-QSettings.setDefaultFormat(QSettings.Format.IniFormat)
-QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, _settings_dir)
-QCoreApplication.setOrganizationName("velorona-test")
-QCoreApplication.setApplicationName("usa-e2e")
 
 qgs = QgsApplication([], True)
 qgs.initQgis()
@@ -59,7 +51,7 @@ class FakeIface:
 
 
 from usa_pack_builder import ATTRIBUTION, write_pack  # noqa: E402
-from velorona.plugin import USA_PACK_SETTING, VeloronaPlugin  # noqa: E402
+from velorona.plugin import USA_PACK_ENV, USA_PACK_KEY, USA_PACK_SCOPE, VeloronaPlugin  # noqa: E402
 from velorona.core import export, layers as layer_helpers  # noqa: E402
 from velorona.core.engines import terrestrial  # noqa: E402
 from velorona.core.inspector import feature_to_entry  # noqa: E402
@@ -72,8 +64,11 @@ plugin._ensure_basemap = lambda: None                      # the basemap is a ne
 SHOWN = []                                                 # modal QMessageBox warnings/errors are recorded instead of blocking the test
 plugin._warn = lambda m: SHOWN.append(m)
 plugin._error = lambda m: SHOWN.append(m)
-settings = QgsSettings()
-old_setting = settings.value(USA_PACK_SETTING, "")
+os.environ.pop(USA_PACK_ENV, None)
+
+
+def set_source(value):
+    QgsProject.instance().writeEntry(USA_PACK_SCOPE, USA_PACK_KEY, value)
 
 
 def messages():
@@ -103,7 +98,7 @@ try:
     check("Set pack source action registered", plugin.action_set_usa_source is not None)
 
     print("\n== a bad pack source is a pack error, never a layer or a NO DATA ==")
-    settings.setValue(USA_PACK_SETTING, os.path.join(pack_dir, "does-not-exist"))
+    set_source(os.path.join(pack_dir, "does-not-exist"))
     plugin._usa_provider = None
     set_view(-106.0, 40.0, -105.0, 42.0)
     plugin.load_usa_view()
@@ -112,7 +107,7 @@ try:
 
     print("\n== loading a view ==")
     _reset_messages()
-    settings.setValue(USA_PACK_SETTING, pack_dir)
+    set_source(pack_dir)
     plugin._usa_provider = None
     plugin.load_usa_view()
     links, sites = find(layer_helpers.SOURCE_US_LINKS), find(layer_helpers.SOURCE_US_SITES)
@@ -214,11 +209,20 @@ try:
                            {"site_a_height_m": 30.0, "site_b_height_m": 30.0, "frequency_ghz": 500.0})
     check("an untouched out-of-range default is still refused, not clamped", [b[0] for b in dlg2.out_of_range()] == ["Frequency"])
 
+    print("\n== the pack source lives in the project, not in the QGIS settings; the environment is the fallback ==")
+    check("source is stored as a project entry", QgsProject.instance().readEntry(USA_PACK_SCOPE, USA_PACK_KEY, "")[0] == pack_dir)
+    plugin_source = open(os.path.join(PLUGIN_DIR, "plugin.py")).read()
+    check("plugin.py never touches QgsSettings", "QgsSettings" not in plugin_source)
+    set_source("")
+    os.environ[USA_PACK_ENV] = pack_dir
+    check("with no project entry the environment variable is used", plugin._configured_usa_source() == pack_dir)
+    os.environ.pop(USA_PACK_ENV, None)
+
     print("\n== unload leaves nothing behind ==")
     plugin.unload()
     check("unload completes", True)
 finally:
-    settings.setValue(USA_PACK_SETTING, old_setting)
+    pass
 
 failed = [r for r in RESULTS if not r[1]]
 print(f"\n===== {len(RESULTS) - len(failed)}/{len(RESULTS)} checks passed =====")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import time
 
 from qgis.core import (
@@ -12,7 +13,6 @@ from qgis.core import (
     QgsSingleSymbolRenderer,
     QgsProject,
     QgsRectangle,
-    QgsSettings,
     QgsVectorTileLayer,
 )
 from qgis.PyQt.QtCore import Qt, QTimer
@@ -41,7 +41,11 @@ from .ui.param_dialog import ParamDialog
 from .ui.results_dock import VeloronaResultsDock
 
 MENU_NAME = "&Velorona"
-USA_PACK_SETTING = "Velorona/usa_pack_source"   # folder or https address of the Velorona USA pack; the pack is NOT bundled
+# Folder or https address of the Velorona USA pack (the pack is NOT bundled). Kept in the QGIS PROJECT (a custom entry saved with it), never in the
+# global QGIS settings: Velorona does not write the user's QGIS settings (tests/qgis_e2e.py enforces it). VELORONA_USA_PACK in the environment is the
+# fallback when the project has none.
+USA_PACK_SCOPE, USA_PACK_KEY = "Velorona", "usa_pack_source"
+USA_PACK_ENV = "VELORONA_USA_PACK"
 WGS84 = QgsCoordinateReferenceSystem("EPSG:4326")
 
 # Basemap -- native QGIS vector tile layer, CARTO Dark Matter, styled from
@@ -1250,11 +1254,10 @@ class VeloronaPlugin:
 
     def set_usa_pack_source(self):
         """Ask for the pack's folder or https address, validate it NOW (index.json readable, schema understood), and only then keep it."""
-        settings = QgsSettings()
         text, ok = QInputDialog.getText(
             self.iface.mainWindow(), "Velorona -- USA data pack",
             "Folder on this computer, or https address, of the Velorona USA data pack\n(the folder that contains index.json and tiles/):",
-            QLineEdit.EchoMode.Normal, str(settings.value(USA_PACK_SETTING, "") or ""))
+            QLineEdit.EchoMode.Normal, self._configured_usa_source())
         if not ok:
             return False
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
@@ -1267,14 +1270,20 @@ class VeloronaPlugin:
             return False
         finally:
             QApplication.restoreOverrideCursor()
-        settings.setValue(USA_PACK_SETTING, text.strip())
+        QgsProject.instance().writeEntry(USA_PACK_SCOPE, USA_PACK_KEY, text.strip())
         self._usa_provider = provider
         self.iface.messageBar().pushSuccess(
             "Velorona", f"USA data pack found: {provider.link_count:,} links, source file dated {attribution.source_file_updated}.")
         return True
 
+    @staticmethod
+    def _configured_usa_source() -> str:
+        """The pack source: this project's entry, else the environment variable, else empty."""
+        value, _ = QgsProject.instance().readEntry(USA_PACK_SCOPE, USA_PACK_KEY, "")
+        return str(value or os.environ.get(USA_PACK_ENV, "") or "").strip()
+
     def _usa_pack_provider(self):
-        source = str(QgsSettings().value(USA_PACK_SETTING, "") or "").strip()
+        source = self._configured_usa_source()
         if not source:
             if not self.set_usa_pack_source():
                 return None

@@ -7,7 +7,7 @@ U.S. Federal Communications Commission, Universal Licensing System (ULS) public 
 
 ## Getting the data in
 1. Obtain a Velorona USA data pack (the Velorona Map project builds it; see its `docs/USA_FCC_ULS_PACK.md`). It is a folder containing `index.json` and `tiles/`, about 14 MB, refreshed when the FCC file is. It is **not** inside the plugin (size and update cadence).
-2. **Explore: Set USA Data Pack Source** — a folder path or an https address. The source is checked immediately and the result (found, missing, corrupt, wrong version, unreachable) is shown.
+2. **Explore: Set USA Data Pack Source** — a folder path or an https address. The source is checked immediately and the result (found, missing, corrupt, wrong version, unreachable) is shown. It is saved in the QGIS **project** (Velorona never writes your global QGIS settings); if the project has none, the environment variable `VELORONA_USA_PACK` is used.
 3. Zoom to an area and **Explore: Load USA Links in View**. Only the 1° tiles touching the view are read. The index's own counts are checked first: more than 20,000 links or 36 tiles is refused ("zoom in"). Links that cross a tile edge appear once.
 4. A `.json` source (instead of a folder) is read as a *regional extract* (`velorona.usa-extract/1`), which also carries the licensee-reported FCC antenna height ("Height to Center RAAT").
 
