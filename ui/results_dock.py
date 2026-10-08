@@ -393,7 +393,6 @@ def _render_site_feature(entry) -> str:
     )
 
 
-
 def _pairing_text(d) -> str:
     """How the two endpoints were paired, in the register's own terms (never inferred from proximity)."""
     if is_fcc(d):
@@ -410,6 +409,7 @@ def _data_source_text(d):
     return (f"{d['attribution']} Source file dated {d.get('source_file_updated') or 'unknown'}; "
             f"pack built {d.get('pack_generated') or 'unknown'}. Licensee-reported record data from a public register; "
             "not a field measurement and not a coverage or performance guarantee.")
+
 
 def _render_link_feature(entry) -> str:
     d = entry.data

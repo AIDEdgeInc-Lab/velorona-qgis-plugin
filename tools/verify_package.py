@@ -45,7 +45,7 @@ def main(path, expected=None):
     if expected and version != expected:
         problems.append(f"metadata.txt version {version!r} != expected {expected!r}")
     req = z.read("velorona/requirements.txt").decode()
-    notes.append("requirements.txt: " + "; ".join(l for l in req.splitlines() if l and not l.startswith("#")))
+    notes.append("requirements.txt: " + "; ".join(ln for ln in req.splitlines() if ln and not ln.startswith("#")))
     total = sum(i.file_size for i in infos)
     notes.append(f"{len(names)} files, {total / 1e6:.1f} MB uncompressed, zip {os.path.getsize(path) / 1e6:.1f} MB")
     for n in notes:

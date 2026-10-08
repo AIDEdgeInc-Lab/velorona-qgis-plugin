@@ -58,13 +58,12 @@ class FakeIface:
     def removeDockWidget(self, dock): self.window.removeDockWidget(dock)
 
 
-from usa_pack_builder import ATTRIBUTION, tiles, write_pack  # noqa: E402
+from usa_pack_builder import ATTRIBUTION, write_pack  # noqa: E402
 from velorona.plugin import USA_PACK_SETTING, VeloronaPlugin  # noqa: E402
 from velorona.core import export, layers as layer_helpers  # noqa: E402
 from velorona.core.engines import terrestrial  # noqa: E402
 from velorona.core.inspector import feature_to_entry  # noqa: E402
 from velorona.ui.param_dialog import ParamDialog  # noqa: E402
-from velorona.core.countries.base import PackError  # noqa: E402
 
 iface = FakeIface()
 QgsProject.instance().clear()
@@ -79,6 +78,11 @@ old_setting = settings.value(USA_PACK_SETTING, "")
 
 def messages():
     return list(SHOWN) + [m.text() for m in iface.bar.items()]
+
+
+def _reset_messages():
+    iface.bar.clearWidgets()
+    SHOWN.clear()
 
 
 def find(key):
@@ -107,7 +111,7 @@ try:
     check("the user is told the folder does not exist", any("does not exist" in m for m in messages()), str(messages()))
 
     print("\n== loading a view ==")
-    iface.bar.clearWidgets(); SHOWN.clear()
+    _reset_messages()
     settings.setValue(USA_PACK_SETTING, pack_dir)
     plugin._usa_provider = None
     plugin.load_usa_view()
@@ -117,7 +121,8 @@ try:
           f"{links.featureCount()} links / {sites.featureCount()} sites")
     check("Canada layers were not created or touched", find(layer_helpers.SOURCE_FIXED_LINKS) is None)
     names = [f.name() for f in links.fields()]
-    check("link layer carries authorization, frequency, call sign, attribution", {"authorization_number", "frequencies_mhz", "call_sign", "attribution"} <= set(names))
+    check("link layer carries authorization, frequency, call sign, attribution",
+          {"authorization_number", "frequencies_mhz", "call_sign", "attribution"} <= set(names))
     check("layer abstract states the attribution, dates and the nature of the data",
           ATTRIBUTION in links.metadata().abstract() and "2026-09-27" in links.metadata().abstract()
           and "not a field measurement" in links.metadata().abstract(), links.metadata().abstract())
@@ -140,7 +145,7 @@ try:
     from velorona.core.countries import usa as usa_pack
     plugin._usa_provider = usa_pack.UsaPackProvider(pack_dir, max_links=1)
     before = links.featureCount()
-    iface.bar.clearWidgets(); SHOWN.clear()
+    _reset_messages()
     plugin.load_usa_view()
     check("budget message says to zoom in", any("Zoom in" in m for m in messages()), str(messages()))
     check("existing layer content left as it was", links.featureCount() == before)
@@ -190,7 +195,7 @@ try:
         check("the displayed result is the link-record result, frequency Observed",
               getattr(shown, "frequency_origin", None) and shown.frequency_origin[0] == "Observed")
         links.removeSelection()
-        iface.bar.clearWidgets(); SHOWN.clear()
+        _reset_messages()
         plugin.run_terrestrial()
         check("nothing selected -> a clear instruction, no analysis", any("exactly one Fixed Service link" in m for m in messages()), str(messages()))
     finally:

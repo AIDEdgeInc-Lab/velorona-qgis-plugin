@@ -34,9 +34,9 @@ if "qgis" not in sys.modules:
     q.core = qc; sys.modules["qgis"] = q; sys.modules["qgis.core"] = qc
 
 import aei_link_clearance.terrain as terrain_mod
-from core import provider_retry
+from core import provider_retry  # noqa: E402
 provider_retry._sleep = lambda seconds: None     # the synthetic 503 fixtures would otherwise wait out the backoff; the outcome (NO DATA) is the same
-from aei_link_clearance import analyze_link, explain
+from aei_link_clearance import analyze_link  # noqa: F401
 from core import export
 from core.engines import microwave_exposure as mw
 from core.engines import terrestrial as tr

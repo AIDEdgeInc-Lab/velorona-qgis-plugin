@@ -96,4 +96,5 @@ def height_origin(record_m: Optional[float], used_m: float, record_source: str =
         return "Assumed", "User, via analysis dialog (default shown, user-confirmed)"
     if abs(float(used_m) - float(record_m)) <= SAME_GHZ_TOLERANCE:      # the tolerance is far below a centimetre in either unit
         return "Observed", record_source or "Record"
-    return "Assumed", f"User override via analysis dialog: the record's own value is {record_m:g} m ({record_source or 'record'}); {used_m:g} m was entered instead."
+    return ("Assumed", f"User override via analysis dialog: the record's own value is {record_m:g} m ({record_source or 'record'}); "
+                       f"{used_m:g} m was entered instead.")
