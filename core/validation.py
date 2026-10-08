@@ -6,6 +6,8 @@ surface; they are never converted into NO DATA.
 
 from __future__ import annotations
 
+import math
+
 # Owner decision P11 (CONFIRMED PHYSICS CORRECTION): effective-earth bulge is subtracted from geometric clearance. aei_link_clearance
 # announces the convention it implements; the plugin refuses a library that still has the pre-correction sign rather than show
 # clearance numbers that are wrong by twice the bulge.
@@ -29,8 +31,6 @@ def require_corrected_clearance(terrain_module) -> None:
 # NO DATA (owner-approved P5, R3, R4, R5, R9). Each validator returns a list of reasons; an empty list means the inputs are usable. A
 # caller that gets reasons raises NoDataError. Nothing here (or at the call sites) wraps unexpected exceptions into NO DATA.
 # ---------------------------------------------------------------------------------------------------------------------------------
-import math
-
 TERRAIN_FREQ_GHZ = (0.1, 100.0)   # CARRIED OVER: terrestrial.PARAM_SPEC / Map evidence.js TERRESTRIAL_BOUNDS
 WEATHER_FREQ_GHZ = (1.0, 100.0)   # CARRIED OVER: ITU-R P.838-3 table range enforced by aei_mw_exposure.physics (MIN_FREQ_GHZ/MAX_FREQ_GHZ)
 HEIGHT_M = (0.1, 1000.0)          # CARRIED OVER: terrestrial.PARAM_SPEC
@@ -38,13 +38,18 @@ FADE_DB = (0.1, 100.0)            # CARRIED OVER: microwave_exposure.PARAM_SPEC
 
 
 class NoDataError(ValueError):
-    """A required input is missing or invalid, so no decision is made. Carries the domain ('terrain' | 'weather') and the reasons."""
+    """A required input is missing or invalid, so no decision is made. Carries the domain ('terrain' | 'weather') and the reasons.
+
+    ``transient`` is True when the cause is a live service that may work on a retry (provider unreachable), False when it is deterministic
+    input validation (invalid coordinates, a frequency outside the rain model's range, ...): callers may cache the former as a recent
+    failure but must report the latter as what it is, every time."""
 
     status = "NO DATA"
 
-    def __init__(self, domain, reasons):
+    def __init__(self, domain, reasons, transient=False):
         self.domain = domain
         self.reasons = list(reasons)
+        self.transient = transient
         super().__init__(f"NO DATA ({domain}): " + "; ".join(self.reasons))
 
 
@@ -75,18 +80,22 @@ def terrain_input_reasons(lat_a, lon_a, lat_b, lon_b, height_a, height_b, freque
     reasons = path_reasons(lat_a, lon_a, lat_b, lon_b)
     for label, value in (("antenna height A", height_a), ("antenna height B", height_b)):
         r = _range_reason(value, HEIGHT_M, label, "m")
-        if r: reasons.append(r)
+        if r:
+            reasons.append(r)
     r = _range_reason(frequency_ghz, TERRAIN_FREQ_GHZ, "frequency", "GHz")
-    if r: reasons.append(r)
+    if r:
+        reasons.append(r)
     return reasons
 
 
 def weather_input_reasons(lat_a, lon_a, lat_b, lon_b, params) -> list:
     reasons = path_reasons(lat_a, lon_a, lat_b, lon_b)
     r = _range_reason(params.get("frequency_ghz"), WEATHER_FREQ_GHZ, "frequency", "GHz (ITU-R P.838-3 range)")
-    if r: reasons.append(r)
+    if r:
+        reasons.append(r)
     r = _range_reason(params.get("fade_margin_db"), FADE_DB, "fade margin", "dB")
-    if r: reasons.append(r)
+    if r:
+        reasons.append(r)
     if params.get("polarization") not in ("V", "H"):
         reasons.append("polarization must be V or H")
     return reasons

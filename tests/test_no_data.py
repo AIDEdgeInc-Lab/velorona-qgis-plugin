@@ -166,3 +166,17 @@ def test_provider_failure_is_no_data(monkeypatch):
     prov = MW.TypedPrecipitationProvider(get=lambda *a, **k: (_ for _ in ()).throw(requests.exceptions.ConnectionError("down")))
     with pytest.raises(NoDataError, match="T3"):
         MW.analyze_link_record((44.0, -79.4), (44.1, -79.4), {"authorization_number": "X-1"}, GOOD_W, provider=prov, history_fetcher=lambda *a, **k: None)
+
+
+# ---- transient vs deterministic NO DATA (plugin.py caches only the transient kind as a recent failure) -------------------------------
+def test_validation_no_data_is_not_transient(monkeypatch):
+    with pytest.raises(NoDataError) as e:
+        _weather(monkeypatch, params=dict(GOOD_W, frequency_ghz=0.96))      # the 0.96 GHz case that exposed this
+    assert e.value.transient is False
+
+
+def test_provider_failure_no_data_is_transient():
+    prov = MW.TypedPrecipitationProvider(get=lambda *a, **k: (_ for _ in ()).throw(requests.exceptions.ConnectionError("down")))
+    with pytest.raises(NoDataError) as e:
+        MW.analyze_link_record((44.0, -79.4), (44.1, -79.4), {"authorization_number": "X-1"}, GOOD_W, provider=prov, history_fetcher=lambda *a, **k: None)
+    assert e.value.transient is True

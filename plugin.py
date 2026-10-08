@@ -28,6 +28,7 @@ from .core import inspector
 from .core.inspector import feature_to_entry
 from .core.layers import LIFECYCLE_EVIDENCE, PUBLIC_RECORDS_DISCLOSURE
 from .core.sources import space_public, terrestrial_public
+from .core.validation import NoDataError
 from .core.viewport_cache import FAILED, MISS, ViewportCache
 from .ui import records_table
 from .ui import theme
@@ -1136,6 +1137,13 @@ class VeloronaPlugin:
         try:
             exposure = microwave_exposure.analyze_link_record(
                 entry.site_a_point, entry.site_b_point, entry.data, params)
+        except NoDataError as exc:
+            if not exc.transient:
+                # Deterministic input validation (e.g. a frequency below the rain model's range): say why, every time. It is not an
+                # outage and must not be remembered as one ("unavailable a moment ago").
+                return inspector.LinkInvestigation(entry=entry, param_origins=origins, weather_error=str(exc))
+            self._link_weather_cache.put_failure(cache_key, bbox)
+            return inspector.LinkInvestigation(entry=entry, param_origins=origins, weather_error=str(exc))
         except Exception as exc:  # live public weather services -- degrade, don't crash
             self._link_weather_cache.put_failure(cache_key, bbox)
             return inspector.LinkInvestigation(entry=entry, param_origins=origins, weather_error=str(exc))

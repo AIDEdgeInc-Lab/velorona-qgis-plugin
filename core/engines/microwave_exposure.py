@@ -140,7 +140,8 @@ def analyze_sites(site_a: MicrowaveSite, site_b: MicrowaveSite, params: dict,
     if missing:
         raise NoDataError("weather", [
             "Could not fetch live weather (Open-Meteo) for: "
-            + ", ".join(f"{site_id} ({weather_errors.get(site_id, 'unknown error')})" for site_id in missing) + " (T3)"])
+            + ", ".join(f"{site_id} ({weather_errors.get(site_id, 'unknown error')})" for site_id in missing) + " (T3)"],
+            transient=True)
 
     exposure = calculate_exposure(link=link, weather_by_site=weather_by_site)
 

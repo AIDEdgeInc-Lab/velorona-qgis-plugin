@@ -614,7 +614,17 @@ canvas.refresh()
 qgs.processEvents()
 
 print("\n== 15. Fixed Service link -> weather evidence ==")
-link_layer.selectByIds([some_fid])
+
+
+def _link_ghz(fid):
+    ghz, _ = microwave_exposure.frequency_ghz_from_record(link_layer.getFeature(fid)["frequencies_mhz"])
+    return ghz
+
+
+# The rain model covers 1-100 GHz. Many ISED links -- including the first ones in this layer -- publish less than 1 GHz, and for those the
+# weather domain is NO DATA by design (section 15b). The weather-evidence checks need a link inside the range.
+weather_fid = next(f for f in sorted(link_layer.allFeatureIds()) if (_link_ghz(f) or 0) >= 1.0 and _link_ghz(f) <= 100.0)
+link_layer.selectByIds([weather_fid])
 qgs.processEvents()
 investigation = plugin.dock._result
 check("link selection produces a link investigation",
@@ -664,8 +674,9 @@ else:
     rows = list(_csv.reader(_io.StringIO("\n".join(body))))
     check("export uses the canonical evidence header", rows[0] == export.EVIDENCE_HEADER)
     vocab = sorted({r[1] for r in rows[1:] if len(r) > 1})
-    check("export Type vocabulary is Observed/Model-derived/Calculated/Inferred",
-          vocab == ["Calculated", "Inferred", "Model-derived", "Observed"], str(vocab))
+    # Five-class vocabulary (1.1.5): engine defaults and user-entered values are Assumed, never Observed.
+    check("export Type vocabulary is Observed/Model-derived/Calculated/Inferred/Assumed",
+          vocab == ["Assumed", "Calculated", "Inferred", "Model-derived", "Observed"], str(vocab))
     check("no Open-Meteo weather-model row is typed Observed",
           not [r for r in rows[1:] if len(r) > 2 and r[1] == "Observed" and "Open-Meteo" in r[2]
                and "Elevation" not in r[2]], "")
@@ -676,6 +687,30 @@ else:
           any(r[0] == "Hardware condition" and "no hardware telemetry" in r[5] for r in rows[1:]))
     check("export records the pairing provenance",
           any(r[0] == "Link pairing" and "Not inferred from proximity" in r[5] for r in rows[1:]))
+
+print("\n== 15b. Fixed Service link below the rain model's range -> weather NO DATA ==")
+subghz_fid = some_fid                                    # the 31st link: 0.96 GHz
+check("the sub-GHz test link really publishes less than 1 GHz", (_link_ghz(subghz_fid) or 9) < 1.0, str(_link_ghz(subghz_fid)))
+messages = []
+for attempt in (1, 2):                                   # the second selection used to say "unavailable a moment ago"
+    link_layer.removeSelection()
+    qgs.processEvents()
+    link_layer.selectByIds([subghz_fid])
+    qgs.processEvents()
+    inv = plugin.dock._result
+    messages.append(getattr(inv, "weather_error", None) or "")
+check("a sub-1 GHz link has no weather evidence (NO DATA, nothing substituted)", inv.exposure is None)
+check("the reason is stated: NO DATA (weather), frequency outside 1-100 GHz",
+      "NO DATA (weather)" in messages[0] and "1-100 GHz" in messages[0], messages[0][:120])
+check("selecting it again gives the same reason, not a remembered outage", messages[1] == messages[0] and "moment ago" not in messages[1], messages[1][:120])
+# Later sections read the dock for the in-range link investigated in section 15, on the view section 15 left it on (Evidence):
+# put that state back. Re-selecting a link opens it on the Summary view, so switch the view explicitly.
+link_layer.removeSelection()
+qgs.processEvents()
+link_layer.selectByIds([weather_fid])
+qgs.processEvents()
+plugin.dock.view_combo.setCurrentIndex(plugin.dock.view_combo.findData("evidence"))
+qgs.processEvents()
 
 print("\n== 17. information architecture regressions ==")
 import re as _re  # noqa: E402
