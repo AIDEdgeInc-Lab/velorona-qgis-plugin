@@ -370,7 +370,7 @@ def _microwave_to_csv(result) -> str:
         "Velorona QGIS -- Microwave Weather Exposure export",
         f"Link: {link.site_a.name} <-> {link.site_b.name}",
         "Evidence of weather, not a hardware diagnosis or an outage prediction. Calculated via aei_mw_exposure (ITU-R P.530 / P.838-3), unmodified.",
-        *identity_lines(decision=False),
+        *identity_lines(decision=False, weather=True),
         f"Generated: {datetime.now(timezone.utc).isoformat()}",
     ])
     buf = io.StringIO()
@@ -510,7 +510,7 @@ def _link_investigation_to_csv(result) -> str:
         "Velorona QGIS -- Fixed Service link investigation export",
         f"Authorization: {authorization}",
         "Evidence of weather, not a hardware diagnosis or an outage prediction.",
-        *identity_lines(decision=False),
+        *identity_lines(decision=False, weather=True),
         *source_lines(d),
         f"Generated: {datetime.now(timezone.utc).isoformat()}",
     ])

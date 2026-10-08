@@ -222,3 +222,14 @@ def test_non_numeric_record_height_is_treated_as_absent():
     assert TR.record_heights({**US_H, "site_a_height_m": "tall"})[0] is None
     assert TR.record_heights({**US_H, "site_a_height_m": float("nan")})[0] is None
     assert TR.record_heights({**US_H, "site_a_height_m": True})[0] is None
+
+
+# --- the open rain-table caveat appears on weather exports only -------------------------------------------------------------------------------------
+def test_weather_exports_carry_the_rain_table_caveat_and_terrain_does_not():
+    from presentation_fixtures import weather_result
+    weather_pre = "\n".join(preamble(export.result_to_csv(weather_result())))
+    assert "NOT been verified against ITU-R P.838-3" in weather_pre and "Earth-curvature" not in weather_pre
+    link = types.SimpleNamespace(kind="link-investigation", exposure=None, param_origins={}, weather_error="x",
+                                 entry=types.SimpleNamespace(data=US, site_a_point=A, site_b_point=B))
+    assert "NOT been verified against ITU-R P.838-3" in "\n".join(preamble(export.result_to_csv(link)))
+    assert "P.838-3" not in "\n".join(preamble(export.result_to_csv(run(US, 11.245)))).replace("Earth-curvature", "")

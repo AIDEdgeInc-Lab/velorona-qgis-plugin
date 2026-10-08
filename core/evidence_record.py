@@ -16,6 +16,11 @@ from .record_source import is_fcc
 SPEC_VERSION = "0.3"
 CURVATURE_CONVENTION = ("bulge-added-to-terrain: the effective-earth bulge (k = 4/3, R = 6371 km) is added to the terrain, i.e. subtracted "
                         "from the geometric clearance")
+# Open caveat (Velorona Map CCR-2; re-run against the released libraries by the QGIS workstream 2026-10-08, see docs/RAIN_COEFFICIENTS_CAVEAT.md). It is
+# a caveat on weather results, not a claim that the table is wrong in any specific band; remove it only with the library release that resolves owner decision D-4.
+RAIN_TABLE_CAVEAT = ("Caveat: the rain-attenuation coefficient table in aei-microwave-link-exposure has NOT been verified against ITU-R P.838-3; an independent "
+                     "check (2026-10-08) found rows that differ, which can understate predicted attenuation, mostly at 6-10 GHz. 'P.838-3' in this export names "
+                     "the method, not a verified table.")
 LIBRARIES = ("aei-link-clearance", "aei-microwave-link-exposure", "aei-geo-features")
 
 _PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -58,12 +63,14 @@ def _snapshot_sha256(path: str) -> str:
     return _SNAPSHOT_SHA[path]
 
 
-def identity_lines(decision: bool = True) -> list:
-    """Product, spec, library and convention lines. ``decision=False`` omits the curvature convention (weather-only exports)."""
+def identity_lines(decision: bool = True, weather: bool = False) -> list:
+    """Product, spec, library and convention lines. ``decision`` adds the curvature convention (terrain); ``weather`` adds the open rain-table caveat."""
     lines = [f"Product: Velorona for QGIS {product_version()}; decision spec {SPEC_VERSION}",
              f"Libraries: {library_versions()}"]
     if decision:
         lines.append(f"Earth-curvature convention: {CURVATURE_CONVENTION}")
+    if weather:
+        lines.append(RAIN_TABLE_CAVEAT)
     return lines
 
 
