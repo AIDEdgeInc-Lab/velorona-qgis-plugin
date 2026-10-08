@@ -7,6 +7,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from aei_link_clearance import LinkClearanceResult, analyze_link, explain
+from aei_link_clearance import terrain as _library_terrain
+
+from ..validation import require_corrected_clearance
 
 from ..features import feature_attr, feature_id_name, feature_to_latlon
 
@@ -68,6 +71,7 @@ def build_params(entries) -> dict:
 
 
 def analyze(entries, params: dict) -> TerrestrialAnalysisResult:
+    require_corrected_clearance(_library_terrain)
     (layer_a, feat_a), (layer_b, feat_b) = entries
     lat_a, lon_a = feature_to_latlon(layer_a, feat_a)
     lat_b, lon_b = feature_to_latlon(layer_b, feat_b)

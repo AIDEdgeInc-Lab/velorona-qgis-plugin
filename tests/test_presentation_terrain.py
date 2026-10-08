@@ -29,7 +29,8 @@ def test_flat_terrain_matches_independent_hand_calculation():
     # independent: r1 = 17.3*sqrt(d1*d2/(f*D)); bulge = d1*d2/(2kR)*1000; LOS is level at 130 m
     r1 = 17.3 * math.sqrt(d1 * d2 / (11.5 * r.distance_km))
     bulge = d1 * d2 / (2 * (4 / 3) * 6371.0088) * 1000
-    expected_available = 130.0 - (100.0 - bulge)
+    # P11 (owner-approved physics correction): the bulge is SUBTRACTED from geometric clearance, i.e. added to the terrain.
+    expected_available = 130.0 - (100.0 + bulge)
     assert brief.data["terrain_clearance_m"] == pytest.approx(expected_available, abs=0.05)
     assert brief.data["required_clearance_m"] == pytest.approx(0.6 * r1, abs=0.01)
     assert brief.data["margin_m"] == brief.data["terrain_clearance_m"] - brief.data["required_clearance_m"]

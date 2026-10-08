@@ -64,7 +64,9 @@ def test_negative_wording_is_explicit():
 def test_positive_and_shortfall_wording():
     ok = T.terrain_explanation(_res(0).result)
     assert "available vs" in ok and "margin" in ok and "×" in ok and "%" not in ok
-    short = T.terrain_explanation(_res(30).result)       # marginal: positive clearance below the requirement
+    # marginal: positive clearance below the requirement. Hump 20 m gives +4.8 m vs 6.8 m required under the corrected curvature sign
+    # (P11); it was 30 m before the correction, when curvature wrongly added clearance.
+    short = T.terrain_explanation(_res(20).result)
     assert "short by" in short and "above the line of sight" not in short
     assert "inside the required clearance envelope" in T.margin_phrase(6.2, 6.8)
 
