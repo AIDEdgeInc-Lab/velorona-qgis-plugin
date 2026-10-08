@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 from . import history as hist
-from .model import CLEAR, NO_DATA, Brief, fmt, signed
+from .model import CLEAR, NO_DATA, Brief, fmt, signed, worst
 from .terrain import CRITICAL_POINT_DEFINITION, margin_phrase
 from .weather import SELECTION_STATION, STATION_SEARCH_RADIUS_KM, STATION_WINDOW_MINUTES
 
@@ -106,12 +106,13 @@ def _status(q, ctx) -> Answer:
     lines, evidence = [], []
     briefs = ctx.briefs()
     first = briefs[0]
-    if first.status == NO_DATA:
+    overall = worst(*(b.status for b in briefs))      # owner-approved P6: overall = worst of terrain and weather; each domain is listed below
+    if overall == NO_DATA:
         lead = "UNKNOWN \u2014 NO DATA."
-    elif first.status == CLEAR:
+    elif overall == CLEAR:
         lead = "YES \u2014 CLEAR."
     else:
-        lead = f"NOT CLEAR \u2014 {first.status}."
+        lead = f"NOT CLEAR \u2014 {overall}."
     for b in briefs:
         if len(briefs) > 1 or b.status != first.status:
             lines.append(f"{b.title}: {b.status}. {b.reason}")

@@ -77,7 +77,7 @@ def test_status_follows_the_librarys_classification():
             assert b.status == CRITICAL
         elif r.los_status == "marginal":
             assert b.status == AT_RISK
-        elif r.near_threshold or r.clearance_ratio < 1.3:
+        elif r.clearance_ratio < 1.3:          # P3: near_threshold is a verification flag and never changes the status
             assert b.status == WATCH
         else:
             assert b.status == CLEAR
@@ -89,7 +89,7 @@ def test_watch_when_clear_but_small_margin():
     for hump in range(0, 60):
         res = terrain_result(hump_m=float(hump))
         r = res.result
-        if r.los_status == "clear" and (r.near_threshold or r.clearance_ratio < 1.3):
+        if r.los_status == "clear" and r.clearance_ratio < 1.3:
             b = T.terrain_brief(res)
             assert b.status == WATCH
             assert "margin" in b.reason
@@ -126,3 +126,28 @@ def test_no_percent_in_primary_facts():
     b = T.terrain_brief(terrain_result())
     for f in b.key_facts:
         assert "%" not in f.value
+
+
+def test_near_threshold_is_a_flag_not_a_status():
+    """P3: a clear link with ratio >= 1.3 stays CLEAR even when the library flags it near_threshold; the flag is still reported."""
+    for hump in range(0, 120):
+        res = terrain_result(hump_m=float(hump))
+        r = res.result
+        if r.los_status == "clear" and r.clearance_ratio >= 1.3 and r.near_threshold:
+            b = T.terrain_brief(res)
+            assert b.status == CLEAR
+            assert any("near a classification boundary" in c for c in b.caveats)       # the flag is still shown
+            return
+    pytest.skip("no clear + near-threshold + ratio >= 1.3 case in this sweep")
+
+
+@pytest.mark.parametrize("pct,ratio,expected", [
+    (0.2999, 0.4998, CRITICAL), (0.30, 0.5, AT_RISK), (0.5999, 0.9998, AT_RISK), (0.60, 1.0, WATCH),
+    (0.7799, 1.2998, WATCH), (0.78, 1.3, CLEAR), (2.0, 3.3, CLEAR),
+])
+def test_status_boundaries_are_inclusive_where_specified(pct, ratio, expected):
+    """0.30 and 0.60 belong to the upper class; the ratio threshold 1.3 is strictly below (1.3 itself is CLEAR). P2 is provisional."""
+    from types import SimpleNamespace
+    los = "obstructed" if pct < 0.30 else "marginal" if pct < 0.60 else "clear"
+    r = SimpleNamespace(profile=[object()], los_status=los, near_threshold=True, clearance_ratio=ratio, terrain_clearance_m=1.0, required_clearance_m=1.0)
+    assert T.terrain_status(r)[0] == expected

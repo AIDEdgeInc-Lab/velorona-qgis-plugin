@@ -22,7 +22,8 @@ import csv
 import io
 from datetime import datetime, timezone
 
-from .presentation.terrain import ratio_meaning, ratio_value, terrain_explanation
+from .presentation.terrain import ratio_meaning, ratio_value, terrain_explanation, terrain_status
+from .presentation.weather import weather_status
 
 EVIDENCE_HEADER = ["Evidence", "Type", "Source", "Observation-Input", "Calculated result", "Interpretation"]
 
@@ -323,6 +324,8 @@ def _terrestrial_to_csv(result) -> str:
                       calculated_result=f"{r.clearance_ratio:.3f}", interpretation=_ratio_note(r)),
         _evidence_row("Line-of-sight status", "Inferred", "aei_link_clearance",
                       interpretation=("NEAR THRESHOLD" if r.near_threshold else r.los_status.upper())),
+        _evidence_row("Terrain status", "Inferred", "Canonical status model (clear below a provisional clearance ratio of 1.3 = WATCH; near threshold is a flag, not a status)",
+                      interpretation=(lambda s: f"{s[0]} -- {s[1]}" + (" Near threshold: verify with a survey." if r.near_threshold else ""))(terrain_status(r))),
         _evidence_row("Explanation", "Inferred", "Velorona presentation of the aei_link_clearance result",
                       interpretation=terrain_explanation(r)),
     ]
@@ -363,6 +366,8 @@ def _microwave_to_csv(result) -> str:
                       # 99.6% and 100.4% both printed 100%, erasing which side of
                       # the fade margin the link sits on -- the one thing this row says
         _evidence_row("Severity", "Inferred", "aei_mw_exposure", interpretation=f"{e.severity.upper()} -- {e.operational_note}"),
+        _evidence_row("Weather status", "Inferred", "Canonical status model (CRITICAL when predicted attenuation >= fade margin)",
+                      interpretation=(lambda s: f"{s[0]} -- {s[1]}")(weather_status(e))),
         _evidence_row("Hardware condition", "Inferred", "", interpretation=f"{NOT_DETERMINED} -- no hardware telemetry input to this analysis."),
     ]
 
@@ -540,6 +545,8 @@ def _link_investigation_to_csv(result) -> str:
                       # the fade margin the link sits on -- the one thing this row says
             _evidence_row("Severity", "Inferred", "aei_mw_exposure",
                           interpretation=f"{e.severity.upper()} -- {e.operational_note}"),
+            _evidence_row("Weather status", "Inferred", "Canonical status model (CRITICAL when predicted attenuation >= fade margin)",
+                          interpretation=(lambda s: f"{s[0]} -- {s[1]}")(weather_status(e))),
             _evidence_row("Hardware condition", "Inferred", "",
                           interpretation=f"{NOT_DETERMINED} -- no hardware telemetry input to this analysis."),
         ]

@@ -149,5 +149,8 @@ if __name__ == "__main__":
     out = []
     for path in sys.argv[1:]:
         fx = json.load(open(path))
-        out.append({"product": "qgis", "fixture": fx["id"], "terrain": terrain_stage(fx), "weather": weather_stage(fx)})
+        t, w = terrain_stage(fx), weather_stage(fx)
+        from core.presentation.model import worst    # the plugin's own worst-of (owner-approved P6)
+        st = lambda d: d.get("native_status")
+        out.append({"product": "qgis", "fixture": fx["id"], "terrain": t, "weather": w, "overall": worst(st(t), st(w)) if st(t) and st(w) else None})
     json.dump(out, sys.stdout, indent=1)

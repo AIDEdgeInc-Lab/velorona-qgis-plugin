@@ -10,13 +10,13 @@ threshold):
 
     obstructed (< 30 % of first Fresnel zone cleared)       -> CRITICAL
     marginal   (30-60 %)                                    -> AT RISK
-    clear but near_threshold, or ratio < COMFORTABLE (1.3)  -> WATCH
+    clear but ratio < COMFORTABLE (1.3, strictly below)     -> WATCH
     clear                                                   -> CLEAR
     no profile                                              -> NO DATA
 
-COMFORTABLE (1.3) is aei_link_clearance.explain.COMFORTABLE_MARGIN_RATIO, the
-library's own "limited headroom" line; near_threshold is the library's
-elevation-uncertainty check. Both are reused, not invented here.
+COMFORTABLE (1.3) is aei_link_clearance.explain.COMFORTABLE_MARGIN_RATIO. It is a PROVISIONAL operational threshold carried over from
+QGIS 1.1.4 (owner decision P2): not physics-validated and not operator-validated. near_threshold (the library's elevation-uncertainty
+check) is a verification FLAG shown beside the status; it never changes the status (owner decision P3).
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from .model import AT_RISK, CLEAR, CRITICAL, NO_DATA, NOT_DETERMINED, WATCH, Bri
 
 # Mirrors of library constants, kept in sync by tests/test_presentation_terrain.py
 # so this module stays importable without the aei_* packages (QGIS-free tests).
-COMFORTABLE_MARGIN_RATIO = 1.3
+COMFORTABLE_MARGIN_RATIO = 1.3   # provisional carried-over operational threshold (P2); the single definition in the plugin
 ELEVATION_UNCERTAINTY_M = 15.0
 CLEAR_THRESHOLD = 0.60
 OBSTRUCTED_THRESHOLD = 0.30
@@ -67,10 +67,6 @@ def terrain_status(r) -> tuple:
     if r.los_status == "marginal":
         return (AT_RISK, f"Clearance is {fmt(-margin)} m below the required minimum at the tightest point.",
                 "Terrain is closer to the path than recommended.")
-    if r.near_threshold:
-        return (WATCH, "Clearance meets the minimum, but the margin is smaller than the accuracy of the "
-                       f"elevation data (about {fmt(ELEVATION_UNCERTAINTY_M, 0)} m), so a survey could change the result.",
-                "Terrain clears the path, but not by enough to be certain.")
     if r.clearance_ratio < COMFORTABLE_MARGIN_RATIO:
         return (WATCH, "Clearance is above the minimum, but the margin is small.",
                 "Terrain clears the path, with little room to spare.")
