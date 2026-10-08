@@ -25,3 +25,16 @@ Commits (in order): `8ea9935` provider · `c90d18f` origin channel / wording / s
 * `ParamDialog`-style exact-value return is QGIS-only (the Map has no dialog).
 
 **Blocked / not run today**: live QGIS e2e (`tests/qgis_e2e.py`, 483 checks) and anything that calls Open-Meteo — `api.open-meteo.com` answers HTTP 429 "Daily API request limit exceeded" (same as your M2). The USA e2e (29 checks, synthetic pack, no network) and all unit tests pass.
+
+## Q5–Q9 — 2026-10-08 — backoff, caveat, packaging, heights, final checks
+Commits since the entry above: `cadc214` rain-table notice on weather exports + `tools/verify_package.py` · `9360622` smoke test expects 7 actions · `547b037` README/docs · `dc16d15`/`e9645d0` docs/USA.md + changelog · `737a62b` https hardening · `abf2aa7`/`9fa8f37` notice on weather limits · `1143a0c` provider backoff.
+
+**What changed / what Map needs to know**
+1. **Library:** `aei-link-clearance` 0.2.0 and 0.2.1 are published; the QGIS pin `>=0.2.0,<0.3` is already the release pin (wheels differ only in `__version__`). Nothing is blocked on a library publish for the curvature path. The rain table (your CCR-2) would need a new `aei-microwave-link-exposure` release; QGIS has the pin change prepared in prose only (LIBRARY_DEPENDENCY_PLAN.md §6).
+2. **CCR-2 reproduced:** your `p838_table_check.py` run unmodified against the *released* `aei-microwave-link-exposure` 0.1.5 gives the same table (21 of 24 rows differ). QGIS now shows a notice on weather limits and in weather exports. I did not re-verify your reference file against the ITU document.
+3. **Provider failures:** QGIS retries only 429/5xx/network (1 s, 3 s; `Retry-After` ≤ 10 s), never a daily limit, and ends in NO DATA marked transient with the real cause. The Map's runner does not retry; outcomes are identical for your 503 fixtures. Worth considering for `getElevations`.
+4. **Parity (final):** 54 fixtures, 1,106 stage comparisons, 0 non-MATCH, vs Map `326e1745`. Statuses: Canada CLEAR 4 / WATCH 4 / AT RISK 4 / CRITICAL 16 / NO DATA 6 (13 of the 34 are synthetic-boundary); USA 8 / 3 / 2 / 2 / 5 (FIXTURE_COVERAGE.md).
+5. **USA NO DATA over the whole pack, with QGIS' own validators:** terrain 0; weather 13,079 (5.21 %); both equal your contract §5.
+6. **ISED column 29 (antenna height, Canada):** height-like (100 % filled, ≤ structure height in 99.4 %, not above-sea-level) but **no header and no unit** in the raw file → not shipped; would need a snapshot rebuild on your side too (HEIGHT_AND_PLAUSIBILITY.md).
+7. **Not run today (BLOCKED):** live `qgis_e2e.py` (483 checks passed at baseline before Open-Meteo's daily limit was used up; aborts at the first live call now), live part of `clean_install_smoke.py`, anything needing elevations/weather. After 00:00 UTC: `tests/run_qgis_tests.sh` and `tests/clean_install_smoke.py`.
+8. **Your stale text (unchanged by me):** `docs/USA_FCC_ULS_PACK.md` §2 and §8; the uptowhere README table (cases 2–3 inputs are recorded nowhere I could find).
