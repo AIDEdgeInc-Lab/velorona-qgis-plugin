@@ -137,7 +137,11 @@ def weather_stage(fx):
                      "ratio": e.exposure_ratio, "severity": e.severity, "fade_margin_db": e.link.fade_margin_db,
                      "fade_remaining_db": e.link.fade_margin_db - att.predicted_attenuation_db},
         "native_status": brief.status, "status_reason": brief.reason, "caveats": brief.caveats,
-        "provenance": rows_from_csv(export.result_to_csv(res)),
+        # The Fixed Service link flow (plugin.py: run_link_investigation) exports a LinkInvestigation, whose rows follow the parameter ORIGINS.
+        "provenance": rows_from_csv(export.result_to_csv(SimpleNamespace(
+            kind="link-investigation", exposure=res, param_origins=origins, weather_error=None,
+            entry=SimpleNamespace(data={"authorization_number": fx["id"], "source": src, "frequencies_mhz": fx["selection"]["published_frequencies_mhz"]},
+                                  site_a_point=(a["lat"], a["lon"]), site_b_point=(b["lat"], b["lon"]))))),
     }
 
 

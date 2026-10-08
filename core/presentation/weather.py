@@ -30,7 +30,7 @@ STATION_WINDOW_MINUTES = 90
 
 MODEL_KIND = "Model-derived (weather model value at the site's coordinates, not a station measurement)"
 STATION_KIND = "Observed (station measurement)"
-RADAR_KIND = "Derived (radar-estimated rain rate, not gauge-measured)"
+RADAR_KIND = "Radar-estimated rain rate, not gauge-measured"   # classification (Observed vs Model-derived) is R6, not decided
 
 SELECTION_MODEL = "Weather model value at the site's own coordinates; no station is selected for this value."
 SELECTION_STATION = (f"Nearest ECCC station that reported within the last {STATION_WINDOW_MINUTES} minutes, "

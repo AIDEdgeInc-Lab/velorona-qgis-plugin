@@ -294,14 +294,14 @@ def _terrestrial_to_csv(result) -> str:
                       observation_input=(f"{site_a_pt.latitude:.5f}, {site_a_pt.longitude:.5f}" if site_a_pt else NOT_DETERMINED)),
         _evidence_row(f"Site B location ({result.site_b_name})", "Observed", result.site_b_source,
                       observation_input=(f"{site_b_pt.latitude:.5f}, {site_b_pt.longitude:.5f}" if site_b_pt else NOT_DETERMINED)),
-        _evidence_row("Site A antenna height", "Observed",
+        _evidence_row("Site A antenna height", "Observed" if result.site_a_height_from_feature else "Assumed",
                       "Feature attribute" if result.site_a_height_from_feature else "User, via analysis dialog (default shown, user-confirmed)",
                       observation_input=f"{_exact(result.site_a_height_m)} m"),
-        _evidence_row("Site B antenna height", "Observed",
+        _evidence_row("Site B antenna height", "Observed" if result.site_b_height_from_feature else "Assumed",
                       "Feature attribute" if result.site_b_height_from_feature else "User, via analysis dialog (default shown, user-confirmed)",
                       observation_input=f"{_exact(result.site_b_height_m)} m"),
-        _evidence_row("Frequency", "Observed", "User, via analysis dialog (not sourced from license data)",
-                      observation_input=f"{_exact(r.frequency_ghz)} GHz"),
+        _evidence_row("Frequency", "Assumed", "User, via analysis dialog (not sourced from license data)",
+                      observation_input=f"{_exact(r.frequency_ghz)} GHz", interpretation="Assumed / user-provided: supplied by the user, not observed from a source."),
         _evidence_row("Ground elevation profile", "Observed", "aei_link_clearance (Open-Meteo Elevation API, Copernicus DEM GLO-90, 90m surface model)",
                       observation_input=f"{len(r.profile)} samples along path"),
         _evidence_row("Path distance", "Calculated", "aei_link_clearance (haversine)",
@@ -351,10 +351,10 @@ def _microwave_to_csv(result) -> str:
         _evidence_row("Rain rate used", "Model-derived", f"Open-Meteo weather model ({e.source_site_id})",
                       observation_input=f"{e.rain_rate_mm_h:.1f} mm/h", interpretation=_rain_note(e, getattr(result, "precipitation", {}))),
         *_precip_rows((getattr(result, "precipitation", None) or {}).get(e.source_site_id)),
-        _evidence_row("Fade margin (link spec)", "Observed", "User, via analysis dialog (not sourced from license data)",
-                      observation_input=f"{_exact(link.fade_margin_db)} dB"),
-        _evidence_row("Frequency / polarization", "Observed", "User, via analysis dialog (not sourced from license data)",
-                      observation_input=f"{_exact(link.frequency_ghz)} GHz, {link.polarization}"),
+        _evidence_row("Fade margin (link spec)", "Assumed", "User, via analysis dialog (not sourced from license data)",
+                      observation_input=f"{_exact(link.fade_margin_db)} dB", interpretation="Assumed / user-provided: supplied by the user, not observed from a source."),
+        _evidence_row("Frequency / polarization", "Assumed", "User, via analysis dialog (not sourced from license data)",
+                      observation_input=f"{_exact(link.frequency_ghz)} GHz, {link.polarization}", interpretation="Assumed / user-provided: supplied by the user, not observed from a source."),
         _evidence_row("Predicted rain attenuation", "Calculated", f"aei_mw_exposure ({att.method})",
                       observation_input=f"{e.rain_rate_mm_h:.1f} mm/h, {_exact(link.frequency_ghz)} GHz, {link.polarization}, {link.length_km:.2f} km",
                       calculated_result=f"{att.predicted_attenuation_db:.2f} dB", interpretation=att.assumption),
@@ -507,26 +507,25 @@ def _link_investigation_to_csv(result) -> str:
         e = result.exposure.exposure
         link = e.link
         att = e.attenuation
-        freq_kind, freq_note = origins.get("frequency_ghz", ("Observed", ""))
-        pol_kind, pol_note = origins.get("polarization", ("Observed", ""))
-        fade_kind, fade_note = origins.get("fade_margin_db", ("Observed", ""))
+        freq_kind, freq_note = origins.get("frequency_ghz", ("Assumed", ""))
+        pol_kind, pol_note = origins.get("polarization", ("Assumed", ""))
+        fade_kind, fade_note = origins.get("fade_margin_db", ("Assumed", ""))
         rows += [
             _evidence_row("Rain rate used", "Model-derived", f"Open-Meteo weather model ({e.source_site_id})",
                           observation_input=f"{e.rain_rate_mm_h:.1f} mm/h", interpretation=_rain_note(e, getattr(result.exposure, "precipitation", {}))),
             *_precip_rows((getattr(result.exposure, "precipitation", None) or {}).get(e.source_site_id)),
             # Type stays in the canonical Observed/Calculated/Inferred vocabulary;
-            # whether a parameter came from the public record or is an engine
-            # assumption is carried in Source, the same convention the standalone
-            # microwave export already uses for user-entered link parameters.
-            _evidence_row("Frequency used for attenuation", "Observed",
+            # whether a parameter came from the public record (Observed) or is an
+            # engine default / user value (Assumed) is the Type; Source says where it came from.
+            _evidence_row("Frequency used for attenuation", freq_kind,
                           source if freq_kind == "Observed"
                           else "aei_mw_exposure default -- not published in the ISED Fixed Service extract",
                           observation_input=f"{_exact(link.frequency_ghz)} GHz", interpretation=freq_note),
-            _evidence_row("Polarization", "Observed",
+            _evidence_row("Polarization", pol_kind,
                           source if pol_kind == "Observed"
                           else "aei_mw_exposure default -- not published in the ISED Fixed Service extract",
                           observation_input=f"{link.polarization}", interpretation=pol_note),
-            _evidence_row("Fade margin", "Observed",
+            _evidence_row("Fade margin", fade_kind,
                           source if fade_kind == "Observed"
                           else "aei_mw_exposure default -- not published in the ISED Fixed Service extract",
                           observation_input=f"{_exact(link.fade_margin_db)} dB", interpretation=fade_note),
