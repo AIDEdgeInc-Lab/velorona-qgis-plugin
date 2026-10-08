@@ -36,7 +36,7 @@ changelog=1.1.3 - Data correction. The bundled Canada Fixed Service snapshot had
     0.2.0 - Experimental local development plugin.
 tracker=https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/issues
 repository=https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin
-homepage=https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin
+homepage=https://map.velorona.ai/
 experimental=False
 category=Vector
 hasProcessingProvider=no
