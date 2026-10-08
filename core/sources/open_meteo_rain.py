@@ -15,6 +15,7 @@ from aei_mw_exposure.providers.open_meteo import OPEN_METEO_URL, SOURCE, OpenMet
 from aei_mw_exposure.weather import WeatherObservation
 
 from ..presentation import precip
+from ..provider_retry import call_with_backoff
 
 
 class TypedPrecipitationProvider(OpenMeteoProvider):
@@ -28,12 +29,19 @@ class TypedPrecipitationProvider(OpenMeteoProvider):
         if get is None:
             import requests
             get = requests.get
-        resp = get(OPEN_METEO_URL, params={
-            "latitude": site.latitude, "longitude": site.longitude,
-            "current": "precipitation,rain,showers,snowfall,weather_code,temperature_2m,wind_speed_10m",
-            "timezone": "auto",
-        }, timeout=self.timeout)
-        resp.raise_for_status()
+        import requests
+
+        def fetch():
+            r = get(OPEN_METEO_URL, params={
+                "latitude": site.latitude, "longitude": site.longitude,
+                "current": "precipitation,rain,showers,snowfall,weather_code,temperature_2m,wind_speed_10m",
+                "timezone": "auto",
+            }, timeout=self.timeout)
+            r.raise_for_status()
+            return r
+        # Bounded backoff for a rate limit / server error / network failure only (core/provider_retry.py); the caller turns a final failure into
+        # NO DATA (transient), never into a status.
+        resp = call_with_backoff(fetch, retryable=(requests.exceptions.RequestException,))
         current = resp.json()["current"]
         p = precip.classify(current)
         self.precipitation[site.id] = p

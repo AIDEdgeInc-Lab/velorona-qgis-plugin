@@ -10,6 +10,7 @@ from typing import Optional, Tuple
 from aei_link_clearance import LinkClearanceResult, analyze_link, explain
 from aei_link_clearance import terrain as _library_terrain
 
+from ..provider_retry import call_with_backoff, classify
 from ..record_source import (FCC_HEIGHT_LABEL, frequency_ghz_from_record, frequency_origin, height_origin, is_fcc, record_labels)
 from ..validation import NoDataError, require_corrected_clearance, terrain_input_reasons
 
@@ -90,14 +91,15 @@ def analyze_endpoints(lat_a, lon_a, lat_b, lon_b, params: dict, link_id: str) ->
     import requests
     from aei_link_clearance.elevation import ElevationDataError
     try:
-        return analyze_link(
+        return call_with_backoff(lambda: analyze_link(
             link_id=link_id,
             site_a_lat=lat_a, site_a_lon=lon_a, site_a_height_m=params["site_a_height_m"],
             site_b_lat=lat_b, site_b_lon=lon_b, site_b_height_m=params["site_b_height_m"],
             frequency_ghz=params["frequency_ghz"],
-        )
+        ), retryable=(ElevationDataError, requests.exceptions.RequestException))
     except (ElevationDataError, requests.exceptions.RequestException) as exc:   # the two explicit elevation-data failures only (T1, R5)
-        raise NoDataError("terrain", [f"elevation data unavailable (T1/R5): {exc}"]) from exc
+        failure = classify(exc)
+        raise NoDataError("terrain", [f"elevation data unavailable (T1/R5): {failure.reason(exc)}"], transient=failure.transient) from exc
 
 
 def analyze(entries, params: dict) -> TerrestrialAnalysisResult:

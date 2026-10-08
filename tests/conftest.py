@@ -21,3 +21,15 @@ for module, repo in _SIBLINGS.items():
         candidate = os.path.join(os.path.dirname(_ROOT), repo, "src")
         if os.path.isdir(candidate):
             sys.path.append(candidate)
+
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def no_real_backoff_sleep(monkeypatch):
+    """Provider backoff (core/provider_retry.py) must not make the suite wait; the waits it WOULD have made are recorded for the tests that check them."""
+    from core import provider_retry
+    waits = []
+    monkeypatch.setattr(provider_retry, "_sleep", waits.append)
+    return waits
