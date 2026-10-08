@@ -17,7 +17,7 @@ DATA DICTIONARY sheet). Summary:
 | Terrain | Bearing | initial great-circle bearing | deg | none | aei_link_clearance |
 | Terrain | Earth bulge | h = d1·d2 / (2·k·R), k = 4/3 | m | none | aei_link_clearance |
 | Terrain | First Fresnel radius | r1 = 17.3·√(d1·d2 / (f·(d1+d2))) | m | none | aei_link_clearance |
-| Terrain | Clearance at a sample | LOS height − (ground − bulge) | m | none | aei_link_clearance |
+| Terrain | Clearance at a sample | LOS height − (ground + bulge) | m | none | aei_link_clearance |
 | Terrain | Critical point | interior sample with lowest clearance / r1 | – | endpoints excluded | aei_link_clearance |
 | Terrain | Required clearance | 0.60 · r1 at the critical point | m | 0.60 (standard practice, not an ITU-R figure) | aei_link_clearance |
 | Terrain | Clearance ratio | available / required | ratio | 1.0 = minimum | aei_link_clearance |

@@ -10,7 +10,7 @@ from importlib.util import find_spec
 
 # (import name, pip requirement)
 REQUIREMENTS = [
-    ("aei_link_clearance", "aei-link-clearance"),
+    ("aei_link_clearance", "aei-link-clearance>=0.2.0,<0.3"),
     ("aei_mw_exposure", "aei-microwave-link-exposure>=0.1.4"),
     ("aei_geo_features", "aei-geo-features"),
     ("skyfield", "skyfield"),
@@ -22,6 +22,11 @@ def _is_installed(import_name: str) -> bool:
         return find_spec(import_name) is not None
     except (ImportError, ValueError):
         return False
+
+
+def _shell_quote(requirement: str) -> str:
+    """Quote a pip requirement that contains shell metacharacters ('>', '<'), so the copied command works."""
+    return f"'{requirement}'" if any(c in requirement for c in "<>") else requirement
 
 
 def missing_requirements() -> list[str]:
@@ -40,6 +45,6 @@ def install_message(missing: list[str], detail: str = "") -> str:
     return (
         "Velorona could not start: required Python packages are missing from QGIS's "
         f"own Python environment{tail}. Install them with QGIS's Python, e.g. "
-        f"`python3 -m pip install {' '.join(missing)}` -- see the README's "
+        f"`python3 -m pip install {' '.join(_shell_quote(m) for m in missing)}` -- see the README's "
         "Requirements section for the exact interpreter path -- then restart QGIS."
     )

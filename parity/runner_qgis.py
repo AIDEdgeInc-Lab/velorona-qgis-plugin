@@ -7,8 +7,8 @@ Coupling (documented, not hidden):
 * The plugin imports `qgis.core` at module level in core/features.py, which core/engines/microwave_exposure.py imports. A system
   Python has no QGIS, so this runner registers an EMPTY stand-in `qgis.core` (three placeholder names). Nothing in the decision path
   uses them; they exist only so the real `analyze_sites()` can be imported.
-* The aei_* libraries are taken from the sibling checkouts (velorona-repos/aei-*/src), exactly as tests/conftest.py does. The version
-  a shipped QGIS actually loads is UNKNOWN (audit OPEN_QUESTIONS #2); this runner tests the sibling source, not the PyPI wheel.
+* aei-link-clearance is the released PyPI package (>=0.2.0,<0.3), as a shipped QGIS loads it; the other aei_* libraries are
+  taken from the installed packages, falling back to sibling checkouts only when absent.
 * Terrain: `requests.get` is replaced (elevation.py imports requests lazily), so the library's own get_elevations() (count check, float()) runs.
 * Weather: TypedPrecipitationProvider(get=...) takes an injected HTTP getter; ECCC station/radar lookups are replaced by "none" and the
   hourly-history fetcher raises (history is context only, not a decision input -- microwave_exposure.py).
@@ -19,8 +19,12 @@ from types import SimpleNamespace
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPOS = os.path.dirname(ROOT)
 sys.path.insert(0, ROOT)
-for r in ("aei-link-clearance", "aei-microwave-link-exposure", "aei-geo-features"):
-    sys.path.insert(0, os.path.join(REPOS, r, "src"))
+import importlib.util
+# Installed (PyPI) packages win; a sibling checkout is used only for a library that is not installed. aei-link-clearance has no
+# sibling fallback: the plugin requires the released package (>=0.2.0,<0.3).
+for mod, r in (("aei_mw_exposure", "aei-microwave-link-exposure"), ("aei_geo_features", "aei-geo-features")):
+    if importlib.util.find_spec(mod) is None:
+        sys.path.insert(0, os.path.join(REPOS, r, "src"))
 if "qgis" not in sys.modules:
     q = types.ModuleType("qgis"); qc = types.ModuleType("qgis.core")
     class _Placeholder:
