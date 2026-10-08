@@ -40,6 +40,17 @@ _GEOM_LAT, _GEOM_LON = "@lat", "@lon"
 # Curated columns per dataset, using the field names the production sources
 # actually produce -- no invented fields.
 COLUMNS = {
+    layer_helpers.SOURCE_US_LINKS: [
+        ("Authorization", "authorization_number"), ("Licensee", "licensee"),
+        ("Site A", _GEOM_A), ("Site B", _GEOM_B),
+        ("Frequency (MHz)", "frequencies_mhz"), ("Expires", "expiration_date"),
+        ("Flags", "flags"), ("Source", "source"),
+    ],
+    layer_helpers.SOURCE_US_SITES: [
+        ("Site", "name"), ("Licensee", "licensee"), ("Call sign(s)", "call_signs"),
+        ("Frequency (MHz)", "frequencies_mhz"), ("State", "province"),
+        ("Latitude", _GEOM_LAT), ("Longitude", _GEOM_LON), ("Source", "source"),
+    ],
     layer_helpers.SOURCE_FIXED_LINKS: [
         ("Authorization", "authorization_number"), ("Licensee", "licensee"),
         ("Site A", _GEOM_A), ("Site B", _GEOM_B),
@@ -79,6 +90,8 @@ COLUMNS = {
 
 # Which single-feature drawer a row of each dataset opens.
 KINDS = {
+    layer_helpers.SOURCE_US_LINKS: "link",
+    layer_helpers.SOURCE_US_SITES: "site",
     layer_helpers.SOURCE_FIXED_LINKS: "link",
     layer_helpers.SOURCE_FIXED_SITES: "site",
     layer_helpers.SOURCE_TOWERS: "site",
@@ -89,11 +102,14 @@ KINDS = {
 
 DATASET_ORDER = [
     layer_helpers.SOURCE_FIXED_LINKS, layer_helpers.SOURCE_FIXED_SITES,
+    layer_helpers.SOURCE_US_LINKS, layer_helpers.SOURCE_US_SITES,
     layer_helpers.SOURCE_TOWERS, layer_helpers.SOURCE_CELLULAR,
     layer_helpers.SOURCE_SATELLITES, layer_helpers.SOURCE_GROUND_STATIONS,
 ]
 
 DATASET_LABELS = {
+    layer_helpers.SOURCE_US_LINKS: "USA Fixed Service links (FCC ULS)",
+    layer_helpers.SOURCE_US_SITES: "USA Fixed Service sites (FCC ULS)",
     layer_helpers.SOURCE_FIXED_LINKS: "Fixed Service links",
     layer_helpers.SOURCE_FIXED_SITES: "Fixed Service sites",
     layer_helpers.SOURCE_TOWERS: "Tower structures",

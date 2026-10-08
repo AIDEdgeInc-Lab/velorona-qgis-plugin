@@ -301,6 +301,7 @@ class UsaPackProvider:
         site_freqs: Dict[str, set] = {}
         links_by_id: Dict[str, dict] = {}
         meta = index.attribution
+        input_sha = index.data["source"].get("input_zip_sha256")
         for key in keys:
             tile, fetched = self._tile(key)
             result.tiles_fetched += 1 if fetched else 0
@@ -315,6 +316,8 @@ class UsaPackProvider:
                         "record_id": call or None, "call_signs": call or None, "authorizations": call or None,
                         "frequencies_mhz": None, "licensee": " / ".join(s["l"]) or None, "province": s.get("s"),
                         "coverage": COVERAGE_US, "flags": ", ".join(s["q"]) if isinstance(s.get("q"), list) else s.get("q"),
+                        "attribution": meta.attribution_text, "pack_generated": meta.pack_generated,
+                        "source_file_updated": meta.source_file_updated, "pack_input_sha256": input_sha,
                     }
                     site_freqs[s["i"]] = set()
                 else:
@@ -332,7 +335,8 @@ class UsaPackProvider:
                     "expiration_date": l.get("x"), "path_type": ", ".join(l.get("t") or []) or None, "frequencies_mhz": freqs,
                     "site_a": a, "site_b": b, "coverage": COVERAGE_US,
                     "flags": ", ".join(l["q"]) if isinstance(l.get("q"), list) else l.get("q"),
-                    "pack_generated": meta.pack_generated, "source_file_updated": meta.source_file_updated,
+                    "attribution": meta.attribution_text, "pack_generated": meta.pack_generated,
+                    "source_file_updated": meta.source_file_updated, "pack_input_sha256": input_sha,
                 }
                 for site in (a, b):
                     site_freqs[site["id"]].update(l["f"])

@@ -22,6 +22,8 @@ import csv
 import io
 from datetime import datetime, timezone
 
+from .evidence_record import identity_lines, source_lines
+from .record_source import record_labels
 from .presentation.terrain import ratio_meaning, ratio_value, terrain_explanation, terrain_status
 from .presentation.weather import weather_status
 
@@ -58,6 +60,7 @@ def feature_to_csv(attrs: dict, latitude: float, longitude: float) -> str:
     preamble = _preamble([
         "Velorona QGIS export",
         f"Record: {attrs.get('name') or attrs.get('licensee') or 'site'}",
+        *source_lines(attrs),
         f"Generated: {datetime.now(timezone.utc).isoformat()}",
     ])
     buf = io.StringIO()
@@ -79,6 +82,7 @@ def link_feature_to_csv(attrs: dict, site_a_point, site_b_point) -> str:
     preamble = _preamble([
         "Velorona QGIS export",
         f"Record: {attrs.get('authorization_number') or 'link'}",
+        *source_lines(attrs),
         f"Generated: {datetime.now(timezone.utc).isoformat()}",
     ])
     buf = io.StringIO()
@@ -274,6 +278,20 @@ def result_to_xlsx(result) -> bytes:
     return build_workbook(result, result_to_csv(result))
 
 
+def _terrain_frequency_row(result, r) -> list:
+    """Frequency typed by its ORIGIN. A terrain analysis started from a link record carries the origin (core/record_source.py); the two-site
+    flow does not, and its frequency is the user's (Assumed) -- never Observed."""
+    origin = getattr(result, "frequency_origin", None)
+    if origin and origin[0] == "Observed":
+        return _evidence_row("Frequency", "Observed", origin[1], observation_input=f"{_exact(r.frequency_ghz)} GHz")
+    if origin:
+        return _evidence_row("Frequency", "Assumed", "User, via analysis dialog (record value overridden)",
+                             observation_input=f"{_exact(r.frequency_ghz)} GHz", interpretation=origin[1])
+    return _evidence_row("Frequency", "Assumed", "User, via analysis dialog (not sourced from license data)",
+                         observation_input=f"{_exact(r.frequency_ghz)} GHz",
+                         interpretation="Assumed / user-provided: supplied by the user, not observed from a source.")
+
+
 def _terrestrial_to_csv(result) -> str:
     r = result.result
     site_a_pt = r.profile[0] if r.profile else None
@@ -283,6 +301,8 @@ def _terrestrial_to_csv(result) -> str:
         "Velorona QGIS -- Terrestrial Path Clearance export",
         f"Link: {result.site_a_name} <-> {result.site_b_name}",
         "Calculated via aei_link_clearance (ITU-R P.530 Fresnel-zone / earth-curvature terrain clearance), unmodified.",
+        *identity_lines(decision=True),
+        *source_lines(getattr(result, "record", None)),
         f"Generated: {datetime.now(timezone.utc).isoformat()}",
     ])
     buf = io.StringIO()
@@ -301,8 +321,7 @@ def _terrestrial_to_csv(result) -> str:
         _evidence_row("Site B antenna height", "Observed" if result.site_b_height_from_feature else "Assumed",
                       "Feature attribute" if result.site_b_height_from_feature else "User, via analysis dialog (default shown, user-confirmed)",
                       observation_input=f"{_exact(result.site_b_height_m)} m"),
-        _evidence_row("Frequency", "Assumed", "User, via analysis dialog (not sourced from license data)",
-                      observation_input=f"{_exact(r.frequency_ghz)} GHz", interpretation="Assumed / user-provided: supplied by the user, not observed from a source."),
+        _terrain_frequency_row(result, r),
         _evidence_row("Ground elevation profile", "Observed", "aei_link_clearance (Open-Meteo Elevation API, Copernicus DEM GLO-90, 90m surface model)",
                       observation_input=f"{len(r.profile)} samples along path"),
         _evidence_row("Path distance", "Calculated", "aei_link_clearance (haversine)",
@@ -343,6 +362,7 @@ def _microwave_to_csv(result) -> str:
         "Velorona QGIS -- Microwave Weather Exposure export",
         f"Link: {link.site_a.name} <-> {link.site_b.name}",
         "Evidence of weather, not a hardware diagnosis or an outage prediction. Calculated via aei_mw_exposure (ITU-R P.530 / P.838-3), unmodified.",
+        *identity_lines(decision=False),
         f"Generated: {datetime.now(timezone.utc).isoformat()}",
     ])
     buf = io.StringIO()
@@ -475,12 +495,15 @@ def _link_investigation_to_csv(result) -> str:
     d = entry.data
     origins = result.param_origins or {}
     authorization = d.get("authorization_number") or d.get("id") or "Fixed Service link"
-    source = d.get("source") or "ISED Fixed Service extract"
+    labels = record_labels(d)
+    source = d.get("source") or labels.extract
 
     preamble = _preamble([
         "Velorona QGIS -- Fixed Service link investigation export",
         f"Authorization: {authorization}",
         "Evidence of weather, not a hardware diagnosis or an outage prediction.",
+        *identity_lines(decision=False),
+        *source_lines(d),
         f"Generated: {datetime.now(timezone.utc).isoformat()}",
     ])
     buf = io.StringIO()
@@ -526,15 +549,15 @@ def _link_investigation_to_csv(result) -> str:
             # engine default / user value (Assumed) is the Type; Source says where it came from.
             _evidence_row("Frequency used for attenuation", freq_kind,
                           source if freq_kind == "Observed"
-                          else "aei_mw_exposure default -- not published in the ISED Fixed Service extract",
+                          else f"aei_mw_exposure default -- not published in the {labels.extract}",
                           observation_input=f"{_exact(link.frequency_ghz)} GHz", interpretation=freq_note),
             _evidence_row("Polarization", pol_kind,
                           source if pol_kind == "Observed"
-                          else "aei_mw_exposure default -- not published in the ISED Fixed Service extract",
+                          else f"aei_mw_exposure default -- not published in the {labels.extract}",
                           observation_input=f"{link.polarization}", interpretation=pol_note),
             _evidence_row("Fade margin", fade_kind,
                           source if fade_kind == "Observed"
-                          else "aei_mw_exposure default -- not published in the ISED Fixed Service extract",
+                          else f"aei_mw_exposure default -- not published in the {labels.extract}",
                           observation_input=f"{_exact(link.fade_margin_db)} dB", interpretation=fade_note),
             _evidence_row("Path length", "Calculated", "aei_mw_exposure (haversine)",
                           calculated_result=f"{att.path_length_km:.2f} km"),

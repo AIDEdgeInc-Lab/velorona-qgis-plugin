@@ -40,6 +40,7 @@ from ..core.export import NotExportable, result_to_csv, result_to_xlsx
 from ..core.presentation import ask as ask_module
 from ..core.export import _precip_note
 from ..core.presentation.model import exact
+from ..core.record_source import is_fcc
 from ..core.presentation.terrain import ratio_meaning, ratio_value, terrain_explanation
 from ..core.presentation.workbook import context_for
 from . import charts, operational_view, theme
@@ -392,6 +393,24 @@ def _render_site_feature(entry) -> str:
     )
 
 
+
+def _pairing_text(d) -> str:
+    """How the two endpoints were paired, in the register's own terms (never inferred from proximity)."""
+    if is_fcc(d):
+        return ("Both endpoints are named as the transmit and receive locations of the same FCC ULS licence path record(s) -- "
+                "not inferred from proximity or frequency.")
+    return ("Both sites share this authorization number in ISED's Fixed Service extract and "
+            "resolve to exactly two distinct coordinates -- not inferred from proximity or frequency.")
+
+
+def _data_source_text(d):
+    """The attribution that must travel with a US record: the pack's own text, the dates, and what kind of data it is."""
+    if not is_fcc(d) or not d.get("attribution"):
+        return None
+    return (f"{d['attribution']} Source file dated {d.get('source_file_updated') or 'unknown'}; "
+            f"pack built {d.get('pack_generated') or 'unknown'}. Licensee-reported record data from a public register; "
+            "not a field measurement and not a coverage or performance guarantee.")
+
 def _render_link_feature(entry) -> str:
     d = entry.data
     kicker = "FIXED SERVICE LINK"
@@ -406,9 +425,9 @@ def _render_link_feature(entry) -> str:
     )
     provenance = (
         _field_row("Source", d.get("source"))
-        + _field_row("Pairing", "Both sites share this authorization number in ISED's Fixed Service extract and "
-                     "resolve to exactly two distinct coordinates -- not inferred from proximity or frequency.")
+        + _field_row("Pairing", _pairing_text(d))
         + _field_row("Coverage", d.get("coverage"))
+        + _field_row("Data source", _data_source_text(d))
     )
     return (
         f"<div class='kicker'>{_esc(kicker)}</div><h3>{_esc(title)}</h3>"

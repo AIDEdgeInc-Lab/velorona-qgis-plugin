@@ -69,16 +69,19 @@ def terrain_stage(fx):
     try:
         try:
             params = {"site_a_height_m": a["height_m"], "site_b_height_m": b["height_m"], "frequency_ghz": L["frequency_ghz"]}
-            r = tr.analyze_endpoints(a["lat"], a["lon"], b["lat"], b["lon"], params, fx["id"])
+            # The Fixed Service link flow: terrain started from the selected LINK RECORD (plugin.py run_terrestrial), which is what the Map's
+            # terrestrialAnalyze does for one selected link. The record's published frequencies reach the engine, so the frequency's origin
+            # (record vs user override) is decided by the engine, not asserted here.
+            link_attrs = {"id": fx["id"], "authorization_number": fx["id"], "source": "ISED Fixed Service record",
+                          "frequencies_mhz": ", ".join(str(v) for v in fx["selection"].get("published_frequencies_mhz", []))}
+            res = tr.analyze_link_record(link_attrs, (a["lat"], a["lon"]), (b["lat"], b["lon"]), params)
+            r = res.result
         except NoDataError as exc:
-            return {"noData": exc.reasons, "native_status": "NO DATA", "via": "core.engines.terrestrial.analyze_endpoints()"}
+            return {"noData": exc.reasons, "native_status": "NO DATA", "via": "core.engines.terrestrial.analyze_link_record()"}
         except Exception as exc:                      # not NO DATA: reported as UNEXPECTED so it can never pass as a decision
-            return {"error": "%s: %s" % (type(exc).__name__, exc), "unexpected": True, "via": "core.engines.terrestrial.analyze_endpoints()"}
+            return {"error": "%s: %s" % (type(exc).__name__, exc), "unexpected": True, "via": "core.engines.terrestrial.analyze_link_record()"}
     finally:
         rq.get = orig
-    res = SimpleNamespace(kind="terrestrial", site_a_name="Site A", site_b_name="Site B", site_a_source="ISED Fixed Service record",
-                          site_b_source="ISED Fixed Service record", site_a_height_m=a["height_m"], site_b_height_m=b["height_m"],
-                          site_a_height_from_feature=False, site_b_height_from_feature=False, result=r, explanation=explain(r))
     brief = pterrain.terrain_brief(res)
     crit = pterrain.critical_point(r)
     return {

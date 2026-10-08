@@ -12,17 +12,22 @@ from qgis.core import (
     QgsSingleSymbolRenderer,
     QgsProject,
     QgsRectangle,
+    QgsSettings,
     QgsVectorTileLayer,
 )
 from qgis.PyQt.QtCore import Qt, QTimer
 from qgis.PyQt.QtGui import QColor
-from qgis.PyQt.QtWidgets import QAction, QApplication, QMessageBox, QWIDGETSIZE_MAX
+from qgis.PyQt.QtWidgets import QAction, QApplication, QInputDialog, QLineEdit, QMessageBox, QWIDGETSIZE_MAX
 
 from .core import basemap_labels
 from .core import layers as layer_helpers
 from .core import network_context
 from .core import overlays
 from .core.colors import COLORS, layer_color
+from .core.countries import usa as usa_pack
+from .core.countries.base import PackError
+from .core.countries.canada import CanadaProvider
+from .core.countries.usa_fields import US_LINK_FIELDS, US_SITE_FIELDS
 from .core.engines import microwave_exposure, satellite_earth_space, terrestrial
 from .core import inspector
 from .core.inspector import feature_to_entry
@@ -36,6 +41,7 @@ from .ui.param_dialog import ParamDialog
 from .ui.results_dock import VeloronaResultsDock
 
 MENU_NAME = "&Velorona"
+USA_PACK_SETTING = "Velorona/usa_pack_source"   # folder or https address of the Velorona USA pack; the pack is NOT bundled
 WGS84 = QgsCoordinateReferenceSystem("EPSG:4326")
 
 # Basemap -- native QGIS vector tile layer, CARTO Dark Matter, styled from
@@ -227,6 +233,7 @@ class VeloronaPlugin:
         self.satellites_layer = None
         self._satellites_fetched_at = None
         self._endpoint_index = {}
+        self._usa_provider = None
         self.network_context_layer = None
 
     # -- QGIS plugin lifecycle -------------------------------------------
@@ -239,9 +246,21 @@ class VeloronaPlugin:
             "each at its own real geographic coverage.",
             self.load_public_data,
         )
+        self.action_load_usa = self._make_action(
+            "Explore: Load USA Links in View (FCC ULS)",
+            "Loads the FCC ULS microwave links and sites that touch the current map view from the Velorona USA data pack. The pack is not "
+            "bundled: set its folder or https address first (Explore: Set USA Data Pack Source).",
+            self.load_usa_view,
+        )
+        self.action_set_usa_source = self._make_action(
+            "Explore: Set USA Data Pack Source",
+            "Folder on this computer, or https address, of the Velorona USA data pack (it contains index.json and a tiles folder).",
+            self.set_usa_pack_source,
+        )
         self.action_terrestrial = self._make_action(
             "Analyze: Terrestrial Path Clearance",
-            "Select exactly two point features (any layer, public or imported) as a link's endpoints.",
+            "Select exactly two point features (any layer, public or imported) as a link's endpoints, or ONE Fixed Service link (its "
+            "endpoints and published frequency are then used and the frequency is typed Observed).",
             self.run_terrestrial,
         )
         self.action_microwave = self._make_action(
@@ -484,13 +503,14 @@ class VeloronaPlugin:
     def _restyle_links(self, dark: bool) -> None:
         """Normal Fixed Service links keep comfortable visibility on both
         basemaps without ever competing with the selected link."""
-        layer = layer_helpers.find_owned_layer(QgsProject.instance(), layer_helpers.SOURCE_FIXED_LINKS)
-        if layer is None:
-            return
-        renderer = layer.renderer()
-        if isinstance(renderer, QgsSingleSymbolRenderer):
-            renderer.setSymbol(layer_helpers.link_symbol(dark))
-            layer.triggerRepaint()
+        for key in (layer_helpers.SOURCE_FIXED_LINKS, layer_helpers.SOURCE_US_LINKS):
+            layer = layer_helpers.find_owned_layer(QgsProject.instance(), key)
+            if layer is None:
+                continue
+            renderer = layer.renderer()
+            if isinstance(renderer, QgsSingleSymbolRenderer):
+                renderer.setSymbol(layer_helpers.link_symbol(dark))
+                layer.triggerRepaint()
 
     def _apply_selection_color(self, dark: bool) -> None:
         """Keeps the selected feature visible on whichever basemap is active.
@@ -526,12 +546,13 @@ class VeloronaPlugin:
             props.setSelectionSymbol(layer_helpers.selection_symbol(layer_color(kind, dark), dark))
             layer.triggerRepaint()
 
-        links = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_FIXED_LINKS)
-        if links is not None:
-            link_props = links.selectionProperties()
-            link_props.setSelectionRenderingMode(Qgis.SelectionRenderingMode.CustomSymbol)
-            link_props.setSelectionSymbol(layer_helpers.link_selection_symbol(dark))
-            links.triggerRepaint()
+        for key in (layer_helpers.SOURCE_FIXED_LINKS, layer_helpers.SOURCE_US_LINKS):
+            links = layer_helpers.find_owned_layer(project, key)
+            if links is not None:
+                link_props = links.selectionProperties()
+                link_props.setSelectionRenderingMode(Qgis.SelectionRenderingMode.CustomSymbol)
+                link_props.setSelectionSymbol(layer_helpers.link_selection_symbol(dark))
+                links.triggerRepaint()
 
     def map_is_dark(self) -> bool:
         """Velorona's own map appearance -- deliberately independent of the QGIS
@@ -712,7 +733,8 @@ class VeloronaPlugin:
 
         # Hero: on by default -- the primary Select Link -> Analyze -> Evidence workflow.
         try:
-            sites, links = terrestrial_public.load_fixed_service_snapshot()
+            loaded = CanadaProvider().load_all()      # identical to terrestrial_public.load_fixed_service_snapshot()
+            sites, links = loaded.sites, loaded.links
             sites_layer = self._ensure_public_layer(
                 layer_helpers.SOURCE_FIXED_SITES, infra_group, visible=True, kind="site",
                 build=lambda: layer_helpers.build_point_layer(
@@ -1179,10 +1201,15 @@ class VeloronaPlugin:
 
     def run_terrestrial(self):
         entries = self._selected_by_kind("site")
+        links = self._selected_by_kind("link")
         if len(entries) != 2:
+            if not entries and len(links) == 1:
+                self._run_terrestrial_for_link(*links[0])
+                return
             self._warn(
-                f"Select exactly two 'site' features (any layer -- public or your own import) as "
-                f"the link's endpoints. Currently {len(entries)} selected."
+                f"Select exactly two 'site' features (any layer, public or your own import) as "
+                f"the link's endpoints, or exactly one Fixed Service link. Currently {len(entries)} site(s) and "
+                f"{len(links)} link(s) selected."
             )
             return
         defaults = terrestrial.build_params(entries)
@@ -1196,6 +1223,118 @@ class VeloronaPlugin:
             return
         self._update_terrain_layer(result)
         self._show_result(result)
+
+    def _run_terrestrial_for_link(self, layer, feature):
+        """Terrain clearance for ONE selected Fixed Service link (Canada or USA): the record's own endpoints, and its highest published
+        frequency pre-filled. The frequency is typed Observed only while it still equals the record's value; changing it makes it the
+        user's (Assumed)."""
+        entry = feature_to_entry(feature, "link")
+        if entry.site_a_point is None or entry.site_b_point is None:
+            self._warn("This link record has no usable endpoint geometry.")
+            return
+        defaults, record_ghz, note = terrestrial.build_link_params(entry.data)
+        title = ("Velorona -- Terrestrial Path Clearance (link record: frequency pre-filled from the record)" if record_ghz is not None
+                 else "Velorona -- Terrestrial Path Clearance (the record publishes no usable frequency)")
+        dialog = ParamDialog(self.iface.mainWindow(), title, terrestrial.PARAM_SPEC, defaults)
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
+        try:
+            result = terrestrial.analyze_link_record(entry.data, entry.site_a_point, entry.site_b_point, dialog.values())
+        except Exception as exc:
+            self._error(f"Analysis failed:\n{exc}")
+            return
+        self._update_terrain_layer(result)
+        self._show_result(result)
+
+    # -- USA (FCC ULS) data pack ----------------------------------------------------------------------------------------
+
+    def set_usa_pack_source(self):
+        """Ask for the pack's folder or https address, validate it NOW (index.json readable, schema understood), and only then keep it."""
+        settings = QgsSettings()
+        text, ok = QInputDialog.getText(
+            self.iface.mainWindow(), "Velorona -- USA data pack",
+            "Folder on this computer, or https address, of the Velorona USA data pack\n(the folder that contains index.json and tiles/):",
+            QLineEdit.EchoMode.Normal, str(settings.value(USA_PACK_SETTING, "") or ""))
+        if not ok:
+            return False
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            provider = usa_pack.UsaPackProvider(text.strip())
+            index = provider.index()
+        except PackError as exc:
+            self._error(str(exc))
+            return False
+        finally:
+            QApplication.restoreOverrideCursor()
+        settings.setValue(USA_PACK_SETTING, text.strip())
+        self._usa_provider = provider
+        self.iface.messageBar().pushSuccess(
+            "Velorona", f"USA data pack found: {index.link_count:,} links, source file dated {index.attribution.source_file_updated}.")
+        return True
+
+    def _usa_pack_provider(self):
+        source = str(QgsSettings().value(USA_PACK_SETTING, "") or "").strip()
+        if not source:
+            if not self.set_usa_pack_source():
+                return None
+            return self._usa_provider
+        if self._usa_provider is None or self._usa_provider.source != source:
+            self._usa_provider = usa_pack.UsaPackProvider(source)     # PackError (e.g. folder gone) is handled by the caller
+        return self._usa_provider
+
+    def load_usa_view(self):
+        """Loads the US links and sites that touch the current map view. Never the whole country: the extent is converted to 1-degree
+        tiles, the index's own counts are checked against the budget BEFORE any tile is downloaded, and a pack problem is reported as a
+        pack problem (never as a link's NO DATA)."""
+        dark = self.map_is_dark()
+        try:
+            provider = self._usa_pack_provider()      # may ask for the pack source (a modal dialog: not under the wait cursor)
+        except PackError as exc:
+            self._error(str(exc))
+            return
+        if provider is None:
+            return
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        QApplication.processEvents()
+        try:
+            loaded = provider.load_bbox(self._current_extent_bbox_wgs84())
+        except PackError as exc:
+            self._error(str(exc))
+            return
+        finally:
+            QApplication.restoreOverrideCursor()
+
+        if not loaded.links:
+            self._warn("No US links in this view in the data pack. Pan or zoom to the United States and try again.")
+            return
+        self._ensure_basemap()
+        infra_group = self._ensure_velorona_groups()[1]["Infrastructure"]
+        abstract = f"{loaded.attribution.one_line()} {PUBLIC_RECORDS_DISCLOSURE.capitalize()}."
+        sites_layer = self._ensure_public_layer(
+            layer_helpers.SOURCE_US_SITES, infra_group, visible=True, kind="site",
+            build=lambda: layer_helpers.build_point_layer(
+                f"USA Fixed Service sites (FCC ULS) -- {PUBLIC_RECORDS_DISCLOSURE}", loaded.sites, US_SITE_FIELDS,
+                layer_color("fixed-sites", dark), abstract=abstract),
+            refresh=lambda lyr: (layer_helpers.replace_point_features(lyr, loaded.sites, US_SITE_FIELDS),
+                                 layer_helpers.set_abstract(lyr, abstract)))
+        links_layer = self._ensure_public_layer(
+            layer_helpers.SOURCE_US_LINKS, infra_group, visible=True, kind="link",
+            build=lambda: layer_helpers.build_link_layer(
+                f"USA Fixed Service links (FCC ULS) -- {PUBLIC_RECORDS_DISCLOSURE}", loaded.links, US_LINK_FIELDS,
+                layer_color("fixed-links", dark), abstract=abstract),
+            refresh=lambda lyr: (layer_helpers.replace_link_features(lyr, loaded.links, US_LINK_FIELDS),
+                                 layer_helpers.set_abstract(lyr, abstract)))
+        for layer in (sites_layer, links_layer):
+            self._endpoint_index.pop(layer.id(), None)    # the shared-endpoint index is per layer content; the content just changed
+        self._apply_selection_symbols(dark)
+        self._restyle_links(dark)
+        self._restyle_clusters(dark)
+        self._populate_records()
+        self.iface.messageBar().pushInfo(
+            "Velorona",
+            f"Loaded {len(loaded.links):,} US links and {len(loaded.sites):,} sites from {loaded.tiles_requested} tile(s) "
+            f"({loaded.duplicate_links_dropped:,} tile-edge duplicates removed). {loaded.attribution.attribution_text} "
+            f"Source file dated {loaded.attribution.source_file_updated}.")
 
     def run_microwave(self):
         entries = self._selected_by_kind("site")
@@ -1350,6 +1489,7 @@ class VeloronaPlugin:
         dock.records.set_layers({
             key: layer_helpers.find_owned_layer(project, key)
             for key in (layer_helpers.SOURCE_FIXED_LINKS, layer_helpers.SOURCE_FIXED_SITES,
+                        layer_helpers.SOURCE_US_LINKS, layer_helpers.SOURCE_US_SITES,
                         layer_helpers.SOURCE_TOWERS, layer_helpers.SOURCE_CELLULAR,
                         layer_helpers.SOURCE_SATELLITES, layer_helpers.SOURCE_GROUND_STATIONS)
         })
