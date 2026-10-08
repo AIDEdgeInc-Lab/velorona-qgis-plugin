@@ -1,6 +1,6 @@
 # Velorona for QGIS
 
-**Velorona QGIS Plugin 1.1.4** — Telecom link evidence, inside QGIS.
+**Velorona QGIS Plugin 1.1.5** — Telecom link evidence, inside QGIS.
 
 ## Explore → Select → Analyze → Evidence → Export
 
@@ -8,7 +8,7 @@
 2. **Select** — Choose a site, link, or two endpoints.
 3. **Analyze** — Run path clearance, microwave weather exposure, or satellite geometry.
 4. **Evidence** — See what is observed, what is calculated, and what is inferred.
-5. **Export** — Take the evidence with you as a structured CSV/GeoJSON result.
+5. **Export** — Take the evidence with you as a structured CSV result or an Excel (.xlsx) workbook.
 
 ## What this is
 
@@ -30,18 +30,40 @@ satellites (global), SatNOGS ground/earth stations (global). Import your
 own point data via QGIS's native Add Layer — it appears on the same map,
 analyzed the same way as public data.
 
+**United States (FCC ULS microwave links).** Not bundled — the dataset is far larger than the plugin and the FCC refreshes it weekly. Point
+Velorona at a Velorona USA data pack (a folder on your computer or an https address) with **Explore: Set USA Data Pack Source**, then zoom to the
+area you want and run **Explore: Load USA Links in View**. Only the map tiles that touch the view are read, never the whole country, and a view
+that would load more than 20,000 links is refused with a request to zoom in. Source: U.S. Federal Communications Commission, Universal Licensing
+System (ULS) public access database (`l_micro`); the source-file date, pack date and attribution are shown on the layer and written into every
+export. It is licensee-reported record data, not a field measurement. See [docs/USA.md](docs/USA.md).
+
 ## Analysis engines (Analyze)
 
 Three, all reused unmodified:
 
 - **Terrestrial Path Clearance** (`aei_link_clearance`) — Fresnel-zone /
-  earth-curvature terrain clearance between two selected sites.
-- **Microwave Weather Exposure** (`aei_mw_exposure`) — ITU-R P.530/P.838-3
-  rain-attenuation exposure between two selected sites, with live
-  Open-Meteo/ECCC weather evidence.
+  earth-curvature terrain clearance between two selected sites, or for ONE
+  selected Fixed Service link (its endpoints and highest published frequency
+  are used; the frequency is typed Observed only while you leave it unchanged).
+- **Microwave Weather Exposure** (`aei_mw_exposure`) — ITU-R P.530
+  rain-attenuation exposure between two selected sites, or for a selected
+  link, with live Open-Meteo/ECCC weather evidence. The rain-coefficient table
+  has not been verified against ITU-R P.838-3 (an independent check found
+  differing rows; see docs/RAIN_COEFFICIENTS_CAVEAT.md), so weather results
+  carry that caveat.
 - **Satellite / Earth-Space** (`skyfield`/SGP4) — look-angle geometry
   (elevation, azimuth, slant range, visibility) between a selected ground
   station and satellite.
+
+## Status, NO DATA and where a value came from
+
+Every result has a status: **CLEAR, WATCH, AT RISK, CRITICAL or NO DATA**. NO DATA means a required input was missing or invalid (invalid
+coordinates, identical endpoints, no elevation, an unusable weather interval, a frequency outside the rain model's 1–100 GHz range, an antenna
+height outside 0.1–1000 m): the reason is shown and no status is guessed. A data-pack problem (missing, corrupt, wrong version, unreachable) is
+reported as a pack problem, never as a link's NO DATA. Each input is typed **Observed** (a named source reports it), **Model-derived**,
+**Calculated**, **Inferred** or **Assumed** (a default, or anything you typed or changed — never Observed). The 30 m antenna height is an
+assumption unless the record carries a height. WATCH for terrain is a clearance ratio below 1.3, a provisional threshold that is neither
+physics-validated nor operator-validated.
 
 ## Records (the Velorona dock)
 
@@ -77,7 +99,8 @@ Python). On macOS that interpreter is:
 refuses to run against an older release rather than show overstated clearance.
 
 The ISED Fixed Service and SatNOGS snapshots the Explore step needs are
-bundled in `data/` — no extra download or configuration.
+bundled in `data/` — no extra download or configuration. The USA data pack is
+not bundled (see Data sources).
 
 ## Dark workspace
 
