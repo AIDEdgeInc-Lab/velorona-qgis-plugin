@@ -23,4 +23,4 @@ U.S. Federal Communications Commission, Universal Licensing System (ULS) public 
 * Only licences with status A are in the pack; flags on a record are review hints, not policy; some records are plainly wrong (e.g. a 7,577 km path) and are shown.
 * The standard pack carries no antenna heights, gains, azimuths or power.
 * The coordinate datum is not stated by the FCC definitions document (NAD83 is the FCC filing convention): treated as WGS84 degrees, an effect far below the 90 m terrain model's resolution (INFERRED, not measured).
-* Operator (licensee) filtering and the "shared endpoint" context apply to what is currently loaded.
+* The Operator (licensee) filter covers the Canadian layers only; US layers can be searched in the Records table. The "shared endpoint" context lists only links in the currently loaded view.
