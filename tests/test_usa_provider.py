@@ -325,3 +325,72 @@ def test_real_pack_dedup_matches_the_index():
     assert len(r.links) == len({lk["id"] for lk in r.links})
     assert len(r.links) + r.duplicate_links_dropped == sum(idx.tiles[k][1] for k in p.tile_keys(bbox))
     assert all(lk["site_a"]["id"] != lk["site_b"]["id"] for lk in r.links)
+
+
+# --- regional extract (velorona.usa-extract/1): carries FCC antenna heights ---------------------------------------------------------------------
+from usa_pack_builder import extract, write_extract  # noqa: E402
+
+
+def test_extract_loads_records_with_heights_and_the_height_source(tmp_path):
+    p = usa.make_provider(write_extract(str(tmp_path)))
+    assert isinstance(p, usa.UsaExtractProvider)
+    r = p.load_bbox((-79.0, 42.0, -76.0, 44.0))
+    one = next(x for x in r.links if x["id"] == "fcc-link-1-1")
+    assert one["authorization_number"] == "WAAA001-1" and one["frequencies_mhz"] == "11245, 6078.625"
+    assert one["site_a_height_m"] == 32.5 and one["site_b_height_m"] == 45.0
+    assert "Height to Center RAAT" in one["height_source"] and "not a field measurement" in one["height_source"]
+    assert "lowest path number" in one["height_source"]                                  # the extract's own selection rule travels with the value
+    assert one["attribution"] == ATTRIBUTION and one["country"] == "US"
+    two = next(x for x in r.links if x["id"] == "fcc-link-2-1")
+    assert two["site_a_height_m"] is None                                                # a height the record does not carry stays absent, never 0 or 30
+
+
+def test_extract_view_filter_and_budget(tmp_path):
+    path = write_extract(str(tmp_path))
+    assert [x["id"] for x in usa.make_provider(path).load_bbox((-78.1, 42.9, -77.95, 43.05)).links] == ["fcc-link-1-1"]
+    assert usa.make_provider(path).load_bbox((100.0, 0.0, 101.0, 1.0)).links == []
+    with pytest.raises(ViewTooLargeError):
+        usa.UsaExtractProvider(path, max_links=1).load_bbox((-79.0, 42.0, -76.0, 44.0))
+
+
+def test_extract_nature_and_dates_come_from_the_extract(tmp_path):
+    a = usa.make_provider(write_extract(str(tmp_path))).attribution()
+    assert a.nature == "Licensee-reported record data from a public record; not a field measurement."
+    assert a.source_file_updated == "2026-09-27" and a.pack_generated == "2026-10-03"
+
+
+def test_pack_nature_comes_from_the_pack_licence_block(tmp_path):
+    idx = index(tiles())
+    idx["licence"] = {"nature": "Licensee-reported record data from a public record; not a field measurement."}
+    assert usa.UsaPackProvider(write_pack(str(tmp_path), idx=idx)).attribution().nature.startswith("Licensee-reported record data from a public record")
+
+
+def test_extract_errors_are_pack_errors(tmp_path):
+    with pytest.raises(PackMissingError):
+        usa.make_provider(str(tmp_path / "nope.json"))
+    with pytest.raises(PackVersionError):
+        usa.make_provider(write_extract(str(tmp_path), {**extract(), "schema": "velorona.usa-extract/2"})).load_bbox((0, 0, 1, 1))
+    bad = extract()
+    bad["links"][0]["site_b"] = "fcc-site-missing"
+    with pytest.raises(PackCorruptError):
+        usa.make_provider(write_extract(str(tmp_path), bad, "b.json")).load_bbox((0, 0, 1, 1))
+    dup = extract()
+    dup["links"][1]["id"] = dup["links"][0]["id"]
+    with pytest.raises(PackCorruptError):
+        usa.make_provider(write_extract(str(tmp_path), dup, "d.json")).load_bbox((0, 0, 1, 1))
+    nometa = extract()
+    del nometa["meta"]["attribution"]
+    with pytest.raises(PackCorruptError):
+        usa.make_provider(write_extract(str(tmp_path), nometa, "m.json")).load_bbox((0, 0, 1, 1))
+    with open(tmp_path / "junk.json", "w") as fh:
+        fh.write("{nope")
+    with pytest.raises(PackCorruptError):
+        usa.make_provider(str(tmp_path / "junk.json")).load_bbox((0, 0, 1, 1))
+
+
+@pytest.mark.skipif(not os.environ.get("VELORONA_US_EXTRACT"), reason="set VELORONA_US_EXTRACT to the Map's parity/contract/usa/usa_extract_wny.json")
+def test_real_extract_loads_whole_with_contract_counts():
+    p = usa.make_provider(os.environ["VELORONA_US_EXTRACT"])
+    r = p.load_bbox((-80.0, 42.0, -77.0, 44.0))
+    assert len(r.links) == 1403 and len(r.sites) == 892                                    # contract section 4
+    assert sum(1 for x in r.links if x["site_a_height_m"] is not None and x["site_b_height_m"] is not None) == 1395

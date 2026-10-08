@@ -174,3 +174,51 @@ def test_single_record_exports_carry_the_attribution():
 
 def test_product_version_comes_from_metadata():
     assert evidence_record.product_version() == "1.1.5"
+
+
+# --- antenna heights: the same rule (spec F.2: Observed only if the record carries it; F.1: overridden -> Assumed) ---------------------------------
+US_H = {**US, "site_a_height_m": 32.5, "site_b_height_m": 45.0,
+        "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, "
+                         "interpreted as above ground; not a field measurement"}
+
+
+def run_h(link, ha, hb, f=11.245):
+    return TR.analyze_link_record(link, A, B, {"site_a_height_m": ha, "site_b_height_m": hb, "frequency_ghz": f})
+
+
+def test_record_heights_are_the_dialog_defaults():
+    defaults, ghz, _ = TR.build_link_params(US_H)
+    assert defaults["site_a_height_m"] == 32.5 and defaults["site_b_height_m"] == 45.0 and ghz == pytest.approx(11.245)
+    plain, _, _ = TR.build_link_params(US)
+    assert plain["site_a_height_m"] == 30.0                      # no record height -> the engine default
+
+
+def test_record_height_unchanged_is_observed_with_the_records_source_text():
+    rows = table(export.result_to_csv(run_h(US_H, 32.5, 45.0)))
+    assert rows["Site A antenna height"][1] == "Observed" and "Height to Center RAAT" in rows["Site A antenna height"][2]
+    assert rows["Site B antenna height"][1] == "Observed" and rows["Site A antenna height"][3] == "32.5 m"
+
+
+def test_one_height_overridden_only_that_one_becomes_assumed():
+    rows = table(export.result_to_csv(run_h(US_H, 40.0, 45.0)))
+    assert rows["Site A antenna height"][1] == "Assumed" and "32.5" in rows["Site A antenna height"][2]
+    assert rows["Site B antenna height"][1] == "Observed"
+
+
+def test_a_record_without_heights_keeps_them_assumed():
+    rows = table(export.result_to_csv(run_h(US, 30.0, 30.0)))
+    assert rows["Site A antenna height"][1] == "Assumed" and rows["Site B antenna height"][1] == "Assumed"
+
+
+@pytest.mark.parametrize("bad", [0.0, -3.0, 1000.5, 2694.7])
+def test_record_height_outside_0_1_to_1000_m_is_no_data_never_clamped(bad):
+    from core.validation import NoDataError
+    with pytest.raises(NoDataError) as exc:
+        run_h({**US_H, "site_a_height_m": bad}, bad, 45.0)
+    assert any("height" in r.lower() for r in exc.value.reasons)
+
+
+def test_non_numeric_record_height_is_treated_as_absent():
+    assert TR.record_heights({**US_H, "site_a_height_m": "tall"})[0] is None
+    assert TR.record_heights({**US_H, "site_a_height_m": float("nan")})[0] is None
+    assert TR.record_heights({**US_H, "site_a_height_m": True})[0] is None

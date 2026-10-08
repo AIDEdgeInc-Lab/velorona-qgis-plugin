@@ -52,6 +52,24 @@ def rows_from_csv(text):
     return out
 
 
+def link_record(fx):
+    """The selected link RECORD as the plugin's layers carry it, built from the fixture's REAL fields only: id, the published frequencies and
+    (US) a record antenna height when the fixture says the height IS the record's own (height_origin Observed). Source text follows the pack, as
+    the plugin's providers set it. Nothing about the expected outcome is read."""
+    pack = fx["selection"].get("pack", "ca-ised-fixed")
+    us = pack == "us-fcc-uls-micro"
+    rec = {"id": fx["id"], "authorization_number": fx["id"],
+           "source": ("FCC ULS public access database: Microwave (l_micro), U.S. Federal Communications Commission" if us else "ISED Fixed Service record"),
+           "frequencies_mhz": ", ".join(str(v) for v in fx["selection"].get("published_frequencies_mhz", []))}
+    if us:
+        rec["country"] = "US"
+        for key, site in (("site_a_height_m", fx["link"]["site_a"]), ("site_b_height_m", fx["link"]["site_b"])):
+            if site.get("height_origin") == "Observed":
+                rec[key] = site["height_m"]
+                rec["height_source"] = site.get("height_source", "")
+    return rec
+
+
 def terrain_stage(fx):
     t, L = fx["terrain"], fx["link"]
     a, b = L["site_a"], L["site_b"]
@@ -72,8 +90,7 @@ def terrain_stage(fx):
             # The Fixed Service link flow: terrain started from the selected LINK RECORD (plugin.py run_terrestrial), which is what the Map's
             # terrestrialAnalyze does for one selected link. The record's published frequencies reach the engine, so the frequency's origin
             # (record vs user override) is decided by the engine, not asserted here.
-            link_attrs = {"id": fx["id"], "authorization_number": fx["id"], "source": "ISED Fixed Service record",
-                          "frequencies_mhz": ", ".join(str(v) for v in fx["selection"].get("published_frequencies_mhz", []))}
+            link_attrs = link_record(fx)
             res = tr.analyze_link_record(link_attrs, (a["lat"], a["lon"]), (b["lat"], b["lon"]), params)
             r = res.result
         except NoDataError as exc:
@@ -113,7 +130,7 @@ def weather_stage(fx):
         site = "A" if abs(params["latitude"] - a["lat"]) < 1e-9 else "B"
         return Resp(w["sites"][site]["open_meteo_current"])
 
-    src = "ISED Fixed Service record"
+    src = link_record(fx)["source"]
     params = {"frequency_ghz": L["frequency_ghz"], "polarization": L["polarization"], "fade_margin_db": L["fade_margin_db"]}
     origins = {"frequency_ghz": (L["frequency_origin"], "fixture"), "polarization": ("Assumed", "fixture"), "fade_margin_db": ("Assumed", "fixture")}
 

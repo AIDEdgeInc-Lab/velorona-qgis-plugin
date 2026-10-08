@@ -19,4 +19,5 @@ US_LINK_FIELDS = FIXED_LINK_FIELDS + [
     ("grant_date", QVariant.String), ("expiration_date", QVariant.String), ("flags", QVariant.String),
     ("attribution", QVariant.String), ("pack_generated", QVariant.String), ("source_file_updated", QVariant.String),
     ("pack_input_sha256", QVariant.String),
+    ("site_a_height_m", QVariant.Double), ("site_b_height_m", QVariant.Double), ("height_source", QVariant.String),
 ]

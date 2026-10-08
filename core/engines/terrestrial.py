@@ -10,7 +10,7 @@ from typing import Optional, Tuple
 from aei_link_clearance import LinkClearanceResult, analyze_link, explain
 from aei_link_clearance import terrain as _library_terrain
 
-from ..record_source import frequency_ghz_from_record, frequency_origin, record_labels
+from ..record_source import (FCC_HEIGHT_LABEL, frequency_ghz_from_record, frequency_origin, height_origin, is_fcc, record_labels)
 from ..validation import NoDataError, require_corrected_clearance, terrain_input_reasons
 
 from ..features import feature_attr, feature_id_name, feature_to_latlon
@@ -58,6 +58,8 @@ class TerrestrialAnalysisResult:
     # Where the frequency came from, as (type, source note) with type in the evidence vocabulary. None = the two-site flow, where the value
     # is entered by the user and is Assumed. Set by the link-record flow (frequency-origin channel, see core/record_source.py).
     frequency_origin: Optional[Tuple[str, str]] = None
+    # Same for the two antenna heights, as {"a": (type, source), "b": (type, source)}; None = decided by the *_from_feature flags (two-site flow).
+    height_origins: Optional[dict] = None
     # The selected link record (id, source, attribution) when the analysis was started from one; None for two free sites.
     record: Optional[dict] = None
 
@@ -118,15 +120,33 @@ def analyze(entries, params: dict) -> TerrestrialAnalysisResult:
     )
 
 
+def record_heights(link_attrs: dict) -> Tuple[Optional[float], Optional[float], str]:
+    """(height_a_m, height_b_m, source text) a link record itself carries, or None for a height it does not carry.
+
+    Neither the Canadian snapshot nor the USA pack (schema /1) carries heights; the regional extract (velorona.usa-extract/1) does. A value that
+    is not a finite number is treated as absent here -- explicit range validation (0.1-1000 m, NO DATA outside) happens at the analysis boundary."""
+    def one(key):
+        v = link_attrs.get(key)
+        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v == v and abs(v) != float("inf") else None
+    a, b = one("site_a_height_m"), one("site_b_height_m")
+    source = str(link_attrs.get("height_source") or (FCC_HEIGHT_LABEL if is_fcc(link_attrs) else "Record"))
+    return a, b, source
+
+
 def build_link_params(link_attrs: dict) -> Tuple[dict, Optional[float], str]:
     """Dialog defaults for a terrain analysis started from ONE selected link record: (defaults, record_ghz, record_note).
 
-    The frequency is the highest published on the record (the same rule as the Velorona Map). Antenna heights are not published by either
-    register's pack, so they keep the 30 m default and are typed Assumed."""
+    The frequency is the highest published on the record (the same rule as the Velorona Map). Antenna heights come from the record when it
+    carries them (extract), otherwise keep the 30 m default and are typed Assumed."""
     defaults = {p["key"]: p["default"] for p in PARAM_SPEC}
     record_ghz, note = frequency_ghz_from_record(link_attrs.get("frequencies_mhz"))
     if record_ghz is not None:
         defaults["frequency_ghz"] = record_ghz
+    height_a, height_b, _ = record_heights(link_attrs)
+    if height_a is not None:
+        defaults["site_a_height_m"] = height_a
+    if height_b is not None:
+        defaults["site_b_height_m"] = height_b
     return defaults, record_ghz, note
 
 
@@ -140,6 +160,9 @@ def analyze_link_record(link_attrs: dict, site_a_point, site_b_point, params: di
     source = str(link_attrs.get("source") or labels.extract)
     record_ghz, note = frequency_ghz_from_record(link_attrs.get("frequencies_mhz"))
     origin = frequency_origin(record_ghz, note, params["frequency_ghz"], labels)
+    height_a, height_b, height_source = record_heights(link_attrs)
+    height_origins = {"a": height_origin(height_a, params["site_a_height_m"], height_source),
+                      "b": height_origin(height_b, params["site_b_height_m"], height_source)}
 
     result = analyze_endpoints(site_a_point[0], site_a_point[1], site_b_point[0], site_b_point[1], params, authorization)
     return TerrestrialAnalysisResult(
@@ -147,7 +170,7 @@ def analyze_link_record(link_attrs: dict, site_a_point, site_b_point, params: di
         site_a_source=source, site_b_source=source,
         site_a_height_m=params["site_a_height_m"], site_b_height_m=params["site_b_height_m"],
         site_a_height_from_feature=False, site_b_height_from_feature=False,
-        result=result, explanation=explain(result), frequency_origin=origin,
+        result=result, explanation=explain(result), frequency_origin=origin, height_origins=height_origins,
         record={"id": link_attrs.get("id"), "authorization_number": authorization, "source": source,
                 "coverage": link_attrs.get("coverage"), "country": link_attrs.get("country"),
                 "attribution": link_attrs.get("attribution"), "pack_generated": link_attrs.get("pack_generated"),

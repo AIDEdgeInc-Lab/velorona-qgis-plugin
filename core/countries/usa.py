@@ -30,6 +30,7 @@ from collections import OrderedDict
 from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import quote, urlparse
 
+from ..record_source import FCC_HEIGHT_LABEL
 from .base import (Attribution, LoadResult, PackCorruptError, PackError, PackMissingError, PackNotConfiguredError,
                    PackUnavailableError, PackVersionError, ViewTooLargeError)
 
@@ -161,12 +162,14 @@ class PackIndex:
     def __init__(self, data: dict):
         self.data = data
         self.tiles: Dict[str, Tuple[int, int]] = {k: (v[0], v[1]) for k, v in data["tiles"].items()}
+        nature = (data.get("licence") or {}).get("nature")      # the pack states what kind of data it is (Map contract section 1); else the default
         self.attribution = Attribution(
             country="US",
             source_name=f"{data['source'].get('agency', 'FCC')}, {data['source'].get('system', 'ULS')}",
             attribution_text=data["attribution"],
             source_file_updated=data["source_file_updated"],
             pack_generated=data["generated_date"],
+            **({"nature": nature} if isinstance(nature, str) and nature else {}),
         )
 
     @property
@@ -246,6 +249,10 @@ class UsaPackProvider:
         if self._index is None:
             self._index = parse_index(self._fetcher.fetch("index.json", MAX_INDEX_BYTES))
         return self._index
+
+    @property
+    def link_count(self) -> int:
+        return self.index().link_count
 
     def attribution(self) -> Attribution:
         return self.index().attribution
@@ -350,3 +357,159 @@ class UsaPackProvider:
     def clear_cache(self) -> None:
         self._cache.clear()
         self._index = None
+
+
+# ---------------------------------------------------------------------------------------------------------------------------------
+# Regional extract (schema velorona.usa-extract/1), published by the Map workstream in parity/contract/usa/. One JSON file; unlike pack /1 it
+# carries the licensee-reported FCC antenna heights (Height to Center RAAT). Same provider interface as the tile pack.
+# ---------------------------------------------------------------------------------------------------------------------------------
+EXTRACT_SCHEMA_RE = re.compile(r"^velorona\.usa-extract/(\d+)$")
+SUPPORTED_EXTRACT_MAJORS = (1,)
+MAX_EXTRACT_BYTES = 64 * 1024 * 1024      # PROPOSED. The regional extract is 1,403 links; a whole-country extract would not fit this guard on purpose.
+
+
+class UsaExtractProvider:
+    country = "US"
+
+    def __init__(self, source: str, fetcher=None, get: Optional[Callable] = None, max_links: int = MAX_LINKS_PER_LOAD):
+        self.source = source
+        self.max_links = max_links
+        text = (source or "").strip()
+        if not text:
+            raise PackNotConfiguredError("No USA data pack is configured.")
+        parsed = urlparse(text)
+        if fetcher is not None:
+            self._fetcher, self._name = fetcher, "extract.json"
+        elif parsed.scheme in ("http", "https"):
+            base, _, name = text.rpartition("/")
+            self._fetcher, self._name = make_fetcher(base + "/", get=get), name
+        else:
+            path = os.path.expanduser(parsed.path if parsed.scheme == "file" else text)
+            if not os.path.isfile(path):
+                raise PackMissingError(f"The USA extract file '{path}' does not exist. Check the pack source setting.")
+            self._fetcher, self._name = LocalFetcher(os.path.dirname(os.path.abspath(path))), os.path.basename(path)
+        self._data: Optional[dict] = None
+        self._attribution: Optional[Attribution] = None
+
+    def _load(self) -> dict:
+        if self._data is None:
+            data = _json(self._fetcher.fetch(self._name, MAX_EXTRACT_BYTES), f"The USA extract {self._name}")
+            if not isinstance(data, dict) or not isinstance(data.get("meta"), dict):
+                raise PackCorruptError(f"The USA extract {self._name} has no 'meta' block.")
+            match = EXTRACT_SCHEMA_RE.match(str(data.get("schema", "")))
+            if not match:
+                raise PackVersionError(f"The file declares schema {data.get('schema')!r}, not a Velorona USA extract (velorona.usa-extract/N).")
+            if int(match.group(1)) not in SUPPORTED_EXTRACT_MAJORS:
+                raise PackVersionError(f"The USA extract uses schema {data['schema']}; this plugin version reads major version(s) "
+                                       f"{', '.join(map(str, SUPPORTED_EXTRACT_MAJORS))} only. Update the plugin or use a compatible extract.")
+            meta = data["meta"]
+            for key in ("attribution", "source_file_updated", "pack_generated_date"):
+                if not isinstance(meta.get(key), str) or not meta[key]:
+                    raise PackCorruptError(f"The USA extract has no '{key}'; refusing data that cannot state where it came from.")
+            if not isinstance(data.get("sites"), list) or not isinstance(data.get("links"), list):
+                raise PackCorruptError("The USA extract has no 'sites'/'links' lists.")
+            site_ids = set()
+            for s_ in data["sites"]:
+                if (not isinstance(s_, dict) or not isinstance(s_.get("id"), str) or not _num(s_.get("lat")) or not _num(s_.get("lon"))
+                        or not -90 <= s_["lat"] <= 90 or not -180 <= s_["lon"] <= 180):
+                    raise PackCorruptError(f"The USA extract has an invalid site record ({str(s_)[:80]}).")
+                site_ids.add(s_["id"])
+            link_ids = set()
+            for lk in data["links"]:
+                if (not isinstance(lk, dict) or not isinstance(lk.get("id"), str) or lk["id"] in link_ids or lk.get("site_a") not in site_ids
+                        or lk.get("site_b") not in site_ids or not isinstance(lk.get("call_sign"), str)
+                        or not isinstance(lk.get("frequencies_mhz"), list) or not all(_num(f) and f > 0 for f in lk["frequencies_mhz"])):
+                    raise PackCorruptError(f"The USA extract has an invalid or duplicate link record ({str(lk)[:80]}).")
+                link_ids.add(lk["id"])
+            self._data = data
+            src = meta.get("source") or {}
+            kwargs = {"nature": meta["data_nature"]} if isinstance(meta.get("data_nature"), str) and meta["data_nature"] else {}
+            self._attribution = Attribution(
+                country="US", source_name=f"{src.get('agency', 'FCC')}, {src.get('system', 'ULS')}", attribution_text=meta["attribution"],
+                source_file_updated=meta["source_file_updated"], pack_generated=meta["pack_generated_date"], **kwargs)
+        return self._data
+
+    def index(self):
+        self._load()
+        return self
+
+    @property
+    def link_count(self) -> int:
+        return len(self._load()["links"])
+
+    def attribution(self) -> Attribution:
+        self._load()
+        return self._attribution
+
+    def _in_view(self, lk, bbox) -> bool:
+        west, south, east, north = bbox
+        lo_lat, hi_lat = sorted((lk["a_lat"], lk["b_lat"]))
+        lo_lon, hi_lon = sorted((lk["a_lon"], lk["b_lon"]))
+        return not (hi_lon < west or lo_lon > east or hi_lat < south or lo_lat > north)
+
+    def _links_in(self, bbox):
+        if not isinstance(bbox, (tuple, list)) or len(bbox) != 4 or not all(_num(v) for v in bbox) or bbox[0] > bbox[2] or bbox[1] > bbox[3]:
+            raise PackError(f"The requested extent {bbox!r} is not a valid west/south/east/north box.")
+        return [lk for lk in self._load()["links"] if self._in_view(lk, bbox)]
+
+    def estimate(self, bbox):
+        return 1, len(self._links_in(bbox))
+
+    def load_bbox(self, bbox) -> LoadResult:
+        data = self._load()
+        selected = self._links_in(bbox)
+        if len(selected) > self.max_links:
+            raise ViewTooLargeError(f"This view covers {len(selected):,} US links; Velorona loads at most {self.max_links:,} at a time. "
+                                    "Zoom in and load again.")
+        meta = data["meta"]
+        att = self._attribution
+        height_source = f"{FCC_HEIGHT_LABEL}; rule: {meta['analysis_height_rule']}" if meta.get("analysis_height_rule") else FCC_HEIGHT_LABEL
+        input_sha = (meta.get("source") or {}).get("input_zip_sha256")
+        site_src = {s_["id"]: s_ for s_ in data["sites"]}
+        sites, freqs = {}, {}
+
+        def site_record(sid):
+            if sid not in sites:
+                s_ = site_src[sid]
+                call = ", ".join(s_.get("call_signs") or [])
+                sites[sid] = {
+                    "id": sid, "latitude": s_["lat"], "longitude": s_["lon"], "source": SOURCE_FCC_ULS, "country": "US",
+                    "name": s_.get("name") or sid, "feature_type": "Fixed Service station (FCC ULS microwave)", "record_id": call or None,
+                    "call_signs": call or None, "authorizations": call or None, "frequencies_mhz": None,
+                    "licensee": " / ".join(s_.get("licensees") or []) or None, "province": s_.get("state"), "coverage": COVERAGE_US,
+                    "flags": None, "attribution": att.attribution_text, "pack_generated": att.pack_generated,
+                    "source_file_updated": att.source_file_updated, "pack_input_sha256": input_sha,
+                }
+                freqs[sid] = set()
+            return sites[sid]
+
+        links = []
+        for lk in selected:
+            a, b = site_record(lk["site_a"]), site_record(lk["site_b"])
+            pl = lk.get("pack_link") or {}
+            links.append({
+                "id": lk["id"], "source": SOURCE_FCC_ULS, "country": "US", "authorization_number": f"{lk['call_sign']}-{pl.get('k')}",
+                "call_sign": lk["call_sign"], "licensee": lk.get("licensee"), "in_service_date": None, "grant_date": lk.get("grant_date"),
+                "expiration_date": lk.get("expiration_date"), "path_type": ", ".join(lk.get("path_types") or []) or None,
+                "frequencies_mhz": ", ".join(_fmt_mhz(f) for f in lk["frequencies_mhz"]), "site_a": a, "site_b": b, "coverage": COVERAGE_US,
+                "flags": ", ".join(lk["flags"]) if lk.get("flags") else None, "attribution": att.attribution_text,
+                "pack_generated": att.pack_generated, "source_file_updated": att.source_file_updated, "pack_input_sha256": input_sha,
+                "site_a_height_m": lk.get("analysis_height_a_m"), "site_b_height_m": lk.get("analysis_height_b_m"), "height_source": height_source,
+            })
+            for site in (a, b):
+                freqs[site["id"]].update(lk["frequencies_mhz"])
+        for sid, fs in freqs.items():
+            if fs:
+                sites[sid]["frequencies_mhz"] = ", ".join(_fmt_mhz(f) for f in sorted(fs))
+        return LoadResult(sites=list(sites.values()), links=links, attribution=att, tiles_requested=1, tiles_fetched=1)
+
+    def clear_cache(self) -> None:
+        self._data = None
+
+
+def make_provider(source: str, get: Optional[Callable] = None):
+    """The provider for a configured pack source: a ``.json`` file (path or URL) is a regional extract, anything else a tile pack."""
+    text = (source or "").strip()
+    if text.lower().split("?", 1)[0].endswith(".json"):
+        return UsaExtractProvider(text, get=get)
+    return UsaPackProvider(text, get=get)

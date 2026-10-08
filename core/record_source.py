@@ -79,3 +79,21 @@ def frequency_origin(record_ghz: Optional[float], record_note: str, used_ghz: fl
     return ("Assumed",
             f"User override via analysis dialog: the {labels.record_prefix}'s own value is {record_ghz:g} GHz ({record_note}); "
             f"{used_ghz:g} GHz was entered instead.")
+
+
+# The label the Velorona Map contract (parity/contract/USA_PACK_SCHEMA.md section 3.3) prescribes for an FCC antenna height: the only
+# correct description of what the field is. Used when a US record carries a height and gives no source text of its own.
+FCC_HEIGHT_LABEL = ("antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted "
+                    "as above ground; not a field measurement")
+
+
+def height_origin(record_m: Optional[float], used_m: float, record_source: str = "") -> Tuple[str, str]:
+    """('Observed' | 'Assumed', source text) for an antenna height actually used in an analysis.
+
+    Same rule as the frequency (spec F.2: "antenna height Observed only if the record carries it, else Assumed"; F.1: overridden by the user it
+    becomes Assumed). A record that carries no height leaves the engine default, which is Assumed."""
+    if record_m is None:
+        return "Assumed", "User, via analysis dialog (default shown, user-confirmed)"
+    if abs(float(used_m) - float(record_m)) <= SAME_GHZ_TOLERANCE:      # the tolerance is far below a centimetre in either unit
+        return "Observed", record_source or "Record"
+    return "Assumed", f"User override via analysis dialog: the record's own value is {record_m:g} m ({record_source or 'record'}); {used_m:g} m was entered instead."

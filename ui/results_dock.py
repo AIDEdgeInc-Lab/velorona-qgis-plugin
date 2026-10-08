@@ -398,7 +398,7 @@ def _pairing_text(d) -> str:
     """How the two endpoints were paired, in the register's own terms (never inferred from proximity)."""
     if is_fcc(d):
         return ("Both endpoints are named as the transmit and receive locations of the same FCC ULS licence path record(s) -- "
-                "not inferred from proximity or frequency.")
+                "not inferred from proximity or frequency. Site A / Site B is the data pack's ordering, not a transmit / receive role.")
     return ("Both sites share this authorization number in ISED's Fixed Service extract and "
             "resolve to exactly two distinct coordinates -- not inferred from proximity or frequency.")
 

@@ -55,3 +55,35 @@ def write_pack(root, tile_map=None, idx=None):
         with open(os.path.join(root, "tiles", f"{key}.json.gz"), "wb") as fh:
             fh.write(gzip.compress(json.dumps(tile).encode(), mtime=0))
     return str(root)
+
+
+# --- regional extract (velorona.usa-extract/1), SYNTHETIC ---------------------------------------------------------------------------------
+def extract(**meta_over):
+    meta = {"attribution": ATTRIBUTION, "data_nature": "Licensee-reported record data from a public record; not a field measurement.",
+            "source_file_updated": "2026-09-27", "pack_generated_date": "2026-10-03",
+            "source": {"agency": "Federal Communications Commission", "system": "Universal Licensing System (ULS) public access database",
+                       "input_zip_sha256": "177254c8"},
+            "analysis_height_rule": "path row with the lowest path number (ties: file order); value copied unchanged"}
+    meta.update(meta_over)
+
+    def st(lat, lon, call):
+        return {"id": f"fcc-site-{lat:.5f},{lon:.5f}", "lat": lat, "lon": lon, "name": "Testville, NY", "state": "NY",
+                "call_signs": [call], "licensees": ["Test Licensee"]}
+    sites = [st(43.0, -78.0, "WAAA001"), st(43.1, -77.9, "WAAA001"), st(43.5, -77.0, "WBBB002")]
+    ids = [s["id"] for s in sites]
+
+    def lk(i, call, k, a, b, f, ha, hb):
+        return {"id": i, "pack_link": {"usi": i.split("-")[2], "k": k}, "call_sign": call, "licensee": "Test Licensee", "site_a": ids[a], "site_b": ids[b],
+                "a_lat": sites[a]["lat"], "a_lon": sites[a]["lon"], "b_lat": sites[b]["lat"], "b_lon": sites[b]["lon"], "frequencies_mhz": f,
+                "path_types": ["Fixed Point-to-Point"], "path_rows": 1, "grant_date": "2021-01-26", "expiration_date": "2031-02-01", "flags": [],
+                "analysis_height_a_m": ha, "analysis_height_b_m": hb}
+    return {"schema": "velorona.usa-extract/1", "pack": "us-fcc-uls-micro", "pack_schema": "velorona.us-fcc-uls-micro/1", "meta": meta, "sites": sites,
+            "links": [lk("fcc-link-1-1", "WAAA001", 1, 0, 1, [11245.0, 6078.625], 32.5, 45.0),
+                      lk("fcc-link-2-1", "WBBB002", 1, 1, 2, [944.75], None, 3000.0)]}
+
+
+def write_extract(root, data=None, name="usa_extract_test.json"):
+    path = os.path.join(root, name)
+    with open(path, "w") as fh:
+        json.dump(data if data is not None else extract(), fh)
+    return path

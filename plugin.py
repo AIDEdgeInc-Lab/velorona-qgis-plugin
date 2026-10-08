@@ -1259,8 +1259,9 @@ class VeloronaPlugin:
             return False
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
-            provider = usa_pack.UsaPackProvider(text.strip())
-            index = provider.index()
+            provider = usa_pack.make_provider(text.strip())
+            provider.index()
+            attribution = provider.attribution()
         except PackError as exc:
             self._error(str(exc))
             return False
@@ -1269,7 +1270,7 @@ class VeloronaPlugin:
         settings.setValue(USA_PACK_SETTING, text.strip())
         self._usa_provider = provider
         self.iface.messageBar().pushSuccess(
-            "Velorona", f"USA data pack found: {index.link_count:,} links, source file dated {index.attribution.source_file_updated}.")
+            "Velorona", f"USA data pack found: {provider.link_count:,} links, source file dated {attribution.source_file_updated}.")
         return True
 
     def _usa_pack_provider(self):
@@ -1279,7 +1280,7 @@ class VeloronaPlugin:
                 return None
             return self._usa_provider
         if self._usa_provider is None or self._usa_provider.source != source:
-            self._usa_provider = usa_pack.UsaPackProvider(source)     # PackError (e.g. folder gone) is handled by the caller
+            self._usa_provider = usa_pack.make_provider(source)     # PackError (e.g. folder gone) is handled by the caller
         return self._usa_provider
 
     def load_usa_view(self):

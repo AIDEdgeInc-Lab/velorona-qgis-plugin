@@ -278,6 +278,18 @@ def result_to_xlsx(result) -> bytes:
     return build_workbook(result, result_to_csv(result))
 
 
+def _terrain_height_row(result, which, label, height_m, from_feature) -> list:
+    """Antenna height typed by its origin: the record's own value (Observed, with the record's source text), a feature attribute (Observed), or
+    the dialog default/user value (Assumed)."""
+    origins = getattr(result, "height_origins", None)
+    if origins:
+        kind, source = origins[which]
+        return _evidence_row(label, kind, source, observation_input=f"{_exact(height_m)} m")
+    return _evidence_row(label, "Observed" if from_feature else "Assumed",
+                         "Feature attribute" if from_feature else "User, via analysis dialog (default shown, user-confirmed)",
+                         observation_input=f"{_exact(height_m)} m")
+
+
 def _terrain_frequency_row(result, r) -> list:
     """Frequency typed by its ORIGIN. A terrain analysis started from a link record carries the origin (core/record_source.py); the two-site
     flow does not, and its frequency is the user's (Assumed) -- never Observed."""
@@ -315,12 +327,8 @@ def _terrestrial_to_csv(result) -> str:
                       observation_input=(f"{site_a_pt.latitude:.5f}, {site_a_pt.longitude:.5f}" if site_a_pt else NOT_DETERMINED)),
         _evidence_row(f"Site B location ({result.site_b_name})", "Observed", result.site_b_source,
                       observation_input=(f"{site_b_pt.latitude:.5f}, {site_b_pt.longitude:.5f}" if site_b_pt else NOT_DETERMINED)),
-        _evidence_row("Site A antenna height", "Observed" if result.site_a_height_from_feature else "Assumed",
-                      "Feature attribute" if result.site_a_height_from_feature else "User, via analysis dialog (default shown, user-confirmed)",
-                      observation_input=f"{_exact(result.site_a_height_m)} m"),
-        _evidence_row("Site B antenna height", "Observed" if result.site_b_height_from_feature else "Assumed",
-                      "Feature attribute" if result.site_b_height_from_feature else "User, via analysis dialog (default shown, user-confirmed)",
-                      observation_input=f"{_exact(result.site_b_height_m)} m"),
+        _terrain_height_row(result, "a", "Site A antenna height", result.site_a_height_m, result.site_a_height_from_feature),
+        _terrain_height_row(result, "b", "Site B antenna height", result.site_b_height_m, result.site_b_height_from_feature),
         _terrain_frequency_row(result, r),
         _evidence_row("Ground elevation profile", "Observed", "aei_link_clearance (Open-Meteo Elevation API, Copernicus DEM GLO-90, 90m surface model)",
                       observation_input=f"{len(r.profile)} samples along path"),
