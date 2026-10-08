@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Fails unless the parity report contains NOTHING except the accepted interface divergence AID-1 (see ACCEPTED_INTERFACE_DIVERGENCES.md).
+"""Fails unless EVERY stage of the parity report is MATCH (pairwise Map vs QGIS, and each product vs the spec oracle).
 
     python3 parity/check_accepted_divergences.py <PARITY_REPORT.json>
 
-Accepted: `provenance.pairwise` differing ONLY in the `frequency` row, Map ['Observed'] vs QGIS containing 'Assumed'.
-Everything else must be MATCH, and each product must match the spec oracle on every stage (no `*_vs_spec` DIVERGE).
+AID-1 (the terrain flow typing a record's frequency Assumed) was CLOSED in 1.1.5 by the link-record terrain flow and the frequency-origin channel
+(core/record_source.py), and the same channel types record antenna heights; the harness therefore accepts NO divergence any more. The AID-1
+pattern is still recognised below only so that a regression is reported by name ("AID-1 REGRESSION") instead of as a bare provenance mismatch.
+See ACCEPTED_INTERFACE_DIVERGENCES.md.
 """
 import json
 import re
@@ -21,16 +23,13 @@ for fid, v in fixtures.items():
             problems.append("%s: pairwise %s DIVERGE (Map %s | QGIS %s)" % (fid, s["stage"], s["a"], s["b"]))
             continue
         diffs = [d for d in str(s["b"]).split("; ") if d and d != "same types"]
-        bad = [d for d in diffs if not re.match(r"^frequency: Map \['Observed'\] vs QGIS \[.*'Assumed'.*\]$", d)]
-        if bad:
-            problems.append("%s: provenance differs beyond AID-1: %s" % (fid, bad))
-        else:
-            accepted += 1
+        aid1 = [d for d in diffs if re.match(r"^frequency: Map \['Observed'\] vs QGIS \[.*'Assumed'.*\]$", d)]
+        problems.append("%s: provenance differs%s: %s" % (fid, " (AID-1 REGRESSION: record frequency typed Assumed)" if aid1 else "", diffs))
     for who in ("map_vs_spec", "qgis_vs_spec"):
         for s in v[who]:
             if s["result"] == "DIVERGE":
                 problems.append("%s: %s %s DIVERGE (%s | %s)" % (fid, who, s["stage"], s["a"], s["b"]))
-print("fixtures: %d | AID-1 occurrences accepted: %d | problems: %d" % (len(fixtures), accepted, len(problems)))
+print("fixtures: %d | accepted divergences: %d | problems: %d" % (len(fixtures), accepted, len(problems)))
 for p in problems:
     print("  PROBLEM", p)
 sys.exit(1 if problems else 0)

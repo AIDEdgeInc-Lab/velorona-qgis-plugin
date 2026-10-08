@@ -1,5 +1,5 @@
 #!/bin/sh
-# Canada P0 parity: Velorona Map vs Velorona for QGIS on the shared frozen fixtures, against the spec oracle.
+# Canada + USA parity: Velorona Map vs Velorona for QGIS on the shared frozen fixtures, against the spec oracle.
 # The two products are run through their OWN entry points; nothing is copied between repos. The oracle (canonical.py) and comparator
 # (compare.py) live in the Map repo's parity/ folder and are used from there.
 #
@@ -12,7 +12,9 @@ PY="${PY:-python3}"
 MAP_REPO="${MAP_REPO:-$HOME/velorona-repos/aei-link-clearance}"
 OUT="${1:-$HERE/out}"; mkdir -p "$OUT"
 [ -f "$MAP_REPO/parity/compare.py" ] || { echo "MAP_REPO=$MAP_REPO has no parity/compare.py (needs the Map parity branch)" >&2; exit 2; }
-FIX="$HERE/fixtures/ca-*.json $HERE/fixtures/synthetic-boundary/sb-*.json"
+# The fixtures are the Map workstream's byte-identical files; MANIFEST.sha256 (its) must verify before anything is run.
+( cd "$HERE/fixtures" && shasum -a 256 -c MANIFEST.sha256 >/dev/null ) || { echo "fixtures do not match MANIFEST.sha256" >&2; exit 2; }
+FIX="$HERE/fixtures/ca-*.json $HERE/fixtures/us-*.json $HERE/fixtures/synthetic-boundary/sb-*.json"
 echo "library under test: $($PY -c 'import aei_link_clearance as a;print(a.__version__, a.__file__)')"
 node "$MAP_REPO/parity/runner_map.js" $FIX > "$OUT/map.json"
 $PY "$HERE/runner_qgis.py" $FIX > "$OUT/qgis.json" 2>/dev/null

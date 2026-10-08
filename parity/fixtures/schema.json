@@ -39,7 +39,10 @@
       "description": "REAL: where the link came from. link_id is an authorization_number in web/fixed_service_snapshot.json.",
       "properties": {
         "pack": {
-          "const": "ca-ised-fixed"
+          "enum": [
+            "ca-ised-fixed",
+            "us-fcc-uls-micro"
+          ]
         },
         "snapshot_sha256": {
           "type": "string"
@@ -58,6 +61,10 @@
           "items": {
             "type": "number"
           }
+        },
+        "extract": {
+          "type": "string",
+          "description": "US fixtures only: repo path of the shared regional extract the link was taken from (snapshot_sha256 is then the extract's sha256)."
         }
       }
     },
@@ -321,6 +328,10 @@
             "string",
             "null"
           ]
+        },
+        "height_source": {
+          "type": "string",
+          "description": "Optional. Required in practice when height_origin is Observed: names the record field and states what it is (e.g. FCC AN 'Height to Center RAAT', licensee-reported, metres, interpreted as above ground)."
         }
       }
     }

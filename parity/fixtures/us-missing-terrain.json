@@ -1,0 +1,119 @@
+{
+ "schema": "velorona.parity-fixture/1",
+ "id": "us-missing-terrain",
+ "tags": [
+  "missing-terrain"
+ ],
+ "note": "fcc-link-1012381-1 (WNEM943), 2.01 km, 10.765 GHz; role: first 1-5 km link >= 6 GHz; elevation provider fails (synthetic HTTP 503)",
+ "selection": {
+  "rule": "see parity/build_us_fixtures.py docstring (SELECTION RULE)",
+  "pack": "us-fcc-uls-micro",
+  "extract": "parity/contract/usa/usa_extract_wny.json",
+  "snapshot_sha256": "8d27633717a5906af55deebd10fb4a041a7fcc64a375205cf6aca961e668f16b",
+  "link_id": "fcc-link-1012381-1",
+  "licensee": "CATTARAUGUS, COUNTY OF",
+  "published_frequencies_mhz": [
+   10765.0
+  ]
+ },
+ "link": {
+  "site_a": {
+   "id": "fcc-site-42.23444,-78.79694",
+   "lat": 42.23444,
+   "lon": -78.79694,
+   "height_m": 32.9,
+   "height_origin": "Observed",
+   "description": "Salamanaca, NY, NY",
+   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+  },
+  "site_b": {
+   "id": "fcc-site-42.25228,-78.80114",
+   "lat": 42.25228,
+   "lon": -78.80114,
+   "height_m": 18.6,
+   "height_origin": "Observed",
+   "description": "LITTLE VALLEY, NY, NY",
+   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+  },
+  "frequency_ghz": 10.765,
+  "frequency_origin": "Observed",
+  "polarization": "V",
+  "polarization_origin": "Assumed",
+  "fade_margin_db": 32.0,
+  "fade_margin_origin": "Assumed"
+ },
+ "terrain": {
+  "mode": "error",
+  "error": "HTTP 503 (synthetic provider failure)"
+ },
+ "weather": {
+  "mode": "snapshot",
+  "source": "SYNTHETIC raw Open-Meteo `current` object (units: mm per `interval` s; snowfall cm)",
+  "sites": {
+   "A": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 0.0,
+     "rain": 0.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 1
+    }
+   },
+   "B": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 0.0,
+     "rain": 0.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 1
+    }
+   }
+  }
+ },
+ "synthetic": [
+  "fade_margin_db",
+  "polarization",
+  "weather"
+ ],
+ "expected": {
+  "schema": "velorona.parity-expected/1",
+  "spec": "0.3",
+  "curvature": "canonical (bulge subtracted from clearance, P11)",
+  "terrain": {
+   "status": "NO DATA",
+   "no_data": "elevation provider failed (T1)"
+  },
+  "weather": {
+   "status": "CLEAR",
+   "no_data": null,
+   "attenuation_db": 0.0,
+   "ratio": 0.0,
+   "fade_margin_db": 32.0,
+   "precip": {
+    "class": "NONE",
+    "flags": [],
+    "rate_mm_h": 0.0,
+    "liquid_mm": 0.0
+   },
+   "status_without_r1": "CLEAR"
+  },
+  "overall": "NO DATA"
+ },
+ "pre_correction": {
+  "curvature": "legacy (bulge added to clearance)",
+  "terrain": {
+   "status": "NO DATA",
+   "no_data": "elevation provider failed (T1)"
+  },
+  "intended_class_when_built": null
+ },
+ "inputs_sha256": "1869934420c7cc842e900c72841c9871d90243d2560580e4b38f54f0c8684aab"
+}

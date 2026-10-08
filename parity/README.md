@@ -1,6 +1,6 @@
 # parity/ (QGIS side) — see the Map repo parity/README.md for the full description; run_all.sh, compare.py, canonical.py live there
 
-Changes **no product behaviour**. Everything here is new; no existing source file is edited.
+Canada AND USA (54 fixtures). The US fixtures, `schema.json` and `MANIFEST.sha256` are byte-identical copies of the Map workstream's files (verified by `run_parity.sh` against that manifest). Changes **no product behaviour**. Everything here is new; no existing source file is edited.
 
     QGIS_REPO=~/velorona-repos/velorona OUT=/tmp/parity-out sh parity/run_all.sh     # no network, no writes outside OUT
 

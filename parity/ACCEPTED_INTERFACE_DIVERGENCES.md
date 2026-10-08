@@ -1,4 +1,11 @@
-# Accepted interface divergences (Map vs QGIS), Canada parity
+# Accepted interface divergences (Map vs QGIS)
+
+> **Status 2026-10-08: no divergence is accepted.** AID-1 below is CLOSED for the harness (Canada and USA): the QGIS terrain flow can now start from one selected
+> link record and types the record's frequency (and, for US records that carry them, antenna heights) Observed only while unchanged (`core/record_source.py`).
+> It remains true of the two-free-sites flow, where the user types the value and Assumed is correct in both products. `check_accepted_divergences.py` now fails
+> on ANY divergence and names an AID-1 pattern as a regression. The original text is kept for the record.
+
+## (historical) Canada parity
 
 Every other stage of the parity run must MATCH. This file lists the only differences that are accepted, why, and how the parity run keeps them
 from growing. `parity/check_accepted_divergences.py` fails the run if anything else differs.
