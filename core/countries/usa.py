@@ -92,7 +92,7 @@ class HttpFetcher:
             get = requests.get
         url = self.base + quote(rel, safe="/")
         try:
-            resp = get(url, timeout=self.timeout)
+            resp = get(url, timeout=self.timeout, stream=True)
         except Exception as exc:    # any transport failure: say so, name the URL; the caller maps it to a clear message
             raise PackUnavailableError(f"Could not reach the USA pack at {url}: {exc}") from exc
         status = getattr(resp, "status_code", None)
@@ -100,9 +100,21 @@ class HttpFetcher:
             raise PackMissingError(f"The USA pack at {self.base} has no '{rel}' (HTTP {status}). Check the pack source setting.")
         if status is None or status >= 400:
             raise PackUnavailableError(f"The USA pack server answered HTTP {status} for {url}. Try again later.")
-        body = resp.content
+        final = urlparse(str(getattr(resp, "url", url)))
+        if final.scheme != "https" and (final.hostname or "") not in _LOCAL_HOSTS:
+            raise PackUnavailableError(f"The USA pack server redirected {url} to a non-https address ({final.geturl()}); refusing it.")
+        if hasattr(resp, "iter_content"):                  # read at most limit + 1 bytes: a hostile or broken server cannot make us buffer more
+            chunks, total = [], 0
+            for chunk in resp.iter_content(chunk_size=1 << 16):
+                chunks.append(chunk)
+                total += len(chunk)
+                if total > limit:
+                    break
+            body = b"".join(chunks)
+        else:
+            body = resp.content
         if len(body) > limit:
-            raise PackCorruptError(f"'{rel}' from {self.base} is {len(body)} bytes, over the {limit}-byte guard.")
+            raise PackCorruptError(f"'{rel}' from {self.base} is over the {limit}-byte guard.")
         return body
 
 

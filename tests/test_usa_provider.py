@@ -260,7 +260,7 @@ class Resp:
 
 
 def getter_for(pack_root, log=None, status_override=None):
-    def get(url, timeout=None):
+    def get(url, timeout=None, **kw):
         if log is not None:
             log.append(url)
         if status_override:
@@ -291,7 +291,7 @@ def test_url_server_error_and_transport_error_are_unavailable(pack):
         usa.UsaPackProvider("https://example.invalid/pack", get=getter_for(pack, status_override=503)).index()
     assert "503" in str(exc.value)
 
-    def boom(url, timeout=None):
+    def boom(url, timeout=None, **kw):
         raise ConnectionError("timed out")
     with pytest.raises(PackUnavailableError) as exc:
         usa.UsaPackProvider("https://example.invalid/pack", get=boom).index()
@@ -394,3 +394,30 @@ def test_real_extract_loads_whole_with_contract_counts():
     r = p.load_bbox((-80.0, 42.0, -77.0, 44.0))
     assert len(r.links) == 1403 and len(r.sites) == 892                                    # contract section 4
     assert sum(1 for x in r.links if x["site_a_height_m"] is not None and x["site_b_height_m"] is not None) == 1395
+
+
+def test_https_pack_that_redirects_to_plain_http_is_refused(pack):
+    class R(Resp):
+        url = "http://evil.example/pack/index.json"
+
+    with pytest.raises(PackUnavailableError) as exc:
+        usa.UsaPackProvider("https://example.invalid/pack", get=lambda url, timeout=None, **kw: R(200, b"{}")).index()
+    assert "non-https" in str(exc.value)
+
+
+def test_streamed_download_is_cut_off_at_the_size_guard():
+    class Big(Resp):
+        def iter_content(self, chunk_size=0):
+            for _ in range(1000):
+                yield b"x" * 65536
+    read = []
+
+    class Counting2(Big):
+        def iter_content(self, chunk_size=0):
+            for c in super().iter_content(chunk_size):
+                read.append(len(c))
+                yield c
+
+    with pytest.raises(PackCorruptError):
+        usa.UsaPackProvider("https://example.invalid/pack", get=lambda url, timeout=None, **kw: Counting2(200)).index()
+    assert sum(read) < 5 * 1024 * 1024                 # stopped just past the 4 MiB index guard, not 64 MB
