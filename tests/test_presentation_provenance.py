@@ -25,7 +25,7 @@ SITE = MicrowaveSite(id="S", name="S", latitude=A[0], longitude=A[1], provenance
 class _Resp:
     def __init__(self, current): self._c = current
     def raise_for_status(self): pass
-    def json(self): return {"current": {"time": "2026-10-06T20:15", "temperature_2m": -2.0, "wind_speed_10m": 12.0, **self._c}}
+    def json(self): return {"current": {"time": "2026-10-06T20:15", "interval": 900, "temperature_2m": -2.0, "wind_speed_10m": 12.0, **self._c}}
 
 
 def _rate(current):
@@ -79,9 +79,9 @@ def test_the_library_provider_does_have_the_defect(monkeypatch):
     snow = {"precipitation": 0.30, "rain": 0.0, "showers": 0.0, "snowfall": 0.21}
     monkeypatch.setattr(lib_open_meteo.requests, "get",
                         lambda *a, **k: type("R", (), {"raise_for_status": lambda s: None,
-                                                       "json": lambda s: {"current": {"time": "t", **snow}}})())
+                                                       "json": lambda s: {"current": {"time": "t", "interval": 900, **snow}}})())
     monkeypatch.setattr(lib_open_meteo.OpenMeteoProvider, "_fetch",
-                        lambda self, site: {"current": {"time": "t", **snow}})
+                        lambda self, site: {"current": {"time": "t", "interval": 900, **snow}})
     assert lib_open_meteo.OpenMeteoProvider().get_current(SITE).rain_rate_mm_h == 0.30  # the defect
     assert _rate(snow)[0] == 0.0                                                         # the plugin's fix
 

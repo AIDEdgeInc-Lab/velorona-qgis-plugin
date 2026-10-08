@@ -33,6 +33,8 @@ import aei_link_clearance.terrain as terrain_mod
 from aei_link_clearance import analyze_link, explain
 from core import export
 from core.engines import microwave_exposure as mw
+from core.engines import terrestrial as tr
+from core.validation import NoDataError
 from core.presentation import terrain as pterrain, weather as pweather
 from core.presentation.model import NO_DATA
 
@@ -53,7 +55,7 @@ def terrain_stage(fx):
     class Resp:
         def __init__(self, body, err=None): self.body, self.err = body, err
         def raise_for_status(self):
-            if self.err: raise RuntimeError(self.err)
+            if self.err: raise rq.exceptions.HTTPError(self.err)
         def json(self): return self.body
     def fake_get(url, params=None, timeout=None):
         if t["mode"] == "error": return Resp(None, t["error"])
@@ -62,11 +64,12 @@ def terrain_stage(fx):
     rq.get = fake_get          # the library's own get_elevations() runs; only the HTTP edge is replaced
     try:
         try:
-            r = analyze_link(fx["id"], a["lat"], a["lon"], a["height_m"], b["lat"], b["lon"], b["height_m"], L["frequency_ghz"])
-        except Exception as exc:
-            nd = pterrain.terrain_status(SimpleNamespace(profile=[]))
-            return {"error": "%s: %s" % (type(exc).__name__, exc), "via": "aei_link_clearance.analyze_link()",
-                    "status_if_empty_profile": nd[0], "note": "NO DATA is only reachable from terrain_status() with an empty profile (core/presentation/terrain.py:51); the library raises first"}
+            params = {"site_a_height_m": a["height_m"], "site_b_height_m": b["height_m"], "frequency_ghz": L["frequency_ghz"]}
+            r = tr.analyze_endpoints(a["lat"], a["lon"], b["lat"], b["lon"], params, fx["id"])
+        except NoDataError as exc:
+            return {"noData": exc.reasons, "native_status": "NO DATA", "via": "core.engines.terrestrial.analyze_endpoints()"}
+        except Exception as exc:                      # not NO DATA: reported as UNEXPECTED so it can never pass as a decision
+            return {"error": "%s: %s" % (type(exc).__name__, exc), "unexpected": True, "via": "core.engines.terrestrial.analyze_endpoints()"}
     finally:
         rq.get = orig
     res = SimpleNamespace(kind="terrestrial", site_a_name="Site A", site_b_name="Site B", site_a_source="ISED Fixed Service record",
@@ -90,10 +93,11 @@ def weather_stage(fx):
     w, L = fx["weather"], fx["link"]
     a, b = L["site_a"], L["site_b"]
 
+    import requests.exceptions as rq_exc
     class Resp:
         def __init__(self, body): self.body = body
         def raise_for_status(self):
-            if self.body is None: raise RuntimeError(w["error"])
+            if self.body is None: raise rq_exc.HTTPError(w["error"])
         def json(self): return {"current": self.body}
 
     def get(url, params=None, timeout=None):
@@ -112,13 +116,12 @@ def weather_stage(fx):
     mw.eccc.get_radar_precipitation = lambda *x, **k: None
     try:
         try:
-            sa = mw.endpoint_site(a["lat"], a["lon"], "A", "Site A", src)      # MicrowaveSite validates coordinates
-            sb = mw.endpoint_site(b["lat"], b["lon"], "B", "Site B", src)
-            res = mw.analyze_sites(sa, sb, params, history_fetcher=no_history, provider=mw.TypedPrecipitationProvider(get=get))
+            res = mw.analyze_link_record((a["lat"], a["lon"]), (b["lat"], b["lon"]), {"authorization_number": fx["id"], "source": src}, params,
+                                         provider=mw.TypedPrecipitationProvider(get=get), history_fetcher=no_history)
+        except NoDataError as exc:
+            return {"noData": exc.reasons, "native_status": "NO DATA", "via": "core.engines.microwave_exposure.analyze_link_record()"}
         except Exception as exc:
-            brief = pweather.exposure_brief(None, origins, str(exc))
-            return {"error": "%s: %s" % (type(exc).__name__, exc), "via": "core.engines.microwave_exposure.analyze_sites()",
-                    "status_if_caught_by_plugin": brief.status, "caught_at": "plugin.py:1141 -> LinkInvestigation(weather_error) -> exposure_brief(None)"}
+            return {"error": "%s: %s" % (type(exc).__name__, exc), "unexpected": True, "via": "core.engines.microwave_exposure.analyze_link_record()"}
     finally:
         mw.eccc.find_nearest_station, mw.eccc.get_radar_precipitation = saved
     brief = pweather.exposure_brief(res, origins)

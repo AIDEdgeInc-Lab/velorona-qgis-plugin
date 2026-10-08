@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from aei_link_clearance import LinkClearanceResult, analyze_link, explain
 from aei_link_clearance import terrain as _library_terrain
 
-from ..validation import require_corrected_clearance
+from ..validation import NoDataError, require_corrected_clearance, terrain_input_reasons
 
 from ..features import feature_attr, feature_id_name, feature_to_latlon
 
@@ -70,8 +70,28 @@ def build_params(entries) -> dict:
     return defaults
 
 
-def analyze(entries, params: dict) -> TerrestrialAnalysisResult:
+def analyze_endpoints(lat_a, lon_a, lat_b, lon_b, params: dict, link_id: str) -> LinkClearanceResult:
+    """QGIS-free boundary of the terrain decision: library guard, explicit NO DATA validation, then the unmodified library call."""
     require_corrected_clearance(_library_terrain)
+    reasons = terrain_input_reasons(lat_a, lon_a, lat_b, lon_b, params["site_a_height_m"], params["site_b_height_m"], params["frequency_ghz"])
+    if reasons:
+        raise NoDataError("terrain", reasons)
+
+    # Imported here, after the library-convention guard above, so an old library fails with the clear message rather than an ImportError.
+    import requests
+    from aei_link_clearance.elevation import ElevationDataError
+    try:
+        return analyze_link(
+            link_id=link_id,
+            site_a_lat=lat_a, site_a_lon=lon_a, site_a_height_m=params["site_a_height_m"],
+            site_b_lat=lat_b, site_b_lon=lon_b, site_b_height_m=params["site_b_height_m"],
+            frequency_ghz=params["frequency_ghz"],
+        )
+    except (ElevationDataError, requests.exceptions.RequestException) as exc:   # the two explicit elevation-data failures only (T1, R5)
+        raise NoDataError("terrain", [f"elevation data unavailable (T1/R5): {exc}"]) from exc
+
+
+def analyze(entries, params: dict) -> TerrestrialAnalysisResult:
     (layer_a, feat_a), (layer_b, feat_b) = entries
     lat_a, lon_a = feature_to_latlon(layer_a, feat_a)
     lat_b, lon_b = feature_to_latlon(layer_b, feat_b)
@@ -80,12 +100,7 @@ def analyze(entries, params: dict) -> TerrestrialAnalysisResult:
     source_a = feature_attr(feat_a, "source", "Selected QGIS feature")
     source_b = feature_attr(feat_b, "source", "Selected QGIS feature")
 
-    result = analyze_link(
-        link_id=f"{id_a}__{id_b}",
-        site_a_lat=lat_a, site_a_lon=lon_a, site_a_height_m=params["site_a_height_m"],
-        site_b_lat=lat_b, site_b_lon=lon_b, site_b_height_m=params["site_b_height_m"],
-        frequency_ghz=params["frequency_ghz"],
-    )
+    result = analyze_endpoints(lat_a, lon_a, lat_b, lon_b, params, f"{id_a}__{id_b}")
     return TerrestrialAnalysisResult(
         kind="terrestrial", site_a_name=name_a, site_b_name=name_b,
         site_a_source=source_a, site_b_source=source_b,
