@@ -29,12 +29,15 @@ from core.engines import terrestrial as TR  # noqa: E402
 A, B = (43.70, -79.40), (43.80, -79.20)
 PARAMS = {"site_a_height_m": 30.0, "site_b_height_m": 30.0, "frequency_ghz": 6.22689}
 
-CA = {"id": "ised-fixed-link-010029391-004", "authorization_number": "010029391-004", "source": "ISED SMS Authorization Data Extract: Fixed Service, Open Government Licence - Canada",
+ATTRIBUTION = ("Source: U.S. Federal Communications Commission, Universal Licensing System (ULS) public access database, "
+               "microwave services (l_micro). Data as published; not endorsed by the FCC.")
+CA = {"id": "ised-fixed-link-010029391-004", "authorization_number": "010029391-004",
+      "source": "ISED SMS Authorization Data Extract: Fixed Service, Open Government Licence - Canada",
       "frequencies_mhz": "5945.2, 5974.85, 6197.24, 6226.89", "coverage": "National (Canada-wide) -- snapshot, not a live query"}
-US = {"id": "fcc-link-1001939-1", "authorization_number": "WMJ504-1", "country": "US", "source": "FCC ULS public access database: Microwave (l_micro), U.S. Federal Communications Commission",
+US = {"id": "fcc-link-1001939-1", "authorization_number": "WMJ504-1", "country": "US",
+      "source": "FCC ULS public access database: Microwave (l_micro), U.S. Federal Communications Commission",
       "frequencies_mhz": "11245, 6078.625", "coverage": "United States -- snapshot, not a live query",
-      "attribution": "Source: U.S. Federal Communications Commission, Universal Licensing System (ULS) public access database, microwave services (l_micro). Data as published; not endorsed by the FCC.",
-      "pack_generated": "2026-10-03", "source_file_updated": "2026-09-27", "pack_input_sha256": "177254c8"}
+      "attribution": ATTRIBUTION, "pack_generated": "2026-10-03", "source_file_updated": "2026-09-27", "pack_input_sha256": "177254c8"}
 
 
 class _Resp:
@@ -49,12 +52,12 @@ def flat_terrain(monkeypatch):
 
 
 def table(csv_text):
-    body = "".join(l for l in io.StringIO(csv_text) if not l.startswith("#"))
+    body = "".join(ln for ln in io.StringIO(csv_text) if not ln.startswith("#"))
     return {r[0]: r for r in list(csv.reader(io.StringIO(body)))[1:]}
 
 
 def preamble(csv_text):
-    return [l[2:].rstrip("\n") for l in io.StringIO(csv_text) if l.startswith("# ")]
+    return [ln[2:].rstrip("\n") for ln in io.StringIO(csv_text) if ln.startswith("# ")]
 
 
 # --- pure rule ---------------------------------------------------------------------------------------------------------------------
@@ -147,7 +150,7 @@ def test_terrain_export_carries_identity_convention_and_data_source():
     assert "Product: Velorona for QGIS 1.1.5; decision spec 0.3" in pre
     assert "aei-link-clearance 0." in pre
     assert "Earth-curvature convention: bulge-added-to-terrain" in pre
-    assert US["attribution"] in pre and "source file dated 2026-09-27" in pre and "pack built 2026-10-03" in pre
+    assert ATTRIBUTION in pre and "source file dated 2026-09-27" in pre and "pack built 2026-10-03" in pre
     assert "not a field measurement" in pre and "30 m default" in pre and "sha256 177254c8" in pre
 
 
@@ -164,9 +167,9 @@ def test_identity_lines_do_not_enter_the_evidence_table():
 
 def test_single_record_exports_carry_the_attribution():
     link_csv = export.link_feature_to_csv(US, A, B)
-    assert US["attribution"] in link_csv
+    assert ATTRIBUTION in link_csv
     site_csv = export.feature_to_csv({**US, "name": "x"}, 1.0, 2.0)
-    assert US["attribution"] in site_csv
+    assert ATTRIBUTION in site_csv
 
 
 def test_product_version_comes_from_metadata():

@@ -27,7 +27,7 @@ import os
 import re
 import zlib
 from collections import OrderedDict
-from typing import Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import quote, urlparse
 
 from .base import (Attribution, LoadResult, PackCorruptError, PackError, PackMissingError, PackNotConfiguredError,
@@ -218,12 +218,12 @@ def _validate_tile(tile, key: str) -> dict:
                 or not -90 <= s["la"] <= 90 or not -180 <= s["lo"] <= 180
                 or not isinstance(s.get("c"), list) or not isinstance(s.get("l"), list)):
             raise PackCorruptError(f"{where} has an invalid site record ({str(s)[:80]}).")
-    for l in tile["links"]:
-        if (not isinstance(l, dict) or not isinstance(l.get("i"), str) or not isinstance(l.get("c"), str)
-                or not isinstance(l.get("a"), int) or not isinstance(l.get("b"), int)
-                or not 0 <= l["a"] < len(sites) or not 0 <= l["b"] < len(sites)
-                or not isinstance(l.get("f"), list) or not all(_num(f) and f > 0 for f in l["f"])):
-            raise PackCorruptError(f"{where} has an invalid link record ({str(l)[:80]}).")
+    for lk in tile["links"]:
+        if (not isinstance(lk, dict) or not isinstance(lk.get("i"), str) or not isinstance(lk.get("c"), str)
+                or not isinstance(lk.get("a"), int) or not isinstance(lk.get("b"), int)
+                or not 0 <= lk["a"] < len(sites) or not 0 <= lk["b"] < len(sites)
+                or not isinstance(lk.get("f"), list) or not all(_num(f) and f > 0 for f in lk["f"])):
+            raise PackCorruptError(f"{where} has an invalid link record ({str(lk)[:80]}).")
     return tile
 
 
@@ -323,23 +323,23 @@ class UsaPackProvider:
                 else:
                     result.duplicate_sites_dropped += 1
                 slot_sites.append(rec)
-            for l in tile["links"]:
-                if l["i"] in links_by_id:
+            for lk in tile["links"]:
+                if lk["i"] in links_by_id:
                     result.duplicate_links_dropped += 1
                     continue
-                a, b = slot_sites[l["a"]], slot_sites[l["b"]]
-                freqs = ", ".join(_fmt_mhz(f) for f in l["f"])
-                links_by_id[l["i"]] = {
-                    "id": l["i"], "source": SOURCE_FCC_ULS, "country": "US", "authorization_number": f"{l['c']}-{l.get('k')}",
-                    "call_sign": l["c"], "licensee": l.get("l"), "in_service_date": None, "grant_date": l.get("g"),
-                    "expiration_date": l.get("x"), "path_type": ", ".join(l.get("t") or []) or None, "frequencies_mhz": freqs,
+                a, b = slot_sites[lk["a"]], slot_sites[lk["b"]]
+                freqs = ", ".join(_fmt_mhz(f) for f in lk["f"])
+                links_by_id[lk["i"]] = {
+                    "id": lk["i"], "source": SOURCE_FCC_ULS, "country": "US", "authorization_number": f"{lk['c']}-{lk.get('k')}",
+                    "call_sign": lk["c"], "licensee": lk.get("l"), "in_service_date": None, "grant_date": lk.get("g"),
+                    "expiration_date": lk.get("x"), "path_type": ", ".join(lk.get("t") or []) or None, "frequencies_mhz": freqs,
                     "site_a": a, "site_b": b, "coverage": COVERAGE_US,
-                    "flags": ", ".join(l["q"]) if isinstance(l.get("q"), list) else l.get("q"),
+                    "flags": ", ".join(lk["q"]) if isinstance(lk.get("q"), list) else lk.get("q"),
                     "attribution": meta.attribution_text, "pack_generated": meta.pack_generated,
                     "source_file_updated": meta.source_file_updated, "pack_input_sha256": input_sha,
                 }
                 for site in (a, b):
-                    site_freqs[site["id"]].update(l["f"])
+                    site_freqs[site["id"]].update(lk["f"])
         for sid, freqs in site_freqs.items():     # a site's frequency list = the union over the loaded links that end there (as the Map)
             if freqs:
                 sites_by_id[sid]["frequencies_mhz"] = ", ".join(_fmt_mhz(f) for f in sorted(freqs))

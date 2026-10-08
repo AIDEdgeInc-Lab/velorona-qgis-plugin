@@ -44,8 +44,17 @@ echo
 echo "== QGIS end-to-end runtime test =="
 "$QGISPY" "$HERE/qgis_e2e.py"
 
+echo
+echo "== QGIS USA support end-to-end test (synthetic pack, no network) =="
+"$QGISPY" "$HERE/qgis_usa_e2e.py"
+
 if [ "$1" = "--bench" ]; then
     echo
     echo "== performance benchmark =="
     "$QGISPY" "$HERE/benchmark_viewport.py" "${2:-run}"
+    if [ -n "$VELORONA_US_PACK" ]; then
+        echo
+        echo "== USA pack loading benchmark ($VELORONA_US_PACK) =="
+        "$QGISPY" "$HERE/benchmark_usa.py" "$VELORONA_US_PACK" "${2:-run}"
+    fi
 fi

@@ -4,9 +4,7 @@ No network and no QGIS: packs are built in a temp folder (SYNTHETIC test data, l
 an injected HTTP getter. One optional test reads a real pack when VELORONA_US_PACK points at one.
 """
 
-import copy
 import gzip
-import json
 import os
 import sys
 
@@ -19,55 +17,7 @@ from core.countries.base import (PackCorruptError, PackError, PackMissingError, 
                                  PackUnavailableError, PackVersionError, ViewTooLargeError)
 from core.validation import NoDataError  # noqa: E402
 
-ATTRIBUTION = ("Source: U.S. Federal Communications Commission, Universal Licensing System (ULS) public access database, microwave "
-               "services (l_micro). Data as published; not endorsed by the FCC.")
-
-
-def site(lat, lon, call, name=""):
-    return {"i": f"fcc-site-{lat:.5f},{lon:.5f}", "la": lat, "lo": lon, "n": name, "c": [call], "s": "CO", "l": ["Test Licensee"]}
-
-
-def link(lid, call, k, a, b, freqs, **extra):
-    d = {"i": lid, "u": lid.split("-")[2], "k": k, "c": call, "a": a, "b": b, "l": "Test Licensee", "f": freqs,
-         "t": ["Fixed Point-to-Point"], "np": 1, "g": "2021-01-26", "x": "2031-02-01"}
-    d.update(extra)
-    return d
-
-
-# SYNTHETIC geometry: the link L1 crosses the 40/41 degree edge, so it is written into both tiles (as the real builder does).
-S_LOW = site(40.5, -105.5, "WAAA001")
-S_HIGH = site(41.5, -105.5, "WAAA001")
-S_FAR = site(40.7, -105.2, "WBBB002")
-L1 = link("fcc-link-1-1", "WAAA001", 1, 0, 1, [11245.0, 6078.625])
-L2 = link("fcc-link-2-1", "WBBB002", 1, 0, 1, [18700.0])
-
-
-def tiles():
-    return copy.deepcopy({
-        "40_-106": {"sites": [S_LOW, S_HIGH, S_FAR], "links": [L1, link("fcc-link-2-1", "WBBB002", 1, 0, 2, [18700.0])]},
-        "41_-106": {"sites": [S_LOW, S_HIGH], "links": [L1]},
-        "10_10": {"sites": [site(10.5, 10.5, "WCCC003"), site(10.6, 10.6, "WCCC003")], "links": [link("fcc-link-3-1", "WCCC003", 1, 0, 1, [7000])]},
-    })
-
-
-def index(tile_map, **over):
-    d = {"pack": "us-fcc-uls-micro", "schema": "velorona.us-fcc-uls-micro/1", "builder_version": "1.0.0", "generated_date": "2026-10-03",
-         "source_file_updated": "2026-09-27", "source": {"agency": "Federal Communications Commission", "system": "Universal Licensing System (ULS)"},
-         "attribution": ATTRIBUTION, "tile_degrees": 1, "min_zoom_hint": 8, "counts": {"links": 3},
-         "tiles": {k: [len(t["sites"]), len(t["links"])] for k, t in tile_map.items()}}
-    d.update(over)
-    return d
-
-
-def write_pack(root, tile_map=None, idx=None):
-    tile_map = tile_map if tile_map is not None else tiles()
-    os.makedirs(os.path.join(root, "tiles"), exist_ok=True)
-    with open(os.path.join(root, "index.json"), "w") as fh:
-        json.dump(idx if idx is not None else index(tile_map), fh)
-    for key, tile in tile_map.items():
-        with open(os.path.join(root, "tiles", f"{key}.json.gz"), "wb") as fh:
-            fh.write(gzip.compress(json.dumps(tile).encode(), mtime=0))
-    return str(root)
+from usa_pack_builder import ATTRIBUTION, L1, L2, S_FAR, S_HIGH, S_LOW, index, link, site, tiles, write_pack  # noqa: E402,F401
 
 
 @pytest.fixture
@@ -128,8 +78,8 @@ def test_link_straddling_a_tile_edge_is_returned_once(pack):
 def test_deduplicated_endpoints_are_the_same_site_objects_the_sites_list_holds(pack):
     r = provider(pack).load_bbox((-106.0, 40.0, -105.0, 42.0))
     by_id = {s["id"]: s for s in r.sites}
-    for l in r.links:
-        assert by_id[l["site_a"]["id"]] is l["site_a"] and by_id[l["site_b"]["id"]] is l["site_b"]
+    for lk in r.links:
+        assert by_id[lk["site_a"]["id"]] is lk["site_a"] and by_id[lk["site_b"]["id"]] is lk["site_b"]
 
 
 # --- extent-aware loading ---------------------------------------------------------------------------------------------------------
@@ -372,6 +322,6 @@ def test_real_pack_dedup_matches_the_index():
     idx = p.index()
     bbox = (-119.0, 34.0, -117.0, 35.0)                        # Los Angeles basin, the densest tiles
     r = p.load_bbox(bbox)
-    assert len(r.links) == len({l["id"] for l in r.links})
+    assert len(r.links) == len({lk["id"] for lk in r.links})
     assert len(r.links) + r.duplicate_links_dropped == sum(idx.tiles[k][1] for k in p.tile_keys(bbox))
-    assert all(l["site_a"]["id"] != l["site_b"]["id"] for l in r.links)
+    assert all(lk["site_a"]["id"] != lk["site_b"]["id"] for lk in r.links)
