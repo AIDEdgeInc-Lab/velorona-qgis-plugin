@@ -3,42 +3,326 @@
   "$id": "velorona.parity-fixture/1",
   "title": "Velorona parity fixture: every input to one link decision, frozen. No network at test time.",
   "type": "object",
-  "required": ["schema", "id", "tags", "selection", "link", "terrain", "weather", "synthetic"],
+  "required": [
+    "schema",
+    "id",
+    "tags",
+    "selection",
+    "link",
+    "terrain",
+    "weather",
+    "synthetic"
+  ],
   "properties": {
-    "schema": {"const": "velorona.parity-fixture/1"},
-    "id": {"type": "string"},
-    "tags": {"type": "array", "items": {"type": "string"}},
-    "note": {"type": "string"},
-    "selection": {"type": "object", "required": ["pack", "snapshot_sha256", "link_id"],
+    "schema": {
+      "const": "velorona.parity-fixture/1"
+    },
+    "id": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "note": {
+      "type": "string"
+    },
+    "selection": {
+      "type": "object",
+      "required": [
+        "pack",
+        "snapshot_sha256",
+        "link_id"
+      ],
       "description": "REAL: where the link came from. link_id is an authorization_number in web/fixed_service_snapshot.json.",
-      "properties": {"pack": {"const": "ca-ised-fixed"}, "snapshot_sha256": {"type": "string"}, "link_id": {"type": "string"},
-                     "licensee": {"type": ["string", "null"]}, "published_frequencies_mhz": {"type": "array", "items": {"type": "number"}}}},
-    "link": {"type": "object", "required": ["site_a", "site_b", "frequency_ghz", "frequency_origin", "polarization", "fade_margin_db"],
       "properties": {
-        "site_a": {"$ref": "#/$defs/site"}, "site_b": {"$ref": "#/$defs/site"},
-        "frequency_ghz": {"type": "number", "description": "GHz. Record value = max published MHz / 1000 unless overridden."},
-        "frequency_origin": {"enum": ["Observed", "Assumed"], "description": "Observed only when it is the record's own value; a user override is Assumed."},
-        "polarization": {"enum": ["V", "H"]}, "polarization_origin": {"const": "Assumed"},
-        "fade_margin_db": {"type": "number", "exclusiveMinimum": 0, "description": "dB. Not published by ISED: always Assumed / synthetic."},
-        "fade_margin_origin": {"const": "Assumed"}}},
-    "terrain": {"oneOf": [
-      {"type": "object", "required": ["mode", "samples"], "properties": {"mode": {"const": "samples"}, "source": {"type": "string"},
-        "samples": {"type": "array", "minItems": 50, "items": {"type": "array", "prefixItems": [{"type": "number"}, {"type": "number"}, {"type": "number"}],
-          "description": "[lat deg, lon deg, ground elevation m ASL], in path order, A to B, great-circle fractions i/(n-1)"}}}},
-      {"type": "object", "required": ["mode", "error"], "properties": {"mode": {"const": "error"}, "error": {"type": "string"}}}]},
-    "weather": {"oneOf": [
-      {"type": "object", "required": ["mode", "sites"], "properties": {"mode": {"const": "snapshot"}, "source": {"type": "string"},
-        "sites": {"type": "object", "required": ["A", "B"], "additionalProperties": {"type": "object", "required": ["open_meteo_current"], "properties": {
-          "open_meteo_current": {"type": "object", "description": "RAW Open-Meteo `current` object, unparsed. Units as the API reports: precipitation/rain/showers mm over `interval` seconds, snowfall cm, weather_code WMO.",
-            "required": ["time", "interval", "precipitation"], "properties": {"time": {"type": "string"}, "interval": {"type": "integer"},
-              "precipitation": {"type": ["number", "null"]}, "rain": {"type": ["number", "null"]}, "showers": {"type": ["number", "null"]},
-              "snowfall": {"type": ["number", "null"]}, "weather_code": {"type": ["integer", "null"]}, "temperature_2m": {"type": "number"}, "wind_speed_10m": {"type": "number"}}},
-          "eccc_station": {"type": ["object", "null"], "description": "reserved; the harness stubs ECCC as 'none found' in both products"},
-          "eccc_radar": {"type": ["object", "null"]}}}}}},
-      {"type": "object", "required": ["mode", "error"], "properties": {"mode": {"const": "error"}, "error": {"type": "string"}}}]},
-    "synthetic": {"type": "array", "items": {"type": "string"}, "description": "Which blocks are NOT real data: terrain, weather, fade_margin_db, ..."}
+        "pack": {
+          "const": "ca-ised-fixed"
+        },
+        "snapshot_sha256": {
+          "type": "string"
+        },
+        "link_id": {
+          "type": "string"
+        },
+        "licensee": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "published_frequencies_mhz": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "link": {
+      "type": "object",
+      "required": [
+        "site_a",
+        "site_b",
+        "frequency_ghz",
+        "frequency_origin",
+        "polarization",
+        "fade_margin_db"
+      ],
+      "properties": {
+        "site_a": {
+          "$ref": "#/$defs/site"
+        },
+        "site_b": {
+          "$ref": "#/$defs/site"
+        },
+        "frequency_ghz": {
+          "type": "number",
+          "description": "GHz. Record value = max published MHz / 1000 unless overridden."
+        },
+        "frequency_origin": {
+          "enum": [
+            "Observed",
+            "Assumed"
+          ],
+          "description": "Observed only when it is the record's own value; a user override is Assumed."
+        },
+        "polarization": {
+          "enum": [
+            "V",
+            "H"
+          ]
+        },
+        "polarization_origin": {
+          "const": "Assumed"
+        },
+        "fade_margin_db": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "dB. Not published by ISED: always Assumed / synthetic."
+        },
+        "fade_margin_origin": {
+          "const": "Assumed"
+        }
+      }
+    },
+    "terrain": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "mode",
+            "samples"
+          ],
+          "properties": {
+            "mode": {
+              "const": "samples"
+            },
+            "source": {
+              "type": "string"
+            },
+            "samples": {
+              "type": "array",
+              "minItems": 50,
+              "items": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "description": "null = provider returned no value (spec R5); present only in ca-null-elevation"
+                  }
+                ],
+                "description": "[lat deg, lon deg, ground elevation m ASL], in path order, A to B, great-circle fractions i/(n-1)"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "mode",
+            "error"
+          ],
+          "properties": {
+            "mode": {
+              "const": "error"
+            },
+            "error": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "weather": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "mode",
+            "sites"
+          ],
+          "properties": {
+            "mode": {
+              "const": "snapshot"
+            },
+            "source": {
+              "type": "string"
+            },
+            "sites": {
+              "type": "object",
+              "required": [
+                "A",
+                "B"
+              ],
+              "additionalProperties": {
+                "type": "object",
+                "required": [
+                  "open_meteo_current"
+                ],
+                "properties": {
+                  "open_meteo_current": {
+                    "type": "object",
+                    "description": "RAW Open-Meteo `current` object, unparsed. Units as the API reports: precipitation/rain/showers mm over `interval` seconds, snowfall cm, weather_code WMO. `interval` is normally present; it is deliberately absent in ca-missing-interval (spec R3).",
+                    "required": [
+                      "time",
+                      "precipitation"
+                    ],
+                    "properties": {
+                      "time": {
+                        "type": "string"
+                      },
+                      "interval": {
+                        "type": "integer"
+                      },
+                      "precipitation": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "rain": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "showers": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "snowfall": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "weather_code": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "temperature_2m": {
+                        "type": "number"
+                      },
+                      "wind_speed_10m": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "eccc_station": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "description": "reserved; the harness stubs ECCC as 'none found' in both products"
+                  },
+                  "eccc_radar": {
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "mode",
+            "error"
+          ],
+          "properties": {
+            "mode": {
+              "const": "error"
+            },
+            "error": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "synthetic": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Which blocks are NOT real data: terrain, weather, fade_margin_db, ..."
+    }
   },
-  "$defs": {"site": {"type": "object", "required": ["lat", "lon", "height_m", "height_origin"], "properties": {
-    "id": {"type": "string"}, "lat": {"type": "number"}, "lon": {"type": "number"}, "height_m": {"type": "number", "description": "m above ground; 30 = product default"},
-    "height_origin": {"enum": ["Observed", "Assumed"]}, "description": {"type": ["string", "null"]}}}}
+  "$defs": {
+    "site": {
+      "type": "object",
+      "required": [
+        "lat",
+        "lon",
+        "height_m",
+        "height_origin"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "lat": {
+          "type": "number"
+        },
+        "lon": {
+          "type": "number"
+        },
+        "height_m": {
+          "type": "number",
+          "description": "m above ground; 30 = product default"
+        },
+        "height_origin": {
+          "enum": [
+            "Observed",
+            "Assumed"
+          ]
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
 }

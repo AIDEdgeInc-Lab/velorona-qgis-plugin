@@ -9,7 +9,7 @@ Coupling (documented, not hidden):
   uses them; they exist only so the real `analyze_sites()` can be imported.
 * The aei_* libraries are taken from the sibling checkouts (velorona-repos/aei-*/src), exactly as tests/conftest.py does. The version
   a shipped QGIS actually loads is UNKNOWN (audit OPEN_QUESTIONS #2); this runner tests the sibling source, not the PyPI wheel.
-* Terrain: aei_link_clearance.terrain.get_elevations is replaced, the same seam tests/presentation_fixtures.py uses.
+* Terrain: `requests.get` is replaced (elevation.py imports requests lazily), so the library's own get_elevations() (count check, float()) runs.
 * Weather: TypedPrecipitationProvider(get=...) takes an injected HTTP getter; ECCC station/radar lookups are replaced by "none" and the
   hourly-history fetcher raises (history is context only, not a decision input -- microwave_exposure.py).
 """
@@ -49,22 +49,26 @@ def rows_from_csv(text):
 def terrain_stage(fx):
     t, L = fx["terrain"], fx["link"]
     a, b = L["site_a"], L["site_b"]
-    orig = terrain_mod.get_elevations
-    if t["mode"] == "error":
-        def boom(points): raise RuntimeError(t["error"])
-        terrain_mod.get_elevations = boom
-    else:
-        els = [s[2] for s in t["samples"]]
-        terrain_mod.get_elevations = lambda points: list(els)
+    import requests as rq   # elevation.py imports requests lazily inside get_elevations(), so the module attribute is the seam
+    class Resp:
+        def __init__(self, body, err=None): self.body, self.err = body, err
+        def raise_for_status(self):
+            if self.err: raise RuntimeError(self.err)
+        def json(self): return self.body
+    def fake_get(url, params=None, timeout=None):
+        if t["mode"] == "error": return Resp(None, t["error"])
+        return Resp({"elevation": [s[2] for s in t["samples"]]})   # nulls included, as a provider could return them
+    orig = rq.get
+    rq.get = fake_get          # the library's own get_elevations() runs; only the HTTP edge is replaced
     try:
         try:
             r = analyze_link(fx["id"], a["lat"], a["lon"], a["height_m"], b["lat"], b["lon"], b["height_m"], L["frequency_ghz"])
         except Exception as exc:
             nd = pterrain.terrain_status(SimpleNamespace(profile=[]))
-            return {"error": str(exc), "via": "aei_link_clearance.analyze_link()",
-                    "status_if_empty_profile": nd[0], "note": "NO DATA is only reachable from terrain_status() with an empty profile (core/presentation/terrain.py:51); the library raises instead"}
+            return {"error": "%s: %s" % (type(exc).__name__, exc), "via": "aei_link_clearance.analyze_link()",
+                    "status_if_empty_profile": nd[0], "note": "NO DATA is only reachable from terrain_status() with an empty profile (core/presentation/terrain.py:51); the library raises first"}
     finally:
-        terrain_mod.get_elevations = orig
+        rq.get = orig
     res = SimpleNamespace(kind="terrestrial", site_a_name="Site A", site_b_name="Site B", site_a_source="ISED Fixed Service record",
                           site_b_source="ISED Fixed Service record", site_a_height_m=a["height_m"], site_b_height_m=b["height_m"],
                           site_a_height_from_feature=False, site_b_height_from_feature=False, result=r, explanation=explain(r))
@@ -72,7 +76,7 @@ def terrain_stage(fx):
     crit = pterrain.critical_point(r)
     return {
         "geometry": {"distance_km": r.distance_km, "bearing_deg": r.bearing_deg},
-        "clearance": {"critical_index": r.profile.index(crit), "critical_distance_from_a_km": crit.distance_from_a_km,
+        "clearance": {"critical_index": next(i for i, p in enumerate(r.profile) if p is crit), "critical_distance_from_a_km": crit.distance_from_a_km,
                       "available_m": r.terrain_clearance_m, "required_m": r.required_clearance_m,
                       "margin_m": r.terrain_clearance_m - r.required_clearance_m, "ratio": r.clearance_ratio,
                       "percent_fresnel_clear": r.percent_fresnel_clear, "fresnel_radius_m": r.first_fresnel_radius_m},
@@ -99,8 +103,6 @@ def weather_stage(fx):
         return Resp(w["sites"][site]["open_meteo_current"])
 
     src = "ISED Fixed Service record"
-    sa = mw.endpoint_site(a["lat"], a["lon"], "A", "Site A", src)
-    sb = mw.endpoint_site(b["lat"], b["lon"], "B", "Site B", src)
     params = {"frequency_ghz": L["frequency_ghz"], "polarization": L["polarization"], "fade_margin_db": L["fade_margin_db"]}
     origins = {"frequency_ghz": (L["frequency_origin"], "fixture"), "polarization": ("Assumed", "fixture"), "fade_margin_db": ("Assumed", "fixture")}
 
@@ -110,10 +112,12 @@ def weather_stage(fx):
     mw.eccc.get_radar_precipitation = lambda *x, **k: None
     try:
         try:
+            sa = mw.endpoint_site(a["lat"], a["lon"], "A", "Site A", src)      # MicrowaveSite validates coordinates
+            sb = mw.endpoint_site(b["lat"], b["lon"], "B", "Site B", src)
             res = mw.analyze_sites(sa, sb, params, history_fetcher=no_history, provider=mw.TypedPrecipitationProvider(get=get))
         except Exception as exc:
             brief = pweather.exposure_brief(None, origins, str(exc))
-            return {"error": str(exc), "via": "core.engines.microwave_exposure.analyze_sites()",
+            return {"error": "%s: %s" % (type(exc).__name__, exc), "via": "core.engines.microwave_exposure.analyze_sites()",
                     "status_if_caught_by_plugin": brief.status, "caught_at": "plugin.py:1141 -> LinkInvestigation(weather_error) -> exposure_brief(None)"}
     finally:
         mw.eccc.find_nearest_station, mw.eccc.get_radar_precipitation = saved
