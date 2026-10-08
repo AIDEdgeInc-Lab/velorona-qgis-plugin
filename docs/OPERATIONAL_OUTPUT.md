@@ -142,11 +142,13 @@ two cannot disagree. Sheets that do not apply say so in one line.
    **Five types (1.1.5):** Observed / Model-derived / Calculated / Inferred / **Assumed**. A value the
    user typed in the analysis dialog (antenna heights, frequency, polarization, fade margin) is
    **Assumed**, never Observed; a value taken from a record or feature attribute keeps Observed, and a
-   Fixed Service link's weather evidence types each parameter by its origin. **Known interface
-   difference:** the terrain-clearance dialog takes its frequency only from the dialog (default 7.0 GHz;
-   it is never read from a record), so the frequency is typed **Assumed** there even if you type the
-   value ISED published for the link. Velorona Map pre-fills that frequency from the record and types it
-   Observed. This is accepted and documented (`parity/ACCEPTED_INTERFACE_DIVERGENCES.md`).
+   Fixed Service link's weather evidence types each parameter by its origin. **Terrain frequency (changed in
+   1.1.5, closes the accepted difference AID-1):** for two free sites the frequency comes from the dialog
+   (default 7.0 GHz) and is **Assumed**. For ONE selected link the dialog is pre-filled with the record's
+   highest published frequency and it is typed **Observed** while it still equals that value, **Assumed**
+   (with the record's value named) once you change it — the same rule as Velorona Map, which pre-fills it
+   from the record. Antenna heights follow the same rule when a record carries one (US regional extract);
+   otherwise they are the 30 m default, Assumed (`core/record_source.py`).
 3. **Critical point.** Calculation unchanged. Defined wherever it appears: the critical
    (tightest) point is where the **Fresnel-zone clearance fraction** (clearance / first Fresnel
    radius) is lowest, **not necessarily** where absolute clearance in metres is lowest. A test
