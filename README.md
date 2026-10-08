@@ -92,13 +92,13 @@ preference that affects every plugin and project.
 ## Install
 
 Velorona is distributed via the project's GitHub Release, not the QGIS
-Plugin Repository. Download `velorona-1.1.4.zip` from the
-[v1.1.4 release](https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/releases/tag/v1.1.4),
+Plugin Repository. Download `velorona-1.1.5.zip` from the
+[v1.1.5 release](https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/releases/tag/v1.1.5),
 then in QGIS: Plugins → Manage and Install Plugins → Install from ZIP, and
 pick that file.
 
 ## Status
 
-Version 1.1.4. Packaged and clean-profile install tested for QGIS 4.x.
+Version 1.1.5. Packaged and clean-profile install tested for QGIS 4.x.
 Distributed via GitHub Release; not yet submitted to the QGIS Plugin
 Repository.
