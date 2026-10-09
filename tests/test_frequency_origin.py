@@ -146,9 +146,16 @@ def test_fcc_detection():
 
 
 # --- spec G identity / source lines -------------------------------------------------------------------------------------------------
+def _metadata_version():
+    """The version in metadata.txt: the tests must not pin a literal that every release bump invalidates."""
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "metadata.txt")
+    with open(path, encoding="utf-8") as fh:
+        return next(line.split("=", 1)[1].strip() for line in fh if line.startswith("version="))
+
+
 def test_terrain_export_carries_identity_convention_and_data_source():
     pre = "\n".join(preamble(export.result_to_csv(run(US, 11.245))))
-    assert "Product: Velorona for QGIS 1.1.6; decision spec 0.3" in pre
+    assert f"Product: Velorona for QGIS {_metadata_version()}; decision spec 0.3" in pre
     assert "aei-link-clearance 0." in pre
     assert "Earth-curvature convention: bulge-added-to-terrain" in pre
     assert ATTRIBUTION in pre and "source file dated 2026-09-27" in pre and "pack built 2026-10-03" in pre
@@ -174,7 +181,7 @@ def test_single_record_exports_carry_the_attribution():
 
 
 def test_product_version_comes_from_metadata():
-    assert evidence_record.product_version() == "1.1.6"
+    assert evidence_record.product_version() == _metadata_version()
 
 
 # --- antenna heights: the same rule (spec F.2: Observed only if the record carries it; F.1: overridden -> Assumed) ---------------------------------
