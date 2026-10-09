@@ -59,11 +59,12 @@ def test_installed_link_clearance_is_inside_the_declared_range():
 import pytest  # noqa: E402
 
 
-def _installed(monkeypatch, version):
+def _installed(monkeypatch, version, per_dist=None):
     def fake(name):
-        if version is None:
+        v = (per_dist or {}).get(name, version)
+        if v is None:
             raise dependencies._metadata.PackageNotFoundError(name)
-        return version
+        return v
     monkeypatch.setattr(dependencies._metadata, "version", fake)
 
 
@@ -78,7 +79,7 @@ def test_out_of_range_library_warns_with_the_fix(monkeypatch, v):
     _installed(monkeypatch, v)
     w = dependencies.library_range_warning()
     assert v in w and "aei-link-clearance>=0.2.0,<0.3" in w and "Python Console" in w and "restart QGIS" in w
-    assert "main(['install', '-U', 'aei-link-clearance>=0.2.0,<0.3'])" in w
+    assert "'aei-link-clearance>=0.2.0,<0.3'" in w and w.count("Plugins > Python Console") == 1
 
 
 def test_not_installed_or_unreadable_version_is_not_reported_here(monkeypatch):
@@ -100,3 +101,12 @@ def test_old_library_refusal_names_the_version_needed_and_how_to_install():
     with pytest.raises(LibraryOutOfDateError) as exc:
         require_corrected_clearance(SimpleNamespace())
     assert "aei-link-clearance>=0.2.0,<0.3" in str(exc.value) and "Python Console" in str(exc.value) and t is not None
+
+
+def test_old_rain_library_alone_is_flagged_with_its_own_fix(monkeypatch):
+    _installed(monkeypatch, "0.2.1", {"aei-microwave-link-exposure": "0.1.5"})
+    w = dependencies.library_range_warning()
+    assert "aei-microwave-link-exposure 0.1.5" in w and "aei-microwave-link-exposure>=0.2.0,<0.3" in w and "P.838-3" in w
+    assert "aei-link-clearance" not in w.split("In QGIS")[0]
+    _installed(monkeypatch, "0.2.1", {"aei-microwave-link-exposure": "0.2.0"})
+    assert dependencies.library_range_warning() == ""
