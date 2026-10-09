@@ -24,3 +24,8 @@ REAL: link id, endpoint coordinates, published frequencies. SYNTHETIC: terrain (
 * QGIS runner uses the sibling `aei-*/src` checkouts (as `tests/conftest.py` does), not the PyPI wheels a shipped plugin loads.
 * Map runner takes sample points from the fixture instead of `app.js`'s own sampling (DOM-bound).
 * ECCC station/radar are stubbed as "none found" in both products; hourly history is not exercised.
+
+## Rain-stage requirement (2026-10-09)
+The weather expectations in the fixtures were recomputed by the Map workstream from the ITU-R P.838-3 equations (Map commit `d2090c3`: new `ca-rain-{6,7,8,11}ghz`, `us-rain-*`, `sb2-*` fixtures). They match only an
+`aei-microwave-link-exposure` that reproduces the Recommendation (0.2.0+). `run_parity.sh` refuses to run against an older one (exit 3). Negative control (OBSERVED): with 0.1.5 the harness reports 96 problems;
+with 0.2.0 built from the library repo (`4b13f64`): 68 fixtures, 1,414 stage comparisons, 0 non-MATCH.
