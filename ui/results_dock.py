@@ -204,6 +204,11 @@ class VeloronaResultsDock(QDockWidget):
         for name, image in charts.images_for(names, brief, self._dark).items():
             document.addResource(QTextDocument.ResourceType.ImageResource,
                                  QUrl(operational_view.CHART_PREFIX + name), image)
+        # Charts are drawn 400 px wide; in a narrower dock scale them to fit instead of forcing a
+        # horizontal scrollbar. The width is read at render time.
+        avail = self.browser.viewport().width() - 24
+        if 120 < avail < charts.WIDTH:
+            body = body.replace("<img src=", f"<img width='{avail}' src=")
         self.browser.setHtml(report_style(self._dark) + body)
 
     def _rerender(self) -> None:

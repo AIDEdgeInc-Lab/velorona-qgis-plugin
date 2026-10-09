@@ -45,6 +45,10 @@ echo "== QGIS end-to-end runtime test =="
 "$QGISPY" "$HERE/qgis_e2e.py"
 
 echo
+echo "== QGIS UI polish end-to-end test =="
+"$QGISPY" "$HERE/qgis_ui_polish_e2e.py"
+
+echo
 echo "== QGIS USA support end-to-end test (synthetic pack, no network) =="
 "$QGISPY" "$HERE/qgis_usa_e2e.py"
 

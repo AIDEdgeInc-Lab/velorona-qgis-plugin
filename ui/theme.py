@@ -151,6 +151,16 @@ def widget_stylesheet(dark: bool = True) -> str:
         border: 1px solid {ACCENT_LINE}; border-radius: 6px;
         padding: 6px 12px; font-size: 11.5px;
     }}
+    QToolButton {{
+        background: {ACCENT_SOFT}; color: {ACCENT_STRONG};
+        border: 1px solid {ACCENT_LINE}; border-radius: 6px;
+        padding: 5px 10px; font-size: 11.5px;
+    }}
+    QToolButton:hover {{ border-color: {ACCENT}; }}
+    QToolButton::menu-indicator {{ image: none; width: 0; }}
+    QMenu {{ background: {SURFACE}; color: {TEXT}; border: 1px solid {BORDER}; }}
+    QMenu::item:selected {{ background: {ACCENT_DEEP}; }}
+    QMenu::item:disabled {{ color: {TEXT_FAINT}; }}
     QPushButton:hover {{ background: rgba(95, 152, 209, 0.22); border-color: {ACCENT}; }}
     QPushButton:pressed {{ background: {ACCENT_DEEP}; color: {TEXT}; }}
     QScrollBar:vertical, QScrollBar:horizontal {{ background: {BG}; width: 10px; height: 10px; border: none; }}
