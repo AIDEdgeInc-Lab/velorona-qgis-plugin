@@ -44,6 +44,16 @@ def main(path, expected=None):
     notes.append(f"metadata.txt: name={meta.get('name')} version={version} qgisMinimumVersion={meta.get('qgisMinimumVersion')}")
     if expected and version != expected:
         problems.append(f"metadata.txt version {version!r} != expected {expected!r}")
+    # The QGIS plugin repository reads metadata.txt with Python's configparser (interpolation on): a lone '%' is rejected.
+    import configparser
+    parser = configparser.ConfigParser()
+    try:
+        parser.read_string(z.read("velorona/metadata.txt").decode("utf-8"))
+        for key in parser["general"]:
+            parser["general"][key]
+        notes.append("metadata.txt parses with configparser interpolation (as the plugin repository does)")
+    except (configparser.Error, KeyError) as exc:
+        problems.append(f"metadata.txt is rejected by the plugin repository's parser: {str(exc)[:160]}")
     req = z.read("velorona/requirements.txt").decode()
     notes.append("requirements.txt: " + "; ".join(ln for ln in req.splitlines() if ln and not ln.startswith("#")))
     total = sum(i.file_size for i in infos)
