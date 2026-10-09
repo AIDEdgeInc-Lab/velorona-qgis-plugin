@@ -7,7 +7,9 @@ reported after the pack's index AND one real tile were read and validated, and t
 
 from __future__ import annotations
 
+import html
 import os
+import string
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -105,8 +107,7 @@ def check_source(text: str, get: Optional[Callable] = None) -> SetupCheck:
                       link_count=links, source_date=attribution.source_file_updated, pack_date=attribution.pack_generated, note=note)
 
 
-def help_html() -> str:
-    return f"""
+_HELP_TEMPLATE = string.Template("""
 <h3>What is the USA data pack?</h3>
 <p>US radio links come from the FCC's public licence records (Universal Licensing System, microwave services). Velorona turns them into a
 <b>separate data pack</b>: a folder with an <code>index.json</code> file and a <code>tiles</code> folder (about 14&nbsp;MB).
@@ -114,7 +115,7 @@ It is <b>not included in the plugin</b> because of its size and because the FCC
 refreshes the data weekly. Canada works without it.</p>
 <h3>Easiest: use Velorona's online data</h3>
 <p>Press <b>Use Velorona's online USA data</b>. Velorona then reads only the small tiles under the map view you ask for (never the whole country), from
-<code>{VELORONA_ONLINE_PACK}</code>. Nothing is downloaded until you press <i>Load USA Links in View</i>.</p>
+<code>${online_pack}</code>. Nothing is downloaded until you press <i>Load USA Links in View</i>.</p>
 <h3>Or keep a copy on your computer</h3>
 <ol><li>Get a Velorona USA data pack (the Velorona Map project builds it from the FCC file; see the guide linked below).</li>
 <li>Unzip it so you have one folder that <b>directly contains</b> <code>index.json</code> and <code>tiles/</code>.</li>
@@ -125,5 +126,10 @@ measurement. Source and dates are shown on the layer and in every export.</li>
 <li>US antenna heights are <b>assumed to be 30&nbsp;m</b> and are labelled "Assumed": the FCC's field documentation does not state the unit or
 reference of its height field.</li>
 <li>A view that would load more than 20,000 links is refused with a request to zoom in.</li></ul>
-<p><a href="{HELP_DOC}">Full guide (docs/USA.md)</a></p>
-"""
+<p><a href="${help_doc}">Full guide (docs/USA.md)</a></p>
+""")
+
+
+def help_html() -> str:
+    """The USA data help page. Plain template substitution (not string formatting) with the two URLs escaped for HTML text and attributes."""
+    return _HELP_TEMPLATE.substitute(online_pack=html.escape(VELORONA_ONLINE_PACK, quote=True), help_doc=html.escape(HELP_DOC, quote=True))

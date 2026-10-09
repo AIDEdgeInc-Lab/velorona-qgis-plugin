@@ -48,6 +48,16 @@ class Failure:
         return detail
 
 
+def _body_text(response) -> str:
+    """The lower-cased response body, or "" when it cannot be read (a dropped connection while streaming, an already-consumed or undecodable
+    body): the failure is then classified by its HTTP status alone. Only the errors reading a body can raise are caught."""
+    import requests
+    try:
+        return (getattr(response, "text", "") or "").lower()
+    except (requests.exceptions.RequestException, RuntimeError, ValueError):
+        return ""
+
+
 def classify(exc: BaseException) -> Failure:
     import requests
     response = getattr(exc, "response", None)
@@ -55,11 +65,7 @@ def classify(exc: BaseException) -> Failure:
     if status is None:
         match = re.match(r"\s*(\d{3})\b", str(exc))
         status = int(match.group(1)) if match else None
-    text = ""
-    try:
-        text = (getattr(response, "text", "") or "").lower()
-    except Exception:       # a response whose body cannot be read is classified by status alone
-        pass
+    text = _body_text(response)
     retry_after = None
     try:
         header = (getattr(response, "headers", None) or {}).get("Retry-After")

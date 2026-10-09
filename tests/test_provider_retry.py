@@ -166,3 +166,26 @@ def test_weather_provider_gives_up_after_the_bound(no_real_backoff_sleep):
     with pytest.raises(requests.exceptions.HTTPError):
         p.get_current(site)
     assert len(n) == 3 and no_real_backoff_sleep == [1.0, 3.0]
+
+
+class _UnreadableBody:
+    """A response whose body raises when read (dropped connection, consumed stream, undecodable bytes)."""
+    def __init__(self, status, error):
+        self.status_code, self.headers, self._error = status, {}, error
+
+    @property
+    def text(self):
+        raise self._error
+
+
+@pytest.mark.parametrize("error", [requests.exceptions.ChunkedEncodingError("cut"), RuntimeError("content already consumed"),
+                                   UnicodeDecodeError("utf-8", b"\xff", 0, 1, "bad")])
+def test_unreadable_body_is_classified_by_status_alone(error):
+    assert PR.classify(requests.exceptions.HTTPError("x", response=_UnreadableBody(503, error))).kind == "server error"
+    f = PR.classify(requests.exceptions.HTTPError("x", response=_UnreadableBody(429, error)))
+    assert (f.kind, f.transient, f.daily) == ("rate limit", True, False)       # without the body there is no "daily" evidence
+
+
+def test_unrelated_errors_while_reading_the_body_are_not_swallowed():
+    with pytest.raises(KeyError):
+        PR.classify(requests.exceptions.HTTPError("x", response=_UnreadableBody(500, KeyError("bug"))))

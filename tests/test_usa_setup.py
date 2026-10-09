@@ -153,3 +153,12 @@ def test_help_text_is_honest_and_actionable():
                    "assumed to be 30", "licensee-reported", "20,000"):
         assert needle in h, needle
     assert "RAAT" not in h                       # no invented FCC height semantics
+
+
+def test_help_links_are_present_and_escaped_for_html(monkeypatch):
+    h = U.help_html()
+    assert f'<code>{U.VELORONA_ONLINE_PACK}</code>' in h and f'<a href="{U.HELP_DOC}">Full guide (docs/USA.md)</a>' in h
+    assert "${" not in h and "$online_pack" not in h
+    monkeypatch.setattr(U, "HELP_DOC", 'https://x.test/a?b=1&c="2"<script>')
+    out = U.help_html()
+    assert '<a href="https://x.test/a?b=1&amp;c=&quot;2&quot;&lt;script&gt;">' in out and "<script>" not in out
