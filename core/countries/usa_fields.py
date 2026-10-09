@@ -22,5 +22,3 @@ US_LINK_FIELDS = FIXED_LINK_FIELDS + [
     ("site_a_height_m", QVariant.Double), ("site_b_height_m", QVariant.Double), ("height_source", QVariant.String),
 ]
 
-# Optional record antenna heights on Canadian link layers (only when a heights sidecar is present; see core/countries/canada.py).
-CA_HEIGHT_FIELDS = [("site_a_height_m", QVariant.Double), ("site_b_height_m", QVariant.Double), ("height_source", QVariant.String)]

@@ -147,7 +147,7 @@ two cannot disagree. Sheets that do not apply say so in one line.
    (default 7.0 GHz) and is **Assumed**. For ONE selected link the dialog is pre-filled with the record's
    highest published frequency and it is typed **Observed** while it still equals that value, **Assumed**
    (with the record's value named) once you change it — the same rule as Velorona Map, which pre-fills it
-   from the record. Antenna heights follow the same rule when a record carries one (US regional extract);
+   from the record. Antenna heights follow the same rule when a record carries one (Canadian links: ISED column 29, snapshot /1.1; US records carry none that are verified);
    otherwise they are the 30 m default, Assumed (`core/record_source.py`).
 3. **Critical point.** Calculation unchanged. Defined wherever it appears: the critical
    (tightest) point is where the **Fresnel-zone clearance fraction** (clearance / first Fresnel

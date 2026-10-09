@@ -1,11 +1,15 @@
 """Does the INSTALLED rain model reproduce Recommendation ITU-R P.838-3? A cheap, pure, read-only spot check run when a result needs to say so. Stdlib only.
 
-It calls the library's public ``physics.rain_coefficients`` (no mutation, no network) at three frequencies and compares k and alpha, both polarizations, with the
-Recommendation's own Table 5. SOURCE of the reference numbers: Rec. ITU-R P.838-3 (03/2005) Table 5, https://www.itu.int/dms_pubrec/itu-r/rec/p/R-REC-P.838-3-200503-I!!PDF-E.pdf
+It calls the library's public ``physics.rain_coefficients`` (no mutation, no network) at three frequencies and compares k and alpha, both
+polarizations, with the
+Recommendation's own Table 5. SOURCE of the reference numbers: Rec. ITU-R P.838-3 (03/2005) Table 5,
+https://www.itu.int/dms_pubrec/itu-r/rec/p/R-REC-P.838-3-200503-I!!PDF-E.pdf
 (sha256 3ab7482993e51fc63c5127a72e9e8930614e73652ac614882760817e7c1469cb), copied from the document text, not from memory.
 
-Why it exists: releases of aei-microwave-link-exposure up to 0.1.5 looked coefficients up in a 24-row table that differed from the Recommendation in 21 rows (QGIS and
-Map audits, 2026-10-09); 0.2.0 evaluates the Recommendation's equations. Rather than trust a version string, the plugin checks behaviour, so the open-issue notice
+Why it exists: releases of aei-microwave-link-exposure up to 0.1.5 looked coefficients up in a 24-row table that differed from the Recommendation in
+21 rows (QGIS and
+Map audits, 2026-10-09); 0.2.0 evaluates the Recommendation's equations. Rather than trust a version string, the plugin checks behaviour, so the
+open-issue notice
 appears exactly when the installed model is wrong and disappears when it is not. It is a spot check at 3 frequencies, NOT a validation of the model.
 """
 

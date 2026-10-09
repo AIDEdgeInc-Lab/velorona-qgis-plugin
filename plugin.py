@@ -27,7 +27,7 @@ from .core.colors import COLORS, layer_color
 from .core.countries import usa as usa_pack
 from .core.countries.base import PackError
 from .core.countries.canada import CanadaProvider
-from .core.countries.usa_fields import CA_HEIGHT_FIELDS, US_LINK_FIELDS, US_SITE_FIELDS
+from .core.countries.usa_fields import US_LINK_FIELDS, US_SITE_FIELDS
 from .core.engines import microwave_exposure, satellite_earth_space, terrestrial
 from .core import dependencies, inspector
 from .core.inspector import feature_to_entry
@@ -744,9 +744,7 @@ class VeloronaPlugin:
         try:
             loaded = CanadaProvider().load_all()      # identical to terrestrial_public.load_fixed_service_snapshot()
             sites, links = loaded.sites, loaded.links
-            link_fields = terrestrial_public.FIXED_LINK_FIELDS + (CA_HEIGHT_FIELDS if loaded.heights_attached else [])
-            if loaded.heights_error:
-                problems.append(loaded.heights_error)
+            link_fields = terrestrial_public.FIXED_LINK_FIELDS
             sites_layer = self._ensure_public_layer(
                 layer_helpers.SOURCE_FIXED_SITES, infra_group, visible=True, kind="site",
                 build=lambda: layer_helpers.build_point_layer(

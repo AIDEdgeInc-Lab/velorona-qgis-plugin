@@ -1,0 +1,376 @@
+{
+ "schema": "velorona.parity-fixture/1",
+ "id": "ca-h-short",
+ "tags": [
+  "short",
+  "record-heights"
+ ],
+ "note": "short link, record heights [010018561-004, 0.94 km, 23.575 GHz]",
+ "selection": {
+  "rule": "see parity/build_ca_height_fixtures.py docstring",
+  "pack": "ca-ised-fixed",
+  "snapshot_sha256": "e10a3ad16d23c6ca07334bc66bf985b2574b5db8de777d4ce5978d1a0e88c50e",
+  "link_id": "010018561-004",
+  "licensee": "Rogers Communications Canada Inc.",
+  "published_frequencies_mhz": [
+   22375.0,
+   23575.0
+  ]
+ },
+ "link": {
+  "site_a": {
+   "id": "ised-fixed-50.09758,-123.00328",
+   "lat": 50.09758,
+   "lon": -123.00328,
+   "height_m": 28.0,
+   "height_origin": "Observed",
+   "height_source": "ISED Fixed Service record -- ISED SMS Authorization Data Extract, column 29 'Height above ground level [m]'; licensee-submitted record value, not a field measurement",
+   "description": "WHISTLER (5097 ALTA LAKE RD) BC"
+  },
+  "site_b": {
+   "id": "ised-fixed-50.10401,-122.99472",
+   "lat": 50.10401,
+   "lon": -122.99472,
+   "height_m": 20.0,
+   "height_origin": "Observed",
+   "height_source": "ISED Fixed Service record -- ISED SMS Authorization Data Extract, column 29 'Height above ground level [m]'; licensee-submitted record value, not a field measurement",
+   "description": "WHISTLER  (5383 ALTA LAKE RD) BC"
+  },
+  "frequency_ghz": 23.575,
+  "frequency_origin": "Observed",
+  "polarization": "V",
+  "polarization_origin": "Assumed",
+  "fade_margin_db": 32.0,
+  "fade_margin_origin": "Assumed"
+ },
+ "terrain": {
+  "mode": "samples",
+  "source": "SYNTHETIC: 100 m flat + triangular hump",
+  "hump_m": 20.877,
+  "target_percent_fresnel_clear": 2.0,
+  "samples": [
+   [
+    50.09758,
+    -123.00328,
+    100.0
+   ],
+   [
+    50.097711231,
+    -123.003105329,
+    100.852122
+   ],
+   [
+    50.097842461,
+    -123.002930657,
+    101.704245
+   ],
+   [
+    50.097973692,
+    -123.002755984,
+    102.556367
+   ],
+   [
+    50.098104922,
+    -123.002581311,
+    103.40849
+   ],
+   [
+    50.098236151,
+    -123.002406636,
+    104.260612
+   ],
+   [
+    50.098367381,
+    -123.00223196,
+    105.112735
+   ],
+   [
+    50.09849861,
+    -123.002057284,
+    105.964857
+   ],
+   [
+    50.098629839,
+    -123.001882606,
+    106.81698
+   ],
+   [
+    50.098761068,
+    -123.001707927,
+    107.669102
+   ],
+   [
+    50.098892296,
+    -123.001533248,
+    108.521224
+   ],
+   [
+    50.099023524,
+    -123.001358567,
+    109.373347
+   ],
+   [
+    50.099154752,
+    -123.001183886,
+    110.225469
+   ],
+   [
+    50.09928598,
+    -123.001009204,
+    111.077592
+   ],
+   [
+    50.099417207,
+    -123.00083452,
+    111.929714
+   ],
+   [
+    50.099548434,
+    -123.000659836,
+    112.781837
+   ],
+   [
+    50.099679661,
+    -123.000485151,
+    113.633959
+   ],
+   [
+    50.099810888,
+    -123.000310464,
+    114.486082
+   ],
+   [
+    50.099942114,
+    -123.000135777,
+    115.338204
+   ],
+   [
+    50.10007334,
+    -122.999961089,
+    116.190327
+   ],
+   [
+    50.100204566,
+    -122.9997864,
+    117.042449
+   ],
+   [
+    50.100335791,
+    -122.99961171,
+    117.894571
+   ],
+   [
+    50.100467017,
+    -122.999437019,
+    118.746694
+   ],
+   [
+    50.100598242,
+    -122.999262327,
+    119.598816
+   ],
+   [
+    50.100729466,
+    -122.999087634,
+    120.450939
+   ],
+   [
+    50.100860691,
+    -122.99891294,
+    120.450939
+   ],
+   [
+    50.100991915,
+    -122.998738245,
+    119.598816
+   ],
+   [
+    50.101123139,
+    -122.99856355,
+    118.746694
+   ],
+   [
+    50.101254363,
+    -122.998388853,
+    117.894571
+   ],
+   [
+    50.101385586,
+    -122.998214155,
+    117.042449
+   ],
+   [
+    50.101516809,
+    -122.998039456,
+    116.190327
+   ],
+   [
+    50.101648032,
+    -122.997864757,
+    115.338204
+   ],
+   [
+    50.101779255,
+    -122.997690056,
+    114.486082
+   ],
+   [
+    50.101910477,
+    -122.997515355,
+    113.633959
+   ],
+   [
+    50.102041699,
+    -122.997340652,
+    112.781837
+   ],
+   [
+    50.102172921,
+    -122.997165949,
+    111.929714
+   ],
+   [
+    50.102304143,
+    -122.996991244,
+    111.077592
+   ],
+   [
+    50.102435364,
+    -122.996816539,
+    110.225469
+   ],
+   [
+    50.102566585,
+    -122.996641833,
+    109.373347
+   ],
+   [
+    50.102697806,
+    -122.996467125,
+    108.521224
+   ],
+   [
+    50.102829027,
+    -122.996292417,
+    107.669102
+   ],
+   [
+    50.102960247,
+    -122.996117708,
+    106.81698
+   ],
+   [
+    50.103091467,
+    -122.995942998,
+    105.964857
+   ],
+   [
+    50.103222687,
+    -122.995768287,
+    105.112735
+   ],
+   [
+    50.103353906,
+    -122.995593575,
+    104.260612
+   ],
+   [
+    50.103485126,
+    -122.995418862,
+    103.40849
+   ],
+   [
+    50.103616345,
+    -122.995244148,
+    102.556367
+   ],
+   [
+    50.103747563,
+    -122.995069433,
+    101.704245
+   ],
+   [
+    50.103878782,
+    -122.994894717,
+    100.852122
+   ],
+   [
+    50.10401,
+    -122.99472,
+    100.0
+   ]
+  ]
+ },
+ "weather": {
+  "mode": "snapshot",
+  "source": "SYNTHETIC raw Open-Meteo `current` object (units: mm per `interval` s; snowfall cm)",
+  "sites": {
+   "A": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 0.0,
+     "rain": 0.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 1
+    }
+   },
+   "B": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 0.0,
+     "rain": 0.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 1
+    }
+   }
+  }
+ },
+ "synthetic": [
+  "fade_margin_db",
+  "polarization",
+  "terrain",
+  "weather"
+ ],
+ "expected": {
+  "schema": "velorona.parity-expected/1",
+  "spec": "0.3",
+  "curvature": "canonical (bulge subtracted from clearance, P11)",
+  "terrain": {
+   "status": "CLEAR",
+   "no_data": null,
+   "distance_km": 0.940191610959851,
+   "critical_index": 25,
+   "available_m": 3.454426187221742,
+   "required_m": 1.036237330870356,
+   "margin_m": 2.418188856351386,
+   "ratio": 3.3336245320560893,
+   "percent_fresnel_clear": 2.000174719233654,
+   "fresnel_radius_m": 1.7270622181172601,
+   "near_threshold": true
+  },
+  "weather": {
+   "status": "CLEAR",
+   "no_data": null,
+   "attenuation_db": 0.0,
+   "ratio": 0.0,
+   "fade_margin_db": 32.0,
+   "precip": {
+    "class": "NONE",
+    "flags": [],
+    "rate_mm_h": 0.0,
+    "liquid_mm": 0.0
+   },
+   "status_without_r1": "CLEAR"
+  },
+  "overall": "CLEAR"
+ },
+ "inputs_sha256": "f08ebd22586e92f400104e19ecc4f4c656663d163e3bdc5d3d0d41f278042cfc"
+}

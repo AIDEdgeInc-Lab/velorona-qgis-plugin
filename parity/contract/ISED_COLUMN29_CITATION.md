@@ -16,3 +16,6 @@ The Map workstream's note (HEIGHT_AND_PLAUSIBILITY_MAP.md) gave the source; this
 | Raw copy | `~/velorona-parity-audit/snapshots/raw/ised/tafl_description_ltaf.pdf` (+ `d.txt`, pdftotext -layout) |
 
 Provenance wording used by the plugin: "ISED SMS Authorization Data Extract (Fixed Service), column 29 'Height above ground level [m]', record-reported value, source file dated YYYY-MM-DD".
+
+## Update 2026-10-09 (stage 2, final)
+The plugin no longer reads the raw CSV. It bundles the Map's snapshot schema `velorona.ca-ised-fixed/1.1` (sha256 `e10a3ad16d23c6ca07334bc66bf985b2574b5db8de777d4ce5978d1a0e88c50e`, byte-identical), whose builder checks the column layout fail-closed on every build (Map `HEIGHTS_CONTRACT.md` section 1). Value rule: the first raw row (file order) per endpoint (the QGIS "lowest in-range" proposal was withdrawn to match the Map).

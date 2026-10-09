@@ -331,18 +331,16 @@ def test_real_pack_dedup_matches_the_index():
 from usa_pack_builder import extract, write_extract  # noqa: E402
 
 
-def test_extract_loads_records_with_heights_and_the_height_source(tmp_path):
+def test_extract_loads_records_but_ignores_fcc_heights(tmp_path):
+    """FCC 'Height to Center RAAT' has no stated unit/reference (Map HEIGHTS_CONTRACT.md section 2): the extract's values are NOT used, every US height stays the Assumed default."""
     p = usa.make_provider(write_extract(str(tmp_path)))
     assert isinstance(p, usa.UsaExtractProvider)
     r = p.load_bbox((-79.0, 42.0, -76.0, 44.0))
     one = next(x for x in r.links if x["id"] == "fcc-link-1-1")
     assert one["authorization_number"] == "WAAA001-1" and one["frequencies_mhz"] == "11245, 6078.625"
-    assert one["site_a_height_m"] == 32.5 and one["site_b_height_m"] == 45.0
-    assert "Height to Center RAAT" in one["height_source"] and "not a field measurement" in one["height_source"]
-    assert "lowest path number" in one["height_source"]                                  # the extract's own selection rule travels with the value
+    assert one["site_a_height_m"] is None and one["site_b_height_m"] is None and one["height_source"] is None
     assert one["attribution"] == ATTRIBUTION and one["country"] == "US"
-    two = next(x for x in r.links if x["id"] == "fcc-link-2-1")
-    assert two["site_a_height_m"] is None                                                # a height the record does not carry stays absent, never 0 or 30
+    assert all(x["site_a_height_m"] is None and x["site_b_height_m"] is None for x in r.links)
 
 
 def test_extract_view_filter_and_budget(tmp_path):
@@ -393,7 +391,7 @@ def test_real_extract_loads_whole_with_contract_counts():
     p = usa.make_provider(os.environ["VELORONA_US_EXTRACT"])
     r = p.load_bbox((-80.0, 42.0, -77.0, 44.0))
     assert len(r.links) == 1403 and len(r.sites) == 892                                    # contract section 4
-    assert sum(1 for x in r.links if x["site_a_height_m"] is not None and x["site_b_height_m"] is not None) == 1395
+    assert all(x["site_a_height_m"] is None for x in r.links)
 
 
 def test_https_pack_that_redirects_to_plain_http_is_refused(pack):

@@ -11,7 +11,7 @@ from aei_link_clearance import LinkClearanceResult, analyze_link, explain
 from aei_link_clearance import terrain as _library_terrain
 
 from ..provider_retry import call_with_backoff, classify
-from ..record_source import (FCC_HEIGHT_LABEL, frequency_ghz_from_record, frequency_origin, height_origin, is_fcc, record_labels)
+from ..record_source import (frequency_ghz_from_record, frequency_origin, height_origin, record_labels)
 from ..validation import NoDataError, require_corrected_clearance, terrain_input_reasons
 
 from ..features import feature_attr, feature_id_name, feature_to_latlon
@@ -125,13 +125,13 @@ def analyze(entries, params: dict) -> TerrestrialAnalysisResult:
 def record_heights(link_attrs: dict) -> Tuple[Optional[float], Optional[float], str]:
     """(height_a_m, height_b_m, source text) a link record itself carries, or None for a height it does not carry.
 
-    Neither the Canadian snapshot nor the USA pack (schema /1) carries heights; the regional extract (velorona.usa-extract/1) does. A value that
+    Only the Canadian snapshot (schema /1.1, ISED column 29) carries verified record heights; the USA pack and extract do not (FCC unit/reference unverified). A value that
     is not a finite number is treated as absent here -- explicit range validation (0.1-1000 m, NO DATA outside) happens at the analysis boundary."""
     def one(key):
         v = link_attrs.get(key)
         return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and v == v and abs(v) != float("inf") else None
     a, b = one("site_a_height_m"), one("site_b_height_m")
-    source = str(link_attrs.get("height_source") or (FCC_HEIGHT_LABEL if is_fcc(link_attrs) else "Record"))
+    source = str(link_attrs.get("height_source") or "Record")
     return a, b, source
 
 

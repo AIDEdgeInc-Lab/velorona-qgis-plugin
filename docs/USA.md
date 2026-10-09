@@ -9,11 +9,11 @@ U.S. Federal Communications Commission, Universal Licensing System (ULS) public 
 1. Obtain a Velorona USA data pack (the Velorona Map project builds it; see its `docs/USA_FCC_ULS_PACK.md`). It is a folder containing `index.json` and `tiles/`, about 14 MB, refreshed when the FCC file is. It is **not** inside the plugin (size and update cadence).
 2. **Explore: Set USA Data Pack Source** — a folder path or an https address. The source is checked immediately and the result (found, missing, corrupt, wrong version, unreachable) is shown. It is saved in the QGIS **project** (Velorona never writes your global QGIS settings); if the project has none, the environment variable `VELORONA_USA_PACK` is used.
 3. Zoom to an area and **Explore: Load USA Links in View**. Only the 1° tiles touching the view are read. The index's own counts are checked first: more than 20,000 links or 36 tiles is refused ("zoom in"). Links that cross a tile edge appear once.
-4. A `.json` source (instead of a folder) is read as a *regional extract* (`velorona.usa-extract/1`), which also carries the licensee-reported FCC antenna height ("Height to Center RAAT").
+4. A `.json` source (instead of a folder) is read as a *regional extract* (`velorona.usa-extract/1`). Its raw FCC antenna-height values are ignored (see below).
 
 ## What is analysed, and what is assumed
 * **Frequency** — highest of the record's frequencies, in MHz ÷ 1000 → GHz. Observed while unchanged; Assumed once you change it.
-* **Antenna heights** — not in the standard pack: 30 m, **Assumed**. From an extract: the record value, Observed, labelled "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement". Outside 0.1–1000 m → NO DATA, never clamped.
+* **Antenna heights** — 30 m, **Assumed**. The FCC field "Height to Center RAAT" exists in the raw record, but the FCC's field documentation states neither its unit nor its reference (and does not define "RAAT"), so by the shared heights contract it is not used in any decision (Map `parity/contract/HEIGHTS_CONTRACT.md` section 2). A height you enter is Assumed.
 * **Polarization, fade margin** — Assumed (not published by the FCC).
 * **Weather** — Open-Meteo model values. The ECCC station/radar cross-check covers Canada only; for US links it reports "Not determined". A highest frequency below 1 GHz is outside the rain model's range: **weather NO DATA** (13,079 of 250,874 links, 5.21 %); terrain is still decided.
 * **Terrain** — Open-Meteo elevation (Copernicus GLO-90, a 90 m surface model). A rate-limited or failed lookup is reported as unavailable elevation (NO DATA with the reason), never as a status.
