@@ -111,6 +111,7 @@ class Brief:
     evidence: List[Fact] = field(default_factory=list)
     changes: List[Change] = field(default_factory=list)
     sites: List[SiteWeather] = field(default_factory=list)
+    heading: str = ""       # on-screen link title (authorization number + endpoints); `location` stays as exported
     caveats: List[str] = field(default_factory=list)
     inspect: str = ""       # what a technician should look at
     # Raw numbers behind the text, un-rounded, for Ask and for the workbook's
@@ -134,3 +135,16 @@ def exact(value: float) -> str:
     stays 7.25, 18.0 reads 18) -- same principle as core.export._exact."""
     text = repr(float(value))
     return text[:-2] if text.endswith(".0") else text
+
+
+_NO_AUTHORIZATION = {"", "link", "none", "null", "nan"}
+
+
+def link_title(authorization, site_a: str = "Site A", site_b: str = "Site B", arrow: str = "\u2194") -> str:
+    """"<authorization> \u00b7 Site A \u2194 Site B". The authorization number is shown only when the
+    record actually carries one; a missing or placeholder value yields the plain endpoint pair."""
+    auth = "" if authorization is None else " ".join(str(authorization).split())
+    pair = f"{site_a} {arrow} {site_b}"
+    if auth.lower() in _NO_AUTHORIZATION or len(auth) > 40:
+        return pair
+    return f"{auth} \u00b7 {pair}"

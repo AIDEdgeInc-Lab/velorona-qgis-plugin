@@ -99,6 +99,20 @@ LINK_INK_DARK = {"color": COLORS_DARK["fixed-links"], "alpha": 90}
 LINK_INK_LIGHT = {"color": COLORS_LIGHT["fixed-links"], "alpha": 128}
 
 
+def fade_link_with_scale(symbol, color) -> None:
+    """Fade and thin a link line as the view widens (see VIEW_SCALE_WIDE); full strength when zoomed in.
+    The base colour stays the type hue; only the data-defined stroke colour/width vary,
+    so the symbol's own colour (what tests and exports read) is unchanged."""
+    layer = symbol.symbolLayer(0)
+    a = color.alpha()
+    layer.setDataDefinedProperty(QgsSymbolLayer.Property.StrokeColor, QgsProperty.fromExpression(
+        f"color_rgba({color.red()},{color.green()},{color.blue()},"
+        + scale_case(round(a * LINK_ALPHA_FACTOR_WIDE), round(a * LINK_ALPHA_FACTOR_MEDIUM), round(a * LINK_ALPHA_FACTOR_CLOSE))
+        + ")"))
+    layer.setDataDefinedProperty(QgsSymbolLayer.Property.StrokeWidth, QgsProperty.fromExpression(
+        scale_case(round(LINE_WIDTH_PX * LINK_WIDTH_FACTOR_WIDE, 2), LINE_WIDTH_PX, LINE_WIDTH_PX)))
+
+
 def link_symbol(dark: bool = True) -> QgsLineSymbol:
     ink = LINK_INK_DARK if dark else LINK_INK_LIGHT
     color = QColor(ink["color"])
@@ -107,6 +121,7 @@ def link_symbol(dark: bool = True) -> QgsLineSymbol:
     symbol.setColor(color)
     symbol.setWidth(LINE_WIDTH_PX)
     symbol.setWidthUnit(Qgis.RenderUnit.Pixels)
+    fade_link_with_scale(symbol, color)
     return symbol
 
 
@@ -223,6 +238,28 @@ CLUSTER_SIZE_EXPRESSION = (
     f"WHEN @cluster_size < 100 THEN {CLUSTER_SIZE_MEDIUM_PX} "
     f"ELSE {CLUSTER_SIZE_LARGE_PX} END"
 )
+
+# Zoom-dependent calm (1.1.7 UI polish). A wide view shows many clusters and, for the US, tens of thousands of link lines; drawn at full strength they read as a
+# dense mass. So the ink FADES and the discs SHRINK as the view widens, and return to the original strength when zoomed in,
+# where there are few and each matters.
+# Nothing about the data, the clustering (tolerance, counts) or the selection changes; only how loudly the same things are drawn. Thresholds are map scales
+# (denominators), PROPOSED from rendering the US pack at ~1:1,000,000 (regional), ~1:200,000 (medium) and ~1:20,000 (close-up).
+VIEW_SCALE_WIDE = 600000             # wider than 1:600,000
+VIEW_SCALE_MEDIUM = 150000           # between 1:150,000 and 1:600,000
+CLUSTER_FILL_ALPHA_WIDE = 46         # of 255; the full-strength value is CLUSTER_FILL_ALPHA below (used when zoomed in)
+CLUSTER_FILL_ALPHA_MEDIUM = 70
+CLUSTER_SIZE_FACTOR_WIDE = 0.8       # of the 32/40/48 px tiers
+CLUSTER_SIZE_FACTOR_MEDIUM = 0.9
+LINK_ALPHA_FACTOR_WIDE = 0.3         # of the link ink's alpha
+LINK_ALPHA_FACTOR_MEDIUM = 0.55
+LINK_ALPHA_FACTOR_CLOSE = 0.8
+LINK_WIDTH_FACTOR_WIDE = 0.75
+
+
+def scale_case(wide, medium, close) -> str:
+    """A QGIS expression choosing a value by the current map scale."""
+    return f"CASE WHEN @map_scale > {VIEW_SCALE_WIDE} THEN {wide} WHEN @map_scale > {VIEW_SCALE_MEDIUM} THEN {medium} ELSE {close} END"
+
 
 # Cluster ink, as "r,g,b,a" (alpha out of 255), derived from each layer's own
 # type colour rather than one shared accent. The web map's own
@@ -477,7 +514,12 @@ def cluster_symbol(color_hex: str, dark: bool = True) -> QgsMarkerSymbol:
         "size_unit": "Pixel",
     })
     disc.setDataDefinedProperty(
-        QgsSymbolLayer.Property.Size, QgsProperty.fromExpression(CLUSTER_SIZE_EXPRESSION))
+        QgsSymbolLayer.Property.Size, QgsProperty.fromExpression(
+            f"({CLUSTER_SIZE_EXPRESSION}) * " + scale_case(CLUSTER_SIZE_FACTOR_WIDE, CLUSTER_SIZE_FACTOR_MEDIUM, 1.0)))
+    fr, fg, fb, _ = (int(v) for v in ink["fill"].split(","))
+    disc.setDataDefinedProperty(
+        QgsSymbolLayer.Property.FillColor, QgsProperty.fromExpression(
+            f"color_rgba({fr},{fg},{fb}," + scale_case(CLUSTER_FILL_ALPHA_WIDE, CLUSTER_FILL_ALPHA_MEDIUM, CLUSTER_FILL_ALPHA) + ")"))
 
     count = QgsFontMarkerSymbolLayer.create({
         "font": "Helvetica",
@@ -577,6 +619,7 @@ def build_link_layer(
     symbol.setColor(color)
     symbol.setWidth(LINE_WIDTH_PX)
     symbol.setWidthUnit(Qgis.RenderUnit.Pixels)
+    fade_link_with_scale(symbol, color)
     layer.setRenderer(QgsSingleSymbolRenderer(symbol))
     layer.setCustomProperty(VELORONA_KIND_PROPERTY, "link")
     if abstract:

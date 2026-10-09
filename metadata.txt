@@ -3,12 +3,13 @@ name=Velorona
 qgisMinimumVersion=4.0
 qgisMaximumVersion=4.99
 description=Telecom link evidence, inside QGIS. Explore -> Select -> Analyze -> Evidence -> Export.
-version=1.1.6
+version=1.1.7
 author=AID Edge Inc.
 email=sara.khosravi.ds@gmail.com
 license=GPL-2.0-or-later
 about=Velorona for QGIS -- Telecom link evidence, inside QGIS. 1. Explore -- Load public telecom infrastructure and your own data. 2. Select -- Choose a site, link, or two endpoints. 3. Analyze -- Run path clearance, microwave weather exposure, or satellite geometry. 4. Evidence -- See what is observed, what is calculated, and what is inferred. 5. Export -- Take the evidence with you as a structured CSV/GeoJSON result. Three analysis engines, all reused unmodified: Terrestrial Path Clearance (aei_link_clearance), Microwave Weather Exposure (aei_mw_exposure), Satellite/Earth-Space look angles (skyfield/SGP4). Requires aei-microwave-link-exposure (0.2.0 or newer), aei-link-clearance (0.2.0 or newer), aei-geo-features, and skyfield to be installed in QGIS's own Python environment.
-changelog=1.1.6 - Friendlier USA data setup. Nothing else changes: no calculation, status, data or Canada behaviour.
+changelog=1.1.7 - Calmer USA map and a tidier Records tab and Evidence view (appearance only: no calculation, status, data or Canada behaviour changes). USA cluster discs and link lines fade with map scale; link titles lead with the authorization number; Records has a Columns menu; narrow windows lay out cleanly.
+    1.1.6 - Friendlier USA data setup. Nothing else changes: no calculation, status, data or Canada behaviour.
     Explore: USA Data Setup... replaces the bare "type a folder path or web address" box that appeared when you pressed Load USA Links in View before USA data was set up. The new window explains that the USA data is a separate download that is not included in the plugin and that Canada works without it, and offers: Choose a folder... (the normal folder picker), Use Velorona's online USA data (reads only the tiles under the map view you ask for), or a web address (https), plus a built-in "How do I get the data?" guide.
     The window shows an honest status: Not set up yet / Ready (with the link count and date taken from the data itself, after the index and one real tile were read) / Problem (what is wrong and what to do: folder missing, index.json not found, damaged or incomplete data, newer data version, address unreachable). "Use this data" stays disabled until a check succeeds. Cancel changes nothing; "Forget the saved setting" removes it. Small slips are forgiven (typing index.json, quotes, choosing the folder above the pack).
     The window opens only when you ask for US data. Starting Velorona, loading Canada and every Canadian analysis never open it. The setting is still saved in the QGIS project (never in your global QGIS settings). US antenna heights are still 30 m and Assumed.

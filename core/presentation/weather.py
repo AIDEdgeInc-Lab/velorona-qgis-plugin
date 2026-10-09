@@ -20,7 +20,7 @@ from typing import Dict, Optional
 
 from .. import evidence_record
 from . import history as hist
-from .model import (AT_RISK, CLEAR, CRITICAL, NO_DATA, NOT_DETERMINED, WATCH, Brief, Fact, SiteWeather,
+from .model import (AT_RISK, CLEAR, CRITICAL, NO_DATA, NOT_DETERMINED, WATCH, Brief, Fact, SiteWeather, link_title,
                     exact, fmt, signed)
 
 # Mirrors of aei_mw_exposure.providers.eccc.find_nearest_station's defaults and
@@ -116,6 +116,7 @@ def exposure_brief(mw, param_origins: Optional[dict] = None, weather_error: Opti
     origins = param_origins or {}
     status, reason, answer = weather_status(exp)
     location = f"{link.site_a.name} ↔ {link.site_b.name}"
+    heading = link_title(getattr(link, "id", None), link.site_a.name, link.site_b.name)
 
     sites = []
     labels = {}
@@ -200,7 +201,7 @@ def exposure_brief(mw, param_origins: Optional[dict] = None, weather_error: Opti
         inspect += "."
 
     return Brief(
-        kind="weather", title="Weather exposure", location=location, status=status, reason=reason,
+        kind="weather", title="Weather exposure", location=location, heading=heading, status=status, reason=reason,
         answer=(answer + (" " + trend if trend else "")), key_facts=key_facts, technical=technical,
         evidence=evidence, changes=changes, sites=sites, caveats=caveats, inspect=inspect,
         data={

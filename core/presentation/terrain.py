@@ -22,7 +22,7 @@ check) is a verification FLAG shown beside the status; it never changes the stat
 from __future__ import annotations
 
 import math
-from .model import AT_RISK, CLEAR, CRITICAL, NO_DATA, NOT_DETERMINED, WATCH, Brief, Fact, exact, fmt, signed
+from .model import link_title, AT_RISK, CLEAR, CRITICAL, NO_DATA, NOT_DETERMINED, WATCH, Brief, Fact, exact, fmt, signed
 
 # Mirrors of library constants, kept in sync by tests/test_presentation_terrain.py
 # so this module stays importable without the aei_* packages (QGIS-free tests).
@@ -133,6 +133,7 @@ def terrain_brief(result) -> Brief:
     available, required = r.terrain_clearance_m, r.required_clearance_m
     margin = available - required
     location = f"{result.site_a_name} → {result.site_b_name}"
+    heading = link_title((getattr(result, "record", None) or {}).get("authorization_number"))
 
     where = ""
     if crit is not None:
@@ -184,7 +185,7 @@ def terrain_brief(result) -> Brief:
                    f"(lat {crit.latitude:.5f}, lon {crit.longitude:.5f}).")
 
     return Brief(
-        kind="terrain", title="Terrain clearance", location=location, status=status, reason=reason, answer=answer,
+        kind="terrain", title="Terrain clearance", location=location, heading=heading, status=status, reason=reason, answer=answer,
         key_facts=key_facts, technical=technical, evidence=evidence, caveats=caveats, inspect=inspect,
         data={
             "link_id": r.link_id, "distance_km": r.distance_km, "bearing_deg": r.bearing_deg,

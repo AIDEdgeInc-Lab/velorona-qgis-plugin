@@ -53,30 +53,51 @@ def _section(label: str, body: str) -> str:
     return f"<div class='sec'>{_e(label)}</div>{body}" if body else ""
 
 
+def _group_changes(changes):
+    """[(baseline, rows_html)] in first-seen order. Each baseline ("vs 1 hour ago") gets its own table so
+    comparisons against different baselines are never interleaved; a change with no baseline is kept
+    under an explicit "not determined" group rather than attached to another baseline."""
+    groups: dict = {}
+    for c in changes:
+        label = (c.baseline or "").strip()
+        period = f"{_e(c.previous_time)} \u2192 {_e(c.current_time)}"
+        groups.setdefault(label, []).append(
+            f"<tr><td class='fk'>{_e(c.label)}</td><td><b>{_e(fmt(c.current, c.decimals))} {_e(c.unit)}</b> "
+            f"&nbsp;{_e(c.delta_text)} <span class='note'>({period})</span></td></tr>")
+    return [(label, "".join(rows)) for label, rows in groups.items()]
+
+
 def _changes_block(brief: Brief) -> str:
     if not brief.changes:
         return ""
-    rows = "".join(
-        f"<tr><td class='fk'>{_e(c.label)}</td><td><b>{_e(fmt(c.current, c.decimals))} {_e(c.unit)}</b> "
-        f"&nbsp;{_e(c.delta_text)} <span class='note'>{_e(c.baseline)} "
-        f"({_e(c.previous_time)} → {_e(c.current_time)})</span></td></tr>"
-        for c in brief.changes)
     site = brief.data.get("driver_site", "")
-    return (f"<table cellpadding='3'>{rows}</table><p class='caveat'>Model-derived hourly values (Open-Meteo weather model) at {_e(site)}, not station observations. "
+    tables = "".join(
+        f"<div class='sub'>{_e(baseline or NOT_DETERMINED)}</div>"
+        f"<table cellpadding='3'>{rows}</table>"
+        for baseline, rows in _group_changes(brief.changes))
+    return (f"{tables}<p class='caveat'>Model-derived hourly values (Open-Meteo weather model) at {_e(site)}, not station observations. "
             f"Hourly values are compared with hourly values, so they can differ from the current reading above.</p>")
 
 
 def _header(brief: Brief) -> str:
+    # The reason line already says why the status is NO DATA; the badge is the status itself.
     return (f"<div class='kicker'>{_e(brief.title)}</div>"
-            f"<h3>{_e(brief.location)}</h3>"
-            f"<p>{status_badge(brief.status)}</p>"
-            f"<p>{_e(brief.reason)}</p>")
+            f"<h3>{_e(brief.heading or brief.location)}</h3>"
+            f"<p>{status_badge(brief.status)} &nbsp;{_e(brief.reason)}</p>")
+
+
+def _answer_line(brief: Brief) -> str:
+    """The plain-language answer. For NO DATA it only restated the reason ("No answer: there is no ... data"),
+    so the reason stays and the answer is dropped; every other status keeps its answer."""
+    if brief.status == NO_DATA:
+        return ""
+    return f"<p><b>{_e(brief.answer)}</b></p>"
 
 
 def render_summary(brief: Brief) -> Tuple[str, List[str]]:
     """(html, chart names needed)."""
     charts: List[str] = []
-    parts = [_header(brief), f"<p><b>{_e(brief.answer)}</b></p>", _section("The numbers", _facts_table(brief.key_facts))]
+    parts = [_header(brief), _answer_line(brief), _section("The numbers", _facts_table(brief.key_facts))]
     if brief.changes:
         parts.append(_section("What changed", _changes_block(brief)))
         if brief.data.get("history"):
@@ -127,8 +148,9 @@ def _site_block(s) -> str:
         rows.append(("Radar rain (estimated)", f"{fmt(s.radar_rain_mm_h)} mm/h", "radar-estimated, not gauge-measured"))
     rows.append(("Do the sources agree?", s.representativeness, s.representativeness_note))
     from ..core.presentation.model import Fact
-    coords = (f" ({s.site_point[0]:.5f}, {s.site_point[1]:.5f})" if s.site_point else "")
-    return (f"<div class='site'>{_e(s.site_label)}<span class='coord'>{_e(coords.strip())}</span></div>"
+    coords = (f"{s.site_point[0]:.5f}, {s.site_point[1]:.5f}" if s.site_point else "")
+    where = f"<span class='coord'> &nbsp;&middot;&nbsp; {_e(coords)}</span>" if coords else ""
+    return (f"<div class='site'>{_e(s.site_label)}{where}</div>"
             + _facts_table([Fact(a, b, c) for a, b, c in rows]))
 
 

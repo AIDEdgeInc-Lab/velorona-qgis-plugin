@@ -20,6 +20,7 @@ from qgis.PyQt.QtCore import (
     Qt,
     pyqtSignal,
 )
+from qgis.PyQt.QtGui import QAction
 from qgis.PyQt.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -27,7 +28,9 @@ from qgis.PyQt.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMenu,
     QTableView,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -181,7 +184,12 @@ class RecordsModel(QAbstractTableModel):
         return 0 if parent.isValid() else len(self._columns)
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
-        if not index.isValid() or role != Qt.ItemDataRole.DisplayRole:
+        if not index.isValid():
+            return None
+        if role == Qt.ItemDataRole.ToolTipRole:
+            # Full value for cells the column width may elide.
+            return self._rows[index.row()][index.column()] or None
+        if role != Qt.ItemDataRole.DisplayRole:
             return None
         return self._rows[index.row()][index.column()]
 
@@ -225,6 +233,9 @@ class VeloronaRecordsTable(QWidget):
         self._syncing = False
 
         self.dataset_combo = QComboBox(self)
+        self.dataset_combo.setAccessibleName("Dataset")
+        self.dataset_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.dataset_combo.setMinimumContentsLength(8)
         # Operator filter across every layer that carries a 'licensee' field
         # (Fixed Service sites, Fixed Service links, Cellular sites -- see
         # layer_helpers.OPERATOR_SOURCE_KEYS). The list is built from the
@@ -240,6 +251,7 @@ class VeloronaRecordsTable(QWidget):
         # communicates "not ready yet" without making the control disappear
         # and reappear as the operator switches tabs.
         self.operator_label = QLabel("Operator", self)
+        self.operator_label.setObjectName("veloronaOperatorLabel")
         self.licensee_combo = QComboBox(self)
         self.licensee_combo.setEditable(True)
         self.licensee_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
@@ -247,6 +259,9 @@ class VeloronaRecordsTable(QWidget):
         self.licensee_combo.setToolTip(
             "Show only this operator's records across Fixed Service sites, Fixed Service "
             "links and Cellular sites. Counts are record counts.")
+        self.licensee_combo.setAccessibleName("Operator filter")
+        self.licensee_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.licensee_combo.setMinimumContentsLength(8)
         self.licensee_combo.setEnabled(False)
         self.licensee_combo.addItem("Load Public Data to populate", "")
         # Web Map parity: "N operator(s) from currently-loaded data"
@@ -254,11 +269,25 @@ class VeloronaRecordsTable(QWidget):
         self.operator_hint = QLabel("", self)
         self.operator_hint.setObjectName("veloronaOperatorHint")
         self.operator_hint.setVisible(False)
+        self.operator_hint.setWordWrap(True)
         self.search_edit = QLineEdit(self)
         self.search_edit.setPlaceholderText("Search records...")
         self.search_edit.setClearButtonEnabled(True)
+        self.search_edit.setAccessibleName("Search records")
+        # Column visibility is a display preference only: it is kept for this session, per dataset, and
+        # never touches the model rows, the layer, selection, sorting, search or any export.
+        self._hidden_columns = {}
+        self.columns_button = QToolButton(self)
+        self.columns_button.setText("Columns \u25be")
+        self.columns_button.setToolTip("Show or hide table columns (display only; search and exports use every column)")
+        self.columns_button.setAccessibleName("Choose table columns")
+        self.columns_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.columns_menu = QMenu(self.columns_button)
+        self.columns_menu.aboutToShow.connect(self._rebuild_columns_menu)
+        self.columns_button.setMenu(self.columns_menu)
         self.status_label = QLabel("Run Explore: Load Public Data to populate records.", self)
         self.status_label.setObjectName("veloronaRecordsStatus")
+        self.status_label.setWordWrap(True)
 
         self.model = RecordsModel(self)
         self.proxy = QSortFilterProxyModel(self)
@@ -273,6 +302,10 @@ class VeloronaRecordsTable(QWidget):
         self.view.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.view.setAlternatingRowColors(True)
+        self.view.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.view.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.view.horizontalHeader().customContextMenuRequested.connect(self._header_menu)
+        self.view.horizontalHeader().setToolTip("Right-click to show or hide columns")
         self.view.verticalHeader().setVisible(False)
         self.view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.view.horizontalHeader().setStretchLastSection(True)
@@ -282,13 +315,14 @@ class VeloronaRecordsTable(QWidget):
 
         top = QHBoxLayout()
         top.addWidget(self.dataset_combo, 1)
-        top.addWidget(self.search_edit, 2)
+        top.addWidget(self.columns_button)
         operator_row = QHBoxLayout()
         operator_row.addWidget(self.operator_label)
         operator_row.addWidget(self.licensee_combo, 1)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(6, 6, 6, 6)
         layout.addLayout(top)
+        layout.addWidget(self.search_edit)
         layout.addLayout(operator_row)
         layout.addWidget(self.operator_hint)
         layout.addWidget(self.view, 1)
@@ -326,11 +360,64 @@ class VeloronaRecordsTable(QWidget):
         self._current_key = key
         self.model.load(self._layers.get(key), key)
         self.view.resizeColumnsToContents()
+        self._apply_column_visibility()
         self._update_status()
         # The Operator combo itself stays visible and enabled regardless of
         # which dataset tab is showing: it is a map-wide filter (Fixed
         # Service sites, Fixed Service links and Cellular sites all filter
         # together, see plugin.set_licensee_filter), not a per-tab control.
+
+    # -- column visibility ----------------------------------------------
+
+    def _column_names(self):
+        return [name for name, _key in self.model._columns]
+
+    def hidden_columns(self):
+        """Names of the columns hidden for the current dataset."""
+        return set(self._hidden_columns.get(self._current_key, ()))
+
+    def set_column_hidden(self, name: str, hidden: bool) -> bool:
+        """Hide or show one column of the current dataset. The last visible column cannot be hidden
+        (an empty-looking table would be unusable). Returns True when the request was applied."""
+        names = self._column_names()
+        if name not in names:
+            return False
+        current = self.hidden_columns()
+        if hidden and len(current | {name}) >= len(names):
+            return False
+        current = current | {name} if hidden else current - {name}
+        self._hidden_columns[self._current_key] = current
+        self._apply_column_visibility()
+        return True
+
+    def _apply_column_visibility(self):
+        hidden = self.hidden_columns()
+        names = self._column_names()
+        if len(hidden & set(names)) >= len(names):  # defensive: never leave nothing visible
+            hidden = set()
+            self._hidden_columns[self._current_key] = hidden
+        for i, name in enumerate(names):
+            self.view.setColumnHidden(i, name in hidden)
+
+    def _rebuild_columns_menu(self):
+        self.columns_menu.clear()
+        names = self._column_names()
+        hidden = self.hidden_columns()
+        visible = [n for n in names if n not in hidden]
+        for name in names:
+            action = QAction(name, self.columns_menu)
+            action.setCheckable(True)
+            action.setChecked(name not in hidden)
+            action.setEnabled(not (name not in hidden and len(visible) == 1))
+            action.toggled.connect(lambda checked, n=name: self.set_column_hidden(n, not checked))
+            self.columns_menu.addAction(action)
+        if not names:
+            placeholder = self.columns_menu.addAction("No columns yet")
+            placeholder.setEnabled(False)
+
+    def _header_menu(self, pos):
+        self._rebuild_columns_menu()
+        self.columns_menu.exec(self.view.horizontalHeader().mapToGlobal(pos))
 
     def populate_licensees(self, counts) -> None:
         """Fills the filter from the operator values actually present in the
@@ -342,14 +429,15 @@ class VeloronaRecordsTable(QWidget):
         self.licensee_combo.blockSignals(True)
         self.licensee_combo.clear()
         total = sum(counts.values())
-        self.licensee_combo.addItem(f"All operators ({total:,} records)", "")
+        self.licensee_combo.addItem("All operators", "")
         for name, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
             self.licensee_combo.addItem(f"{name} ({count:,})", name)
         index = self.licensee_combo.findData(current) if current else 0
         self.licensee_combo.setCurrentIndex(max(0, index))
         self.licensee_combo.blockSignals(False)
         self.licensee_combo.setEnabled(bool(counts))
-        self.operator_hint.setText(f"{len(counts):,} operator(s) from currently-loaded data.")
+        self.operator_hint.setText(
+            f"{len(counts):,} operator(s), {total:,} records in currently-loaded data.")
         self.operator_hint.setVisible(bool(counts))
 
     def _on_licensee_changed(self, _index):
