@@ -133,6 +133,10 @@ Plugin Repository. Download `velorona-1.1.5.zip` from the
 then in QGIS: Plugins → Manage and Install Plugins → Install from ZIP, and
 pick that file.
 
+## Version history
+
+See [CHANGELOG.md](CHANGELOG.md) (what changed in 1.1.5 compared with 1.1.4) and the [release page](https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/releases/tag/v1.1.5).
+
 ## Status
 
 Version 1.1.5. Packaged and clean-profile install tested for QGIS 4.x.
