@@ -65,10 +65,10 @@ def link_record(fx):
            "frequencies_mhz": ", ".join(str(v) for v in fx["selection"].get("published_frequencies_mhz", []))}
     if us:
         rec["country"] = "US"
-        for key, site in (("site_a_height_m", fx["link"]["site_a"]), ("site_b_height_m", fx["link"]["site_b"])):
-            if site.get("height_origin") == "Observed":
-                rec[key] = site["height_m"]
-                rec["height_source"] = site.get("height_source", "")
+    for key, site in (("site_a_height_m", fx["link"]["site_a"]), ("site_b_height_m", fx["link"]["site_b"])):
+        if site.get("height_origin") == "Observed":      # the fixture says this height IS the record's own (ISED column 29 for ca-h-*/rs-ca-*; the frozen us-* mechanism fixtures)
+            rec[key] = site["height_m"]
+            rec["height_source"] = site.get("height_source", "")
     return rec
 
 

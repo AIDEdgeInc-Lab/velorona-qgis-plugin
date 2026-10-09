@@ -67,6 +67,8 @@ FIXED_LINK_FIELDS = [
     ("id", QVariant.String), ("source", QVariant.String), ("authorization_number", QVariant.String),
     ("licensee", QVariant.String), ("in_service_date", QVariant.String),
     ("frequencies_mhz", QVariant.String), ("coverage", QVariant.String),
+    # Record antenna heights (snapshot schema /1.1, ISED column 29); empty when the record has none (the 30 m default then applies, Assumed).
+    ("site_a_height_m", QVariant.Double), ("site_b_height_m", QVariant.Double), ("height_source", QVariant.String),
 ]
 
 
@@ -169,6 +171,10 @@ def load_fixed_service_snapshot(path: str = FIXED_SERVICE_SNAPSHOT_PATH) -> Tupl
             "coverage": "National (Canada-wide) -- snapshot, not a live query",
         }
 
+    height_source = None
+    if isinstance(raw.get("heights"), dict):           # schema velorona.ca-ised-fixed/1.1+: text identical to the Map's (web/context.js recordHeightText)
+        height_source = (f"ISED Fixed Service record -- {raw['heights']['field'].split(' (')[0]}; "
+                         "licensee-submitted record value, not a field measurement")
     links = []
     for link in raw["links"]:
         site_a = sites_by_id.get(link["site_a_id"])
@@ -184,6 +190,8 @@ def load_fixed_service_snapshot(path: str = FIXED_SERVICE_SNAPSHOT_PATH) -> Tupl
             "frequencies_mhz": ", ".join(str(v) for v in link.get("frequencies_mhz", [])),
             "site_a": site_a, "site_b": site_b,
             "coverage": "National (Canada-wide) -- snapshot, not a live query",
+            "site_a_height_m": link.get("site_a_height_m"), "site_b_height_m": link.get("site_b_height_m"),
+            "height_source": height_source if (link.get("site_a_height_m") is not None or link.get("site_b_height_m") is not None) else None,
         })
 
     return list(sites_by_id.values()), links

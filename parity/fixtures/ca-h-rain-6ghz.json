@@ -1,0 +1,379 @@
+{
+ "schema": "velorona.parity-fixture/1",
+ "id": "ca-h-rain-6ghz",
+ "tags": [
+  "rain-band",
+  "record-heights"
+ ],
+ "note": "6 GHz band, 32 mm/h, ratio 0.50 [010018417-003, 21.05 km, 6.34549 GHz]",
+ "selection": {
+  "rule": "see parity/build_ca_height_fixtures.py docstring",
+  "pack": "ca-ised-fixed",
+  "snapshot_sha256": "e10a3ad16d23c6ca07334bc66bf985b2574b5db8de777d4ce5978d1a0e88c50e",
+  "link_id": "010018417-003",
+  "licensee": "TELUS Communications Inc.",
+  "published_frequencies_mhz": [
+   6034.15,
+   6093.45,
+   6286.19,
+   6345.49
+  ]
+ },
+ "link": {
+  "site_a": {
+   "id": "ised-fixed-49.69667,-124.43639",
+   "lat": 49.69667,
+   "lon": -124.43639,
+   "height_m": 20.0,
+   "height_origin": "Observed",
+   "height_source": "ISED Fixed Service record -- ISED SMS Authorization Data Extract, column 29 'Height above ground level [m]'; licensee-submitted record value, not a field measurement",
+   "description": "MT POCAHONTAS BC (REPEATER)"
+  },
+  "site_b": {
+   "id": "ised-fixed-49.87903,-124.51506",
+   "lat": 49.87903,
+   "lon": -124.51506,
+   "height_m": 20.0,
+   "height_origin": "Observed",
+   "height_source": "ISED Fixed Service record -- ISED SMS Authorization Data Extract, column 29 'Height above ground level [m]'; licensee-submitted record value, not a field measurement",
+   "description": "POWELL RIVER BC (CRANBERRY LAKE)"
+  },
+  "frequency_ghz": 6.34549,
+  "frequency_origin": "Observed",
+  "polarization": "V",
+  "polarization_origin": "Assumed",
+  "fade_margin_db": 3.14,
+  "fade_margin_origin": "Assumed"
+ },
+ "terrain": {
+  "mode": "samples",
+  "source": "SYNTHETIC: 100 m flat + triangular hump",
+  "hump_m": -12.115,
+  "target_percent_fresnel_clear": 1.5,
+  "samples": [
+   [
+    49.69667,
+    -124.43639,
+    100.0
+   ],
+   [
+    49.700392164,
+    -124.437989602,
+    99.50551
+   ],
+   [
+    49.704114306,
+    -124.43958945,
+    99.01102
+   ],
+   [
+    49.707836425,
+    -124.441189542,
+    98.516531
+   ],
+   [
+    49.711558523,
+    -124.44278988,
+    98.022041
+   ],
+   [
+    49.715280599,
+    -124.444390463,
+    97.527551
+   ],
+   [
+    49.719002652,
+    -124.445991291,
+    97.033061
+   ],
+   [
+    49.722724684,
+    -124.447592365,
+    96.538571
+   ],
+   [
+    49.726446693,
+    -124.449193684,
+    96.044082
+   ],
+   [
+    49.730168681,
+    -124.450795249,
+    95.549592
+   ],
+   [
+    49.733890646,
+    -124.45239706,
+    95.055102
+   ],
+   [
+    49.737612589,
+    -124.453999116,
+    94.560612
+   ],
+   [
+    49.74133451,
+    -124.455601418,
+    94.066122
+   ],
+   [
+    49.745056409,
+    -124.457203966,
+    93.571633
+   ],
+   [
+    49.748778286,
+    -124.458806759,
+    93.077143
+   ],
+   [
+    49.752500141,
+    -124.460409799,
+    92.582653
+   ],
+   [
+    49.756221973,
+    -124.462013085,
+    92.088163
+   ],
+   [
+    49.759943784,
+    -124.463616617,
+    91.593673
+   ],
+   [
+    49.763665572,
+    -124.465220395,
+    91.099184
+   ],
+   [
+    49.767387339,
+    -124.466824419,
+    90.604694
+   ],
+   [
+    49.771109083,
+    -124.46842869,
+    90.110204
+   ],
+   [
+    49.774830805,
+    -124.470033207,
+    89.615714
+   ],
+   [
+    49.778552505,
+    -124.47163797,
+    89.121224
+   ],
+   [
+    49.782274182,
+    -124.47324298,
+    88.626735
+   ],
+   [
+    49.785995838,
+    -124.474848237,
+    88.132245
+   ],
+   [
+    49.789717471,
+    -124.47645374,
+    88.132245
+   ],
+   [
+    49.793439082,
+    -124.47805949,
+    88.626735
+   ],
+   [
+    49.797160671,
+    -124.479665487,
+    89.121224
+   ],
+   [
+    49.800882238,
+    -124.481271731,
+    89.615714
+   ],
+   [
+    49.804603782,
+    -124.482878222,
+    90.110204
+   ],
+   [
+    49.808325304,
+    -124.484484959,
+    90.604694
+   ],
+   [
+    49.812046805,
+    -124.486091944,
+    91.099184
+   ],
+   [
+    49.815768282,
+    -124.487699176,
+    91.593673
+   ],
+   [
+    49.819489738,
+    -124.489306655,
+    92.088163
+   ],
+   [
+    49.823211171,
+    -124.490914382,
+    92.582653
+   ],
+   [
+    49.826932583,
+    -124.492522355,
+    93.077143
+   ],
+   [
+    49.830653972,
+    -124.494130577,
+    93.571633
+   ],
+   [
+    49.834375338,
+    -124.495739045,
+    94.066122
+   ],
+   [
+    49.838096683,
+    -124.497347762,
+    94.560612
+   ],
+   [
+    49.841818005,
+    -124.498956726,
+    95.055102
+   ],
+   [
+    49.845539305,
+    -124.500565937,
+    95.549592
+   ],
+   [
+    49.849260582,
+    -124.502175397,
+    96.044082
+   ],
+   [
+    49.852981837,
+    -124.503785104,
+    96.538571
+   ],
+   [
+    49.85670307,
+    -124.505395059,
+    97.033061
+   ],
+   [
+    49.860424281,
+    -124.507005262,
+    97.527551
+   ],
+   [
+    49.86414547,
+    -124.508615713,
+    98.022041
+   ],
+   [
+    49.867866636,
+    -124.510226413,
+    98.516531
+   ],
+   [
+    49.871587779,
+    -124.51183736,
+    99.01102
+   ],
+   [
+    49.875308901,
+    -124.513448556,
+    99.50551
+   ],
+   [
+    49.87903,
+    -124.51506,
+    100.0
+   ]
+  ]
+ },
+ "weather": {
+  "mode": "snapshot",
+  "source": "SYNTHETIC raw Open-Meteo `current` object (units: mm per `interval` s; snowfall cm)",
+  "sites": {
+   "A": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 8.0,
+     "rain": 8.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 63
+    }
+   },
+   "B": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 8.0,
+     "rain": 8.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 63
+    }
+   }
+  }
+ },
+ "synthetic": [
+  "fade_margin_calibrated",
+  "fade_margin_db",
+  "polarization",
+  "terrain",
+  "weather"
+ ],
+ "expected": {
+  "schema": "velorona.parity-expected/1",
+  "spec": "0.3",
+  "curvature": "canonical (bulge subtracted from clearance, P11)",
+  "terrain": {
+   "status": "CLEAR",
+   "no_data": null,
+   "distance_km": 21.049312184881224,
+   "critical_index": 17,
+   "available_m": 22.497432706874733,
+   "required_m": 8.998851724480982,
+   "margin_m": 13.49858098239375,
+   "ratio": 2.500033714931812,
+   "percent_fresnel_clear": 1.5000202289590872,
+   "fresnel_radius_m": 14.998086207468305,
+   "near_threshold": true
+  },
+  "weather": {
+   "status": "WATCH",
+   "no_data": null,
+   "attenuation_db": 1.57,
+   "ratio": 0.5,
+   "fade_margin_db": 3.14,
+   "precip": {
+    "class": "RAIN",
+    "flags": [],
+    "rate_mm_h": 32.0,
+    "liquid_mm": 8.0
+   },
+   "status_without_r1": "WATCH"
+  },
+  "overall": "WATCH"
+ },
+ "inputs_sha256": "023ce09323d1d4b8310c39f10c371cf16f624a83375afbe7065cd848ce343da0"
+}

@@ -67,5 +67,4 @@ class LoadResult:
     tiles_fetched: int = 0                 # not served from the in-memory cache
     duplicate_links_dropped: int = 0       # same link id seen again in a neighbouring tile
     duplicate_sites_dropped: int = 0
-    heights_error: str = ""               # an optional heights file was present but unusable: why (the records still load, with the default heights)
     heights_attached: int = 0              # links that received record antenna heights (0 = none: the 30 m default / user value applies)

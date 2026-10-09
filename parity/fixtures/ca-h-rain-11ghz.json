@@ -1,0 +1,377 @@
+{
+ "schema": "velorona.parity-fixture/1",
+ "id": "ca-h-rain-11ghz",
+ "tags": [
+  "rain-band",
+  "record-heights"
+ ],
+ "note": "11 GHz band, 32 mm/h, fade set so the independent-oracle ratio is 0.50 [010018067-001, 13.84 km, 10.6562 GHz]",
+ "selection": {
+  "rule": "see parity/build_ca_height_fixtures.py docstring",
+  "pack": "ca-ised-fixed",
+  "snapshot_sha256": "e10a3ad16d23c6ca07334bc66bf985b2574b5db8de777d4ce5978d1a0e88c50e",
+  "link_id": "010018067-001",
+  "licensee": "Greater Vancouver Regional District",
+  "published_frequencies_mhz": [
+   10591.25,
+   10656.25
+  ]
+ },
+ "link": {
+  "site_a": {
+   "id": "ised-fixed-49.23056,-123.00778",
+   "lat": 49.23056,
+   "lon": -123.00778,
+   "height_m": 84.0,
+   "height_origin": "Observed",
+   "height_source": "ISED Fixed Service record -- ISED SMS Authorization Data Extract, column 29 'Height above ground level [m]'; licensee-submitted record value, not a field measurement",
+   "description": "BURNABY BC (METROTOWN)"
+  },
+  "site_b": {
+   "id": "ised-fixed-49.35500,-123.00889",
+   "lat": 49.355,
+   "lon": -123.00889,
+   "height_m": 65.0,
+   "height_origin": "Observed",
+   "height_source": "ISED Fixed Service record -- ISED SMS Authorization Data Extract, column 29 'Height above ground level [m]'; licensee-submitted record value, not a field measurement",
+   "description": "NORTH VANCOUVER, BC LSCR"
+  },
+  "frequency_ghz": 10.65625,
+  "frequency_origin": "Observed",
+  "polarization": "V",
+  "polarization_origin": "Assumed",
+  "fade_margin_db": 15.12,
+  "fade_margin_origin": "Assumed"
+ },
+ "terrain": {
+  "mode": "samples",
+  "source": "SYNTHETIC: 100 m flat + triangular hump",
+  "hump_m": 57.889,
+  "target_percent_fresnel_clear": 1.5,
+  "samples": [
+   [
+    49.23056,
+    -123.00778,
+    100.0
+   ],
+   [
+    49.233099592,
+    -123.007802597,
+    102.362816
+   ],
+   [
+    49.235639184,
+    -123.007825197,
+    104.725633
+   ],
+   [
+    49.238178776,
+    -123.007847798,
+    107.088449
+   ],
+   [
+    49.240718368,
+    -123.007870402,
+    109.451265
+   ],
+   [
+    49.24325796,
+    -123.007893009,
+    111.814082
+   ],
+   [
+    49.245797552,
+    -123.007915618,
+    114.176898
+   ],
+   [
+    49.248337144,
+    -123.007938229,
+    116.539714
+   ],
+   [
+    49.250876735,
+    -123.007960842,
+    118.902531
+   ],
+   [
+    49.253416327,
+    -123.007983458,
+    121.265347
+   ],
+   [
+    49.255955919,
+    -123.008006076,
+    123.628163
+   ],
+   [
+    49.258495511,
+    -123.008028696,
+    125.99098
+   ],
+   [
+    49.261035103,
+    -123.008051319,
+    128.353796
+   ],
+   [
+    49.263574695,
+    -123.008073944,
+    130.716612
+   ],
+   [
+    49.266114287,
+    -123.008096571,
+    133.079429
+   ],
+   [
+    49.268653879,
+    -123.008119201,
+    135.442245
+   ],
+   [
+    49.271193471,
+    -123.008141833,
+    137.805061
+   ],
+   [
+    49.273733062,
+    -123.008164467,
+    140.167878
+   ],
+   [
+    49.276272654,
+    -123.008187104,
+    142.530694
+   ],
+   [
+    49.278812246,
+    -123.008209743,
+    144.89351
+   ],
+   [
+    49.281351838,
+    -123.008232385,
+    147.256327
+   ],
+   [
+    49.28389143,
+    -123.008255028,
+    149.619143
+   ],
+   [
+    49.286431022,
+    -123.008277674,
+    151.981959
+   ],
+   [
+    49.288970614,
+    -123.008300323,
+    154.344776
+   ],
+   [
+    49.291510205,
+    -123.008322973,
+    156.707592
+   ],
+   [
+    49.294049797,
+    -123.008345626,
+    156.707592
+   ],
+   [
+    49.296589389,
+    -123.008368282,
+    154.344776
+   ],
+   [
+    49.299128981,
+    -123.008390939,
+    151.981959
+   ],
+   [
+    49.301668573,
+    -123.008413599,
+    149.619143
+   ],
+   [
+    49.304208165,
+    -123.008436262,
+    147.256327
+   ],
+   [
+    49.306747756,
+    -123.008458926,
+    144.89351
+   ],
+   [
+    49.309287348,
+    -123.008481593,
+    142.530694
+   ],
+   [
+    49.31182694,
+    -123.008504263,
+    140.167878
+   ],
+   [
+    49.314366532,
+    -123.008526934,
+    137.805061
+   ],
+   [
+    49.316906124,
+    -123.008549609,
+    135.442245
+   ],
+   [
+    49.319445715,
+    -123.008572285,
+    133.079429
+   ],
+   [
+    49.321985307,
+    -123.008594964,
+    130.716612
+   ],
+   [
+    49.324524899,
+    -123.008617645,
+    128.353796
+   ],
+   [
+    49.327064491,
+    -123.008640328,
+    125.99098
+   ],
+   [
+    49.329604082,
+    -123.008663014,
+    123.628163
+   ],
+   [
+    49.332143674,
+    -123.008685702,
+    121.265347
+   ],
+   [
+    49.334683266,
+    -123.008708392,
+    118.902531
+   ],
+   [
+    49.337222858,
+    -123.008731085,
+    116.539714
+   ],
+   [
+    49.33976245,
+    -123.00875378,
+    114.176898
+   ],
+   [
+    49.342302041,
+    -123.008776478,
+    111.814082
+   ],
+   [
+    49.344841633,
+    -123.008799177,
+    109.451265
+   ],
+   [
+    49.347381225,
+    -123.00882188,
+    107.088449
+   ],
+   [
+    49.349920817,
+    -123.008844584,
+    104.725633
+   ],
+   [
+    49.352460408,
+    -123.008867291,
+    102.362816
+   ],
+   [
+    49.355,
+    -123.00889,
+    100.0
+   ]
+  ]
+ },
+ "weather": {
+  "mode": "snapshot",
+  "source": "SYNTHETIC raw Open-Meteo `current` object (units: mm per `interval` s; snowfall cm)",
+  "sites": {
+   "A": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 8.0,
+     "rain": 8.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 63
+    }
+   },
+   "B": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 8.0,
+     "rain": 8.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 63
+    }
+   }
+  }
+ },
+ "synthetic": [
+  "fade_margin_calibrated",
+  "fade_margin_db",
+  "polarization",
+  "terrain",
+  "weather"
+ ],
+ "expected": {
+  "schema": "velorona.parity-expected/1",
+  "spec": "0.3",
+  "curvature": "canonical (bulge subtracted from clearance, P11)",
+  "terrain": {
+   "status": "CLEAR",
+   "no_data": null,
+   "distance_km": 13.8373308193531,
+   "critical_index": 25,
+   "available_m": 14.78217541915339,
+   "required_m": 5.912904440854672,
+   "margin_m": 8.869270978298719,
+   "ratio": 2.49998550915474,
+   "percent_fresnel_clear": 1.499991305492844,
+   "fresnel_radius_m": 9.854840734757786,
+   "near_threshold": true
+  },
+  "weather": {
+   "status": "WATCH",
+   "no_data": null,
+   "attenuation_db": 7.56,
+   "ratio": 0.5,
+   "fade_margin_db": 15.12,
+   "precip": {
+    "class": "RAIN",
+    "flags": [],
+    "rate_mm_h": 32.0,
+    "liquid_mm": 8.0
+   },
+   "status_without_r1": "WATCH"
+  },
+  "overall": "WATCH"
+ },
+ "inputs_sha256": "8f4832ecde53810cb9775ae6d09427964d6a406e873a372b24f67cfb6d5e2202"
+}

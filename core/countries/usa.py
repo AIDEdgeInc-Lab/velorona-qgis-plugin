@@ -30,7 +30,6 @@ from collections import OrderedDict
 from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import quote, urlparse
 
-from ..record_source import FCC_HEIGHT_LABEL
 from .base import (Attribution, LoadResult, PackCorruptError, PackError, PackMissingError, PackNotConfiguredError,
                    PackUnavailableError, PackVersionError, ViewTooLargeError)
 
@@ -373,7 +372,7 @@ class UsaPackProvider:
 
 # ---------------------------------------------------------------------------------------------------------------------------------
 # Regional extract (schema velorona.usa-extract/1), published by the Map workstream in parity/contract/usa/. One JSON file; unlike pack /1 it
-# carries the licensee-reported FCC antenna heights (Height to Center RAAT). Same provider interface as the tile pack.
+# carries raw FCC antenna-height values, which this provider deliberately ignores (unverified unit/reference). Same provider interface as the tile pack.
 # ---------------------------------------------------------------------------------------------------------------------------------
 EXTRACT_SCHEMA_RE = re.compile(r"^velorona\.usa-extract/(\d+)$")
 SUPPORTED_EXTRACT_MAJORS = (1,)
@@ -475,7 +474,8 @@ class UsaExtractProvider:
                                     "Zoom in and load again.")
         meta = data["meta"]
         att = self._attribution
-        height_source = f"{FCC_HEIGHT_LABEL}; rule: {meta['analysis_height_rule']}" if meta.get("analysis_height_rule") else FCC_HEIGHT_LABEL
+        # FCC 'Height to Center RAAT' is NOT used: its unit and reference are not stated by the FCC's field documentation (Map HEIGHTS_CONTRACT.md section 2),
+        # so by the owner rule every US analysis keeps the 30 m default, Assumed. The values stay in the extract file, unread here.
         input_sha = (meta.get("source") or {}).get("input_zip_sha256")
         site_src = {s_["id"]: s_ for s_ in data["sites"]}
         sites, freqs = {}, {}
@@ -506,7 +506,7 @@ class UsaExtractProvider:
                 "frequencies_mhz": ", ".join(_fmt_mhz(f) for f in lk["frequencies_mhz"]), "site_a": a, "site_b": b, "coverage": COVERAGE_US,
                 "flags": ", ".join(lk["flags"]) if lk.get("flags") else None, "attribution": att.attribution_text,
                 "pack_generated": att.pack_generated, "source_file_updated": att.source_file_updated, "pack_input_sha256": input_sha,
-                "site_a_height_m": lk.get("analysis_height_a_m"), "site_b_height_m": lk.get("analysis_height_b_m"), "height_source": height_source,
+                "site_a_height_m": None, "site_b_height_m": None, "height_source": None,
             })
             for site in (a, b):
                 freqs[site["id"]].update(lk["frequencies_mhz"])

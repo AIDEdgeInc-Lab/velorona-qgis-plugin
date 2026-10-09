@@ -81,12 +81,6 @@ def frequency_origin(record_ghz: Optional[float], record_note: str, used_ghz: fl
             f"{used_ghz:g} GHz was entered instead.")
 
 
-# The label the Velorona Map contract (parity/contract/USA_PACK_SCHEMA.md section 3.3) prescribes for an FCC antenna height: the only
-# correct description of what the field is. Used when a US record carries a height and gives no source text of its own.
-FCC_HEIGHT_LABEL = ("antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted "
-                    "as above ground; not a field measurement")
-
-
 def height_origin(record_m: Optional[float], used_m: float, record_source: str = "") -> Tuple[str, str]:
     """('Observed' | 'Assumed', source text) for an antenna height actually used in an analysis.
 

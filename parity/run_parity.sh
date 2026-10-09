@@ -14,7 +14,7 @@ OUT="${1:-$HERE/out}"; mkdir -p "$OUT"
 [ -f "$MAP_REPO/parity/compare.py" ] || { echo "MAP_REPO=$MAP_REPO has no parity/compare.py (needs the Map parity branch)" >&2; exit 2; }
 # The fixtures are the Map workstream's byte-identical files; MANIFEST.sha256 (its) must verify before anything is run.
 ( cd "$HERE/fixtures" && shasum -a 256 -c MANIFEST.sha256 >/dev/null ) || { echo "fixtures do not match MANIFEST.sha256" >&2; exit 2; }
-FIX="$HERE/fixtures/ca-*.json $HERE/fixtures/us-*.json $HERE/fixtures/synthetic-boundary/sb*-*.json"
+FIX="$HERE/fixtures/ca-*.json $HERE/fixtures/us-*.json $HERE/fixtures/synthetic-boundary/sb*-*.json $HERE/fixtures/real-snapshot/rs-*.json"
 # The fixtures' weather expectations are the Map workstream's recomputed ones (ITU-R P.838-3 equations, Map commit d2090c3). An installed rain model that fails the
 # spot check (aei-microwave-link-exposure <= 0.1.5) would DIVERGE on them by design; say so instead of printing 90+ problems.
 "$PY" -c "import sys; sys.path.insert(0, '$HERE/..'); from core import rain_check; sys.exit(0 if rain_check.rain_model_matches_p838_3() else 3)" \

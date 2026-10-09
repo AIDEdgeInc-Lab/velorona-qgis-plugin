@@ -1,0 +1,377 @@
+{
+ "schema": "velorona.parity-fixture/1",
+ "id": "rs-ca-10-24to100ghz",
+ "tags": [
+  "real-snapshot",
+  "24-100GHz"
+ ],
+ "note": "011037121-001 -- REAL terrain and weather captured 2026-10-09T01:53:30Z (elevation) / 2026-10-09T01:53:31Z, 2026-10-09T01:53:33Z (weather)",
+ "selection": {
+  "rule": "see parity/snapshots/capture.py docstring",
+  "pack": "ca-ised-fixed",
+  "snapshot_sha256": "e10a3ad16d23c6ca07334bc66bf985b2574b5db8de777d4ce5978d1a0e88c50e",
+  "link_id": "011037121-001",
+  "licensee": "Videotron Ltd. dba Freedom Mobile",
+  "published_frequencies_mhz": [
+   71750.0,
+   81750.0
+  ]
+ },
+ "link": {
+  "site_a": {
+   "id": "ised-fixed-43.88788,-78.81915",
+   "lat": 43.88788,
+   "lon": -78.81915,
+   "height_m": 24.0,
+   "height_origin": "Observed",
+   "height_source": "ISED Fixed Service record -- ISED SMS Authorization Data Extract, column 29 'Height above ground level [m]'; licensee-submitted record value, not a field measurement",
+   "description": "OSHAWA (1011 BLOOR ST E) ON"
+  },
+  "site_b": {
+   "id": "ised-fixed-43.92146,-78.85452",
+   "lat": 43.92146,
+   "lon": -78.85452,
+   "height_m": 38.0,
+   "height_origin": "Observed",
+   "height_source": "ISED Fixed Service record -- ISED SMS Authorization Data Extract, column 29 'Height above ground level [m]'; licensee-submitted record value, not a field measurement",
+   "description": "OSHAWA (666 TERRACE DR) ON"
+  },
+  "frequency_ghz": 81.75,
+  "frequency_origin": "Observed",
+  "polarization": "V",
+  "polarization_origin": "Assumed",
+  "fade_margin_db": 32.0,
+  "fade_margin_origin": "Assumed"
+ },
+ "terrain": {
+  "mode": "samples",
+  "source": "REAL: Open-Meteo Elevation API (Copernicus DEM GLO-90, 90 m surface model), requested 2026-10-09T01:53:30Z, raw response sha256 e2f76949b1311222752a64e81aa024b1fab439815fcdcf6e7d8c8f2b4b751a6c",
+  "samples": [
+   [
+    43.88788,
+    -78.81915,
+    83.0
+   ],
+   [
+    43.88856541513067,
+    -78.81987143798895,
+    83.0
+   ],
+   [
+    43.889250825722684,
+    -78.82059289258181,
+    86.0
+   ],
+   [
+    43.88993623177581,
+    -78.82131436377925,
+    85.0
+   ],
+   [
+    43.89062163328985,
+    -78.82203585158194,
+    82.0
+   ],
+   [
+    43.89130703026458,
+    -78.82275735599055,
+    86.0
+   ],
+   [
+    43.89199242269978,
+    -78.82347887700574,
+    88.0
+   ],
+   [
+    43.89267781059525,
+    -78.8242004146282,
+    84.0
+   ],
+   [
+    43.89336319395077,
+    -78.82492196885858,
+    90.0
+   ],
+   [
+    43.894048572766124,
+    -78.82564353969755,
+    82.0
+   ],
+   [
+    43.89473394704112,
+    -78.82636512714579,
+    85.0
+   ],
+   [
+    43.89541931677552,
+    -78.82708673120398,
+    89.0
+   ],
+   [
+    43.89610468196911,
+    -78.82780835187276,
+    92.0
+   ],
+   [
+    43.8967900426217,
+    -78.82852998915283,
+    94.0
+   ],
+   [
+    43.89747539873308,
+    -78.82925164304484,
+    94.0
+   ],
+   [
+    43.898160750302985,
+    -78.82997331354947,
+    94.0
+   ],
+   [
+    43.89884609733125,
+    -78.83069500066739,
+    90.0
+   ],
+   [
+    43.89953143981765,
+    -78.83141670439926,
+    95.0
+   ],
+   [
+    43.90021677776197,
+    -78.83213842474576,
+    96.0
+   ],
+   [
+    43.900902111164,
+    -78.83286016170757,
+    98.0
+   ],
+   [
+    43.901587440023526,
+    -78.83358191528534,
+    97.0
+   ],
+   [
+    43.90227276434033,
+    -78.83430368547975,
+    98.0
+   ],
+   [
+    43.90295808411418,
+    -78.83502547229146,
+    96.0
+   ],
+   [
+    43.90364339934491,
+    -78.83574727572115,
+    98.0
+   ],
+   [
+    43.904328710032274,
+    -78.83646909576949,
+    101.0
+   ],
+   [
+    43.90501401617606,
+    -78.83719093243715,
+    101.0
+   ],
+   [
+    43.90569931777606,
+    -78.83791278572481,
+    102.0
+   ],
+   [
+    43.90638461483206,
+    -78.83863465563311,
+    102.0
+   ],
+   [
+    43.907069907343846,
+    -78.83935654216276,
+    103.0
+   ],
+   [
+    43.90775519531121,
+    -78.84007844531439,
+    100.0
+   ],
+   [
+    43.90844047873394,
+    -78.84080036508871,
+    103.0
+   ],
+   [
+    43.9091257576118,
+    -78.84152230148636,
+    105.0
+   ],
+   [
+    43.90981103194459,
+    -78.84224425450803,
+    98.0
+   ],
+   [
+    43.910496301732124,
+    -78.84296622415438,
+    101.0
+   ],
+   [
+    43.911181566974136,
+    -78.84368821042608,
+    105.0
+   ],
+   [
+    43.91186682767046,
+    -78.84441021332381,
+    107.0
+   ],
+   [
+    43.91255208382085,
+    -78.84513223284823,
+    107.0
+   ],
+   [
+    43.913237335425116,
+    -78.84585426900001,
+    107.0
+   ],
+   [
+    43.913922582483025,
+    -78.84657632177982,
+    105.0
+   ],
+   [
+    43.91460782499438,
+    -78.84729839118835,
+    111.0
+   ],
+   [
+    43.915293062958945,
+    -78.84802047722626,
+    112.0
+   ],
+   [
+    43.91597829637654,
+    -78.8487425798942,
+    119.0
+   ],
+   [
+    43.916663525246925,
+    -78.84946469919288,
+    122.0
+   ],
+   [
+    43.91734874956988,
+    -78.85018683512293,
+    121.0
+   ],
+   [
+    43.91803396934523,
+    -78.85090898768505,
+    118.0
+   ],
+   [
+    43.91871918457273,
+    -78.85163115687989,
+    118.0
+   ],
+   [
+    43.919404395252165,
+    -78.85235334270814,
+    122.0
+   ],
+   [
+    43.92008960138334,
+    -78.85307554517046,
+    117.0
+   ],
+   [
+    43.92077480296603,
+    -78.85379776426751,
+    117.0
+   ],
+   [
+    43.92146,
+    -78.85452,
+    120.0
+   ]
+  ]
+ },
+ "weather": {
+  "mode": "snapshot",
+  "source": "REAL: Open-Meteo forecast API `current`, requested 2026-10-09T01:53:31Z (A, response sha256 d5cb38911ce4b534bc2387c4499840dcca7d4416c751012f691e4e75b2f74cfc) and 2026-10-09T01:53:33Z (B, 31fee6a4cf04a29372f7a397523f2b4501e11c57cb552cf197925d0f0b9ad0b7); units: mm per `interval` s; snowfall cm",
+  "sites": {
+   "A": {
+    "open_meteo_current": {
+     "time": "2026-10-08T21:45",
+     "interval": 900,
+     "precipitation": 0.0,
+     "rain": 0.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 0,
+     "temperature_2m": 10.2,
+     "wind_speed_10m": 7.6
+    }
+   },
+   "B": {
+    "open_meteo_current": {
+     "time": "2026-10-08T21:45",
+     "interval": 900,
+     "precipitation": 0.0,
+     "rain": 0.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 1,
+     "temperature_2m": 10.0,
+     "wind_speed_10m": 10.2
+    }
+   }
+  }
+ },
+ "synthetic": [
+  "fade_margin_db",
+  "polarization"
+ ],
+ "capture": {
+  "api": "Open-Meteo /v1/elevation and /v1/forecast (no API version string is published by the service; the response sha256 values above identify the bytes used)",
+  "index": "parity/snapshots/capture_index.json",
+  "raw_cache": "~/velorona-parity-audit/snapshots/raw/open-meteo/"
+ },
+ "expected": {
+  "schema": "velorona.parity-expected/1",
+  "spec": "0.3",
+  "curvature": "canonical (bulge subtracted from clearance, P11)",
+  "terrain": {
+   "status": "CLEAR",
+   "no_data": null,
+   "distance_km": 4.687423628842615,
+   "critical_index": 19,
+   "available_m": 28.468484477276633,
+   "required_m": 1.2110495792421239,
+   "margin_m": 27.257434898034507,
+   "ratio": 23.507282414558322,
+   "percent_fresnel_clear": 14.104369448734992,
+   "fresnel_radius_m": 2.01841596540354,
+   "near_threshold": false
+  },
+  "weather": {
+   "status": "CLEAR",
+   "no_data": null,
+   "attenuation_db": 0.0,
+   "ratio": 0.0,
+   "fade_margin_db": 32.0,
+   "precip": {
+    "class": "NONE",
+    "flags": [],
+    "rate_mm_h": 0.0,
+    "liquid_mm": 0.0
+   },
+   "status_without_r1": "CLEAR"
+  },
+  "overall": "CLEAR"
+ },
+ "inputs_sha256": "3f9b95f524a9d992af9ef177936ab3207ad5e85601b29963ec7f4920369f09cb"
+}

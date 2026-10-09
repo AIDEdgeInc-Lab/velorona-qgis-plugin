@@ -158,7 +158,7 @@ def test_terrain_export_carries_identity_convention_and_data_source():
 def test_canadian_export_names_its_register_and_snapshot_hash():
     pre = "\n".join(preamble(export.result_to_csv(run(CA, 6.22689))))
     assert "Open Government Licence - Canada" in pre
-    assert "bundled fixed_service_snapshot.json, sha256 f9daa05e51a38a8083d50513d63c7c173caa1ffd5257011af54aed11ce1387c8" in pre
+    assert "bundled fixed_service_snapshot.json, sha256 e10a3ad16d23c6ca07334bc66bf985b2574b5db8de777d4ce5978d1a0e88c50e" in pre
 
 
 def test_identity_lines_do_not_enter_the_evidence_table():
