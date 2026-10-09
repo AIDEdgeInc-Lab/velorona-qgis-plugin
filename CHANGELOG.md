@@ -37,7 +37,7 @@ Why it matters: 1.1.5 changes numbers. Terrain clearance on long paths is lower,
 - New: `docs/USA.md`, `docs/RAIN_COEFFICIENTS_CAVEAT.md`, this file; `parity/` harness and handoff notes; `tools/verify_package.py`; USA end-to-end test and loading benchmark.
 
 ### Not changed
-Thresholds, the Fresnel/clearance formulas, the earth-model constants (k = 4/3), the satellite engine, the Excel workbook layout.
+Thresholds, the Fresnel/clearance formulas, the earth-model constants (k = 4/3), the satellite engine.
 
 ## 1.1.4 — 2026-10 (reference)
 Operational output: plain-language Summary / Details / Evidence, Ask box, Excel export, hourly weather history; Bandit/Flake8 cleanups. Earlier versions: see `metadata.txt`.
