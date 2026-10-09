@@ -1,0 +1,373 @@
+{
+ "schema": "velorona.parity-fixture/1",
+ "id": "ca-h-height-zero",
+ "tags": [
+  "no-data",
+  "record-height-out-of-range"
+ ],
+ "note": "a real record height of 0 m (outside 0.1-1000 m) -> NO DATA, not clamped, not replaced by 30 m [010047013-003, 0.29 km, 7.12 GHz]",
+ "selection": {
+  "rule": "see parity/build_ca_height_fixtures.py docstring",
+  "pack": "ca-ised-fixed",
+  "snapshot_sha256": "e10a3ad16d23c6ca07334bc66bf985b2574b5db8de777d4ce5978d1a0e88c50e",
+  "link_id": "010047013-003",
+  "licensee": "Telus Communications Inc.",
+  "published_frequencies_mhz": [
+   6940.0,
+   6960.0,
+   6980.0,
+   7000.0,
+   7040.0,
+   7060.0,
+   7100.0,
+   7120.0
+  ]
+ },
+ "link": {
+  "site_a": {
+   "id": "ised-fixed-53.53778,-113.48972",
+   "lat": 53.53778,
+   "lon": -113.48972,
+   "height_m": 0.0,
+   "height_origin": "Observed",
+   "height_source": "ISED Fixed Service record -- ISED SMS Authorization Data Extract, column 29 'Height above ground level [m]'; licensee-submitted record value, not a field measurement",
+   "description": "PBL EDMONTON ALTA"
+  },
+  "site_b": {
+   "id": "ised-fixed-53.54028,-113.49111",
+   "lat": 53.54028,
+   "lon": -113.49111,
+   "height_m": 90.0,
+   "height_origin": "Observed",
+   "height_source": "ISED Fixed Service record -- ISED SMS Authorization Data Extract, column 29 'Height above ground level [m]'; licensee-submitted record value, not a field measurement",
+   "description": "EDMONTON, AB (10020-100 STREET)"
+  },
+  "frequency_ghz": 7.12,
+  "frequency_origin": "Observed",
+  "polarization": "V",
+  "polarization_origin": "Assumed",
+  "fade_margin_db": 32.0,
+  "fade_margin_origin": "Assumed"
+ },
+ "terrain": {
+  "mode": "samples",
+  "source": "SYNTHETIC: 100 m flat + triangular hump",
+  "hump_m": 29.169,
+  "target_percent_fresnel_clear": 1.5,
+  "samples": [
+   [
+    53.53778,
+    -113.48972,
+    100.0
+   ],
+   [
+    53.537831021,
+    -113.489748366,
+    101.190571
+   ],
+   [
+    53.537882041,
+    -113.489776731,
+    102.381143
+   ],
+   [
+    53.537933062,
+    -113.489805097,
+    103.571714
+   ],
+   [
+    53.537984082,
+    -113.489833463,
+    104.762286
+   ],
+   [
+    53.538035103,
+    -113.489861829,
+    105.952857
+   ],
+   [
+    53.538086123,
+    -113.489890195,
+    107.143429
+   ],
+   [
+    53.538137144,
+    -113.489918561,
+    108.334
+   ],
+   [
+    53.538188164,
+    -113.489946928,
+    109.524571
+   ],
+   [
+    53.538239185,
+    -113.489975294,
+    110.715143
+   ],
+   [
+    53.538290205,
+    -113.49000366,
+    111.905714
+   ],
+   [
+    53.538341226,
+    -113.490032027,
+    113.096286
+   ],
+   [
+    53.538392246,
+    -113.490060393,
+    114.286857
+   ],
+   [
+    53.538443267,
+    -113.49008876,
+    115.477429
+   ],
+   [
+    53.538494287,
+    -113.490117126,
+    116.668
+   ],
+   [
+    53.538545308,
+    -113.490145493,
+    117.858571
+   ],
+   [
+    53.538596328,
+    -113.49017386,
+    119.049143
+   ],
+   [
+    53.538647349,
+    -113.490202226,
+    120.239714
+   ],
+   [
+    53.538698369,
+    -113.490230593,
+    121.430286
+   ],
+   [
+    53.53874939,
+    -113.49025896,
+    122.620857
+   ],
+   [
+    53.53880041,
+    -113.490287327,
+    123.811429
+   ],
+   [
+    53.538851431,
+    -113.490315694,
+    125.002
+   ],
+   [
+    53.538902451,
+    -113.490344061,
+    126.192571
+   ],
+   [
+    53.538953471,
+    -113.490372429,
+    127.383143
+   ],
+   [
+    53.539004492,
+    -113.490400796,
+    128.573714
+   ],
+   [
+    53.539055512,
+    -113.490429163,
+    128.573714
+   ],
+   [
+    53.539106533,
+    -113.490457531,
+    127.383143
+   ],
+   [
+    53.539157553,
+    -113.490485898,
+    126.192571
+   ],
+   [
+    53.539208573,
+    -113.490514266,
+    125.002
+   ],
+   [
+    53.539259594,
+    -113.490542633,
+    123.811429
+   ],
+   [
+    53.539310614,
+    -113.490571001,
+    122.620857
+   ],
+   [
+    53.539361635,
+    -113.490599369,
+    121.430286
+   ],
+   [
+    53.539412655,
+    -113.490627737,
+    120.239714
+   ],
+   [
+    53.539463675,
+    -113.490656104,
+    119.049143
+   ],
+   [
+    53.539514696,
+    -113.490684472,
+    117.858571
+   ],
+   [
+    53.539565716,
+    -113.49071284,
+    116.668
+   ],
+   [
+    53.539616736,
+    -113.490741208,
+    115.477429
+   ],
+   [
+    53.539667757,
+    -113.490769577,
+    114.286857
+   ],
+   [
+    53.539718777,
+    -113.490797945,
+    113.096286
+   ],
+   [
+    53.539769797,
+    -113.490826313,
+    111.905714
+   ],
+   [
+    53.539820818,
+    -113.490854682,
+    110.715143
+   ],
+   [
+    53.539871838,
+    -113.49088305,
+    109.524571
+   ],
+   [
+    53.539922858,
+    -113.490911419,
+    108.334
+   ],
+   [
+    53.539973878,
+    -113.490939787,
+    107.143429
+   ],
+   [
+    53.540024899,
+    -113.490968156,
+    105.952857
+   ],
+   [
+    53.540075919,
+    -113.490996524,
+    104.762286
+   ],
+   [
+    53.540126939,
+    -113.491024893,
+    103.571714
+   ],
+   [
+    53.540177959,
+    -113.491053262,
+    102.381143
+   ],
+   [
+    53.54022898,
+    -113.491081631,
+    101.190571
+   ],
+   [
+    53.54028,
+    -113.49111,
+    100.0
+   ]
+  ]
+ },
+ "weather": {
+  "mode": "snapshot",
+  "source": "SYNTHETIC raw Open-Meteo `current` object (units: mm per `interval` s; snowfall cm)",
+  "sites": {
+   "A": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 0.0,
+     "rain": 0.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 1
+    }
+   },
+   "B": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 0.0,
+     "rain": 0.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 1
+    }
+   }
+  }
+ },
+ "synthetic": [
+  "fade_margin_db",
+  "polarization",
+  "terrain",
+  "weather"
+ ],
+ "expected": {
+  "schema": "velorona.parity-expected/1",
+  "spec": "0.3",
+  "curvature": "canonical (bulge subtracted from clearance, P11)",
+  "terrain": {
+   "status": "NO DATA",
+   "no_data": "antenna height A out of range"
+  },
+  "weather": {
+   "status": "CLEAR",
+   "no_data": null,
+   "attenuation_db": 0.0,
+   "ratio": 0.0,
+   "fade_margin_db": 32.0,
+   "precip": {
+    "class": "NONE",
+    "flags": [],
+    "rate_mm_h": 0.0,
+    "liquid_mm": 0.0
+   },
+   "status_without_r1": "CLEAR"
+  },
+  "overall": "NO DATA"
+ },
+ "inputs_sha256": "ba41d68ff72fbf168d61ae2cb40c1ab08898d1fc458740dd88ddb320e094efc1"
+}

@@ -1,0 +1,378 @@
+{
+ "schema": "velorona.parity-fixture/1",
+ "id": "ca-h-obstructed",
+ "tags": [
+  "obstructed",
+  "record-heights"
+ ],
+ "note": "next mid-length link, terrain above the line of sight [010018191-002, 21.65 km, 7.7 GHz]",
+ "selection": {
+  "rule": "see parity/build_ca_height_fixtures.py docstring",
+  "pack": "ca-ised-fixed",
+  "snapshot_sha256": "e10a3ad16d23c6ca07334bc66bf985b2574b5db8de777d4ce5978d1a0e88c50e",
+  "link_id": "010018191-002",
+  "licensee": "BC Hydro (Fixed)",
+  "published_frequencies_mhz": [
+   7220.0,
+   7395.0,
+   7550.0,
+   7700.0
+  ]
+ },
+ "link": {
+  "site_a": {
+   "id": "ised-fixed-49.28111,-123.12528",
+   "lat": 49.28111,
+   "lon": -123.12528,
+   "height_m": 84.0,
+   "height_origin": "Observed",
+   "height_source": "ISED Fixed Service record -- ISED SMS Authorization Data Extract, column 29 'Height above ground level [m]'; licensee-submitted record value, not a field measurement",
+   "description": "VANCOUVER BC - 970 BURRARD ST"
+  },
+  "site_b": {
+   "id": "ised-fixed-49.31222,-122.83056",
+   "lat": 49.31222,
+   "lon": -122.83056,
+   "height_m": 47.0,
+   "height_origin": "Observed",
+   "height_source": "ISED Fixed Service record -- ISED SMS Authorization Data Extract, column 29 'Height above ground level [m]'; licensee-submitted record value, not a field measurement",
+   "description": "New Westminster, BC - 555 6th St (Noons Creek II)"
+  },
+  "frequency_ghz": 7.7,
+  "frequency_origin": "Observed",
+  "polarization": "V",
+  "polarization_origin": "Assumed",
+  "fade_margin_db": 32.0,
+  "fade_margin_origin": "Assumed"
+ },
+ "terrain": {
+  "mode": "samples",
+  "source": "SYNTHETIC: 100 m flat + triangular hump",
+  "hump_m": 63.882,
+  "target_percent_fresnel_clear": -0.3,
+  "samples": [
+   [
+    49.28111,
+    -123.12528,
+    100.0
+   ],
+   [
+    49.281752387,
+    -123.119269038,
+    102.607429
+   ],
+   [
+    49.282394462,
+    -123.113257919,
+    105.214857
+   ],
+   [
+    49.283036225,
+    -123.107246644,
+    107.822286
+   ],
+   [
+    49.283677677,
+    -123.101235213,
+    110.429714
+   ],
+   [
+    49.284318816,
+    -123.095223625,
+    113.037143
+   ],
+   [
+    49.284959644,
+    -123.089211881,
+    115.644571
+   ],
+   [
+    49.28560016,
+    -123.08319998,
+    118.252
+   ],
+   [
+    49.286240364,
+    -123.077187924,
+    120.859429
+   ],
+   [
+    49.286880256,
+    -123.071175711,
+    123.466857
+   ],
+   [
+    49.287519836,
+    -123.065163342,
+    126.074286
+   ],
+   [
+    49.288159104,
+    -123.059150818,
+    128.681714
+   ],
+   [
+    49.28879806,
+    -123.053138137,
+    131.289143
+   ],
+   [
+    49.289436704,
+    -123.047125301,
+    133.896571
+   ],
+   [
+    49.290075037,
+    -123.041112309,
+    136.504
+   ],
+   [
+    49.290713057,
+    -123.035099161,
+    139.111429
+   ],
+   [
+    49.291350765,
+    -123.029085858,
+    141.718857
+   ],
+   [
+    49.291988162,
+    -123.023072399,
+    144.326286
+   ],
+   [
+    49.292625246,
+    -123.017058784,
+    146.933714
+   ],
+   [
+    49.293262018,
+    -123.011045015,
+    149.541143
+   ],
+   [
+    49.293898478,
+    -123.00503109,
+    152.148571
+   ],
+   [
+    49.294534626,
+    -122.999017009,
+    154.756
+   ],
+   [
+    49.295170462,
+    -122.993002774,
+    157.363429
+   ],
+   [
+    49.295805985,
+    -122.986988383,
+    159.970857
+   ],
+   [
+    49.296441197,
+    -122.980973837,
+    162.578286
+   ],
+   [
+    49.297076097,
+    -122.974959136,
+    162.578286
+   ],
+   [
+    49.297710684,
+    -122.968944281,
+    159.970857
+   ],
+   [
+    49.298344959,
+    -122.96292927,
+    157.363429
+   ],
+   [
+    49.298978922,
+    -122.956914105,
+    154.756
+   ],
+   [
+    49.299612573,
+    -122.950898785,
+    152.148571
+   ],
+   [
+    49.300245911,
+    -122.94488331,
+    149.541143
+   ],
+   [
+    49.300878937,
+    -122.938867681,
+    146.933714
+   ],
+   [
+    49.301511651,
+    -122.932851897,
+    144.326286
+   ],
+   [
+    49.302144053,
+    -122.926835959,
+    141.718857
+   ],
+   [
+    49.302776143,
+    -122.920819866,
+    139.111429
+   ],
+   [
+    49.30340792,
+    -122.914803619,
+    136.504
+   ],
+   [
+    49.304039385,
+    -122.908787218,
+    133.896571
+   ],
+   [
+    49.304670537,
+    -122.902770663,
+    131.289143
+   ],
+   [
+    49.305301377,
+    -122.896753954,
+    128.681714
+   ],
+   [
+    49.305931905,
+    -122.89073709,
+    126.074286
+   ],
+   [
+    49.30656212,
+    -122.884720073,
+    123.466857
+   ],
+   [
+    49.307192023,
+    -122.878702902,
+    120.859429
+   ],
+   [
+    49.307821614,
+    -122.872685577,
+    118.252
+   ],
+   [
+    49.308450892,
+    -122.866668098,
+    115.644571
+   ],
+   [
+    49.309079858,
+    -122.860650465,
+    113.037143
+   ],
+   [
+    49.309708511,
+    -122.854632679,
+    110.429714
+   ],
+   [
+    49.310336852,
+    -122.84861474,
+    107.822286
+   ],
+   [
+    49.310964881,
+    -122.842596646,
+    105.214857
+   ],
+   [
+    49.311592597,
+    -122.8365784,
+    102.607429
+   ],
+   [
+    49.31222,
+    -122.83056,
+    100.0
+   ]
+  ]
+ },
+ "weather": {
+  "mode": "snapshot",
+  "source": "SYNTHETIC raw Open-Meteo `current` object (units: mm per `interval` s; snowfall cm)",
+  "sites": {
+   "A": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 0.0,
+     "rain": 0.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 1
+    }
+   },
+   "B": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 0.0,
+     "rain": 0.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 1
+    }
+   }
+  }
+ },
+ "synthetic": [
+  "fade_margin_db",
+  "polarization",
+  "terrain",
+  "weather"
+ ],
+ "expected": {
+  "schema": "velorona.parity-expected/1",
+  "spec": "0.3",
+  "curvature": "canonical (bulge subtracted from clearance, P11)",
+  "terrain": {
+   "status": "CRITICAL",
+   "no_data": null,
+   "distance_km": 21.64974303984632,
+   "critical_index": 25,
+   "available_m": -4.350106345650659,
+   "required_m": 8.700774420762349,
+   "margin_m": -13.050880766413007,
+   "ratio": -0.49996771957104813,
+   "percent_fresnel_clear": -0.2999806317426289,
+   "fresnel_radius_m": 14.50129070127058,
+   "near_threshold": true
+  },
+  "weather": {
+   "status": "CLEAR",
+   "no_data": null,
+   "attenuation_db": 0.0,
+   "ratio": 0.0,
+   "fade_margin_db": 32.0,
+   "precip": {
+    "class": "NONE",
+    "flags": [],
+    "rate_mm_h": 0.0,
+    "liquid_mm": 0.0
+   },
+   "status_without_r1": "CLEAR"
+  },
+  "overall": "CRITICAL"
+ },
+ "inputs_sha256": "fbd9ca6a27da7a199a8f73aa54e0773c2e1ddcb0bef7391d66f59d99c33ecd94"
+}

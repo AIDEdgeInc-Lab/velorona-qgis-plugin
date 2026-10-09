@@ -1,0 +1,372 @@
+{
+ "schema": "velorona.parity-fixture/1",
+ "id": "us-identical-endpoints",
+ "tags": [
+  "no-data",
+  "R4",
+  "R9",
+  "zero-length"
+ ],
+ "note": "us-clear with site B moved onto site A (distance exactly 0; SYNTHETIC alteration)",
+ "selection": {
+  "rule": "see parity/build_us_fixtures.py docstring (SELECTION RULE)",
+  "pack": "us-fcc-uls-micro",
+  "extract": "parity/contract/usa/usa_extract_wny.json",
+  "snapshot_sha256": "8d27633717a5906af55deebd10fb4a041a7fcc64a375205cf6aca961e668f16b",
+  "link_id": "fcc-link-1003499-1",
+  "licensee": "Cellco Partnership",
+  "published_frequencies_mhz": [
+   6286.19
+  ]
+ },
+ "link": {
+  "site_a": {
+   "id": "fcc-site-42.08517,-79.28658",
+   "lat": 42.08517,
+   "lon": -79.28658,
+   "height_m": 106.4,
+   "height_origin": "Observed",
+   "description": "Jamestown West, NY, NY",
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
+  },
+  "site_b": {
+   "id": "fcc-site-42.14433,-79.57486",
+   "lat": 42.08517,
+   "lon": -79.28658,
+   "height_m": 45.4,
+   "height_origin": "Observed",
+   "description": "Sherman, NY, NY",
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
+  },
+  "frequency_ghz": 6.2861899999999995,
+  "frequency_origin": "Observed",
+  "polarization": "V",
+  "polarization_origin": "Assumed",
+  "fade_margin_db": 32.0,
+  "fade_margin_origin": "Assumed"
+ },
+ "terrain": {
+  "mode": "samples",
+  "source": "SYNTHETIC: 100 m flat + triangular hump",
+  "hump_m": 41.471,
+  "target_percent_fresnel_clear": 1.5,
+  "samples": [
+   [
+    42.08517,
+    -79.28658,
+    100.0
+   ],
+   [
+    42.08517,
+    -79.28658,
+    101.692694
+   ],
+   [
+    42.08517,
+    -79.28658,
+    103.385388
+   ],
+   [
+    42.08517,
+    -79.28658,
+    105.078082
+   ],
+   [
+    42.08517,
+    -79.28658,
+    106.770776
+   ],
+   [
+    42.08517,
+    -79.28658,
+    108.463469
+   ],
+   [
+    42.08517,
+    -79.28658,
+    110.156163
+   ],
+   [
+    42.08517,
+    -79.28658,
+    111.848857
+   ],
+   [
+    42.08517,
+    -79.28658,
+    113.541551
+   ],
+   [
+    42.08517,
+    -79.28658,
+    115.234245
+   ],
+   [
+    42.08517,
+    -79.28658,
+    116.926939
+   ],
+   [
+    42.08517,
+    -79.28658,
+    118.619633
+   ],
+   [
+    42.08517,
+    -79.28658,
+    120.312327
+   ],
+   [
+    42.08517,
+    -79.28658,
+    122.00502
+   ],
+   [
+    42.08517,
+    -79.28658,
+    123.697714
+   ],
+   [
+    42.08517,
+    -79.28658,
+    125.390408
+   ],
+   [
+    42.08517,
+    -79.28658,
+    127.083102
+   ],
+   [
+    42.08517,
+    -79.28658,
+    128.775796
+   ],
+   [
+    42.08517,
+    -79.28658,
+    130.46849
+   ],
+   [
+    42.08517,
+    -79.28658,
+    132.161184
+   ],
+   [
+    42.08517,
+    -79.28658,
+    133.853878
+   ],
+   [
+    42.08517,
+    -79.28658,
+    135.546571
+   ],
+   [
+    42.08517,
+    -79.28658,
+    137.239265
+   ],
+   [
+    42.08517,
+    -79.28658,
+    138.931959
+   ],
+   [
+    42.08517,
+    -79.28658,
+    140.624653
+   ],
+   [
+    42.08517,
+    -79.28658,
+    140.624653
+   ],
+   [
+    42.08517,
+    -79.28658,
+    138.931959
+   ],
+   [
+    42.08517,
+    -79.28658,
+    137.239265
+   ],
+   [
+    42.08517,
+    -79.28658,
+    135.546571
+   ],
+   [
+    42.08517,
+    -79.28658,
+    133.853878
+   ],
+   [
+    42.08517,
+    -79.28658,
+    132.161184
+   ],
+   [
+    42.08517,
+    -79.28658,
+    130.46849
+   ],
+   [
+    42.08517,
+    -79.28658,
+    128.775796
+   ],
+   [
+    42.08517,
+    -79.28658,
+    127.083102
+   ],
+   [
+    42.08517,
+    -79.28658,
+    125.390408
+   ],
+   [
+    42.08517,
+    -79.28658,
+    123.697714
+   ],
+   [
+    42.08517,
+    -79.28658,
+    122.00502
+   ],
+   [
+    42.08517,
+    -79.28658,
+    120.312327
+   ],
+   [
+    42.08517,
+    -79.28658,
+    118.619633
+   ],
+   [
+    42.08517,
+    -79.28658,
+    116.926939
+   ],
+   [
+    42.08517,
+    -79.28658,
+    115.234245
+   ],
+   [
+    42.08517,
+    -79.28658,
+    113.541551
+   ],
+   [
+    42.08517,
+    -79.28658,
+    111.848857
+   ],
+   [
+    42.08517,
+    -79.28658,
+    110.156163
+   ],
+   [
+    42.08517,
+    -79.28658,
+    108.463469
+   ],
+   [
+    42.08517,
+    -79.28658,
+    106.770776
+   ],
+   [
+    42.08517,
+    -79.28658,
+    105.078082
+   ],
+   [
+    42.08517,
+    -79.28658,
+    103.385388
+   ],
+   [
+    42.08517,
+    -79.28658,
+    101.692694
+   ],
+   [
+    42.08517,
+    -79.28658,
+    100.0
+   ]
+  ]
+ },
+ "weather": {
+  "mode": "snapshot",
+  "source": "SYNTHETIC raw Open-Meteo `current` object (units: mm per `interval` s; snowfall cm)",
+  "sites": {
+   "A": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 0.0,
+     "rain": 0.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 1
+    }
+   },
+   "B": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 0.0,
+     "rain": 0.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 1
+    }
+   }
+  }
+ },
+ "synthetic": [
+  "endpoint_b",
+  "fade_margin_db",
+  "polarization",
+  "terrain",
+  "weather"
+ ],
+ "expected": {
+  "schema": "velorona.parity-expected/1",
+  "spec": "0.3",
+  "curvature": "canonical (bulge subtracted from clearance, P11)",
+  "terrain": {
+   "status": "NO DATA",
+   "no_data": "zero-length link: identical endpoints (R4, R9)"
+  },
+  "weather": {
+   "status": "NO DATA",
+   "no_data": "zero-length link: identical endpoints (R4, R9)",
+   "precip": {
+    "class": "NONE",
+    "flags": []
+   }
+  },
+  "overall": "NO DATA"
+ },
+ "pre_correction": {
+  "curvature": "legacy (bulge added to clearance)",
+  "terrain": {
+   "status": "NO DATA",
+   "no_data": "zero-length link: identical endpoints (R4, R9)"
+  },
+  "intended_class_when_built": null
+ },
+ "inputs_sha256": "d353ad6e34bc21ad0ba743b03275c17f9861c95587518195f7a41d8c2f84b0aa"
+}

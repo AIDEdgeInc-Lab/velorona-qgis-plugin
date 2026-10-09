@@ -3,6 +3,7 @@
 | File | Needs QGIS? | What it covers |
 |---|---|---|
 | `test_viewport_cache.py` | no | Viewport cache: TTL, negative caching, LRU eviction, bound, key separation |
+| `test_presentation_terrain.py`, `_weather.py`, `_ask.py`, `_workbook.py` | no | Operational output layer: status mapping against the real libraries, history changes, station provenance, Ask answers, Excel values equal to engine values exactly |
 | `qgis_e2e.py` | yes | Real plugin through a real `QgsProject`/`QgsMapCanvas`: CRS, extent, layers, basemap, render, pan/zoom, inspector, dock, engines, exports, Qt6 idioms, ownership markers, unload lifecycle |
 | `benchmark_viewport.py` | yes | Load / render / navigation timings, HTTP counts, canvas-refresh counts |
 

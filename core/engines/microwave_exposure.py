@@ -11,10 +11,14 @@ from typing import Dict
 
 from aei_mw_exposure import LinkExposure, MicrowaveLink, MicrowaveSite, Provenance, calculate_exposure
 from aei_mw_exposure.providers import eccc
-from aei_mw_exposure.providers.open_meteo import OpenMeteoProvider
 from aei_mw_exposure.representativeness import WeatherRepresentativeness, assess_representativeness
 
 from ..features import feature_id_name, feature_to_latlon
+from ..presentation import history as weather_history
+from ..presentation import precip
+from ..sources.open_meteo_rain import TypedPrecipitationProvider
+from ..record_source import frequency_ghz_from_record, record_labels  # noqa: F401  (re-exported: the one definition lives in record_source)
+from ..validation import NoDataError, weather_input_reasons
 
 # See terrestrial.py's PARAM_SPEC note. The frequency bound here is stronger
 # than the terrestrial one: it is the rain model's own tabulated validity
@@ -44,6 +48,11 @@ class MicrowaveAnalysisResult:
     exposure: LinkExposure
     representativeness: Dict[str, WeatherRepresentativeness]
     weather_errors: Dict[str, str] = field(default_factory=dict)
+    # Hourly model history per site id, for "what changed" comparisons. It is
+    # context only: nothing in calculate_exposure() reads it.
+    history: Dict[str, weather_history.WeatherHistory] = field(default_factory=dict)
+    # How each site's precipitation was split into liquid rain and the rest.
+    precipitation: Dict[str, precip.Precipitation] = field(default_factory=dict)
 
 
 def build_params(entries) -> dict:
@@ -66,27 +75,6 @@ def _build_site(layer, feature, fallback_label: str) -> MicrowaveSite:
     )
 
 
-def frequency_ghz_from_record(frequencies_mhz) -> tuple:
-    """(GHz, provenance note) from an ISED Fixed Service record's published
-    frequency list, or (None, reason). The highest published frequency on the
-    authorization is used: rain attenuation rises with frequency, so it is the
-    conservative choice, and it is a value from the record -- never invented."""
-    if not frequencies_mhz:
-        return None, "No frequency published on this authorization."
-    values = []
-    for chunk in str(frequencies_mhz).split(","):
-        try:
-            values.append(float(chunk.strip()))
-        except ValueError:
-            continue
-    if not values:
-        return None, "Published frequency could not be parsed from this record."
-    top = max(values)
-    note = (f"Highest of {len(values)} published frequencies on this authorization "
-            f"({top:.1f} MHz); rain attenuation rises with frequency.")
-    return top / 1000.0, note
-
-
 def endpoint_site(latitude, longitude, site_id, name, source) -> MicrowaveSite:
     """A MicrowaveSite at a Fixed Service link endpoint. The coordinates come
     from the ISED record the link itself carries, so the site is REAL, not
@@ -100,10 +88,14 @@ def endpoint_site(latitude, longitude, site_id, name, source) -> MicrowaveSite:
 def analyze_sites(site_a: MicrowaveSite, site_b: MicrowaveSite, params: dict,
                   link_provenance: Provenance = Provenance.USER_PROVIDED,
                   link_source: str = "Velorona QGIS plugin -- link parameters entered by user",
-                  link_id: str = None) -> MicrowaveAnalysisResult:
+                  link_id: str = None, history_fetcher=weather_history.fetch_weather_history,
+                  provider=None) -> MicrowaveAnalysisResult:
     """The shared exposure + representativeness pass. Both the two-selected-
     sites path and the Fixed Service link path end up here, so there is one
     calculation, not two."""
+    reasons = weather_input_reasons(site_a.latitude, site_a.longitude, site_b.latitude, site_b.longitude, params)
+    if reasons:
+        raise NoDataError("weather", reasons)
     if site_a.id == site_b.id:
         site_a = MicrowaveSite(**{**site_a.__dict__, "id": f"{site_a.id}-a"})
         site_b = MicrowaveSite(**{**site_b.__dict__, "id": f"{site_b.id}-b"})
@@ -115,7 +107,7 @@ def analyze_sites(site_a: MicrowaveSite, site_b: MicrowaveSite, params: dict,
         source=link_source,
     )
 
-    provider = OpenMeteoProvider()
+    provider = TypedPrecipitationProvider() if provider is None else provider
     weather_errors: Dict[str, str] = {}
     weather_by_site = {}
     for site in (site_a, site_b):
@@ -126,10 +118,10 @@ def analyze_sites(site_a: MicrowaveSite, site_b: MicrowaveSite, params: dict,
 
     missing = [s.id for s in (site_a, site_b) if s.id not in weather_by_site]
     if missing:
-        raise RuntimeError(
+        raise NoDataError("weather", [
             "Could not fetch live weather (Open-Meteo) for: "
-            + ", ".join(f"{site_id} ({weather_errors.get(site_id, 'unknown error')})" for site_id in missing)
-        )
+            + ", ".join(f"{site_id} ({weather_errors.get(site_id, 'unknown error')})" for site_id in missing) + " (T3)"],
+            transient=True)
 
     exposure = calculate_exposure(link=link, weather_by_site=weather_by_site)
 
@@ -161,9 +153,17 @@ def analyze_sites(site_a: MicrowaveSite, site_b: MicrowaveSite, params: dict,
             )
         representativeness[site.id] = rep
 
+    histories = {}
+    for site in (site_a, site_b):
+        try:
+            histories[site.id] = history_fetcher(site.id, site.latitude, site.longitude)
+        except Exception as exc:  # optional context -- say so, never fabricate a trend
+            weather_errors[f"{site.id} (weather history)"] = f"No history available: {exc}"
+
     return MicrowaveAnalysisResult(
         kind="microwave-exposure", exposure=exposure,
-        representativeness=representativeness, weather_errors=weather_errors,
+        representativeness=representativeness, weather_errors=weather_errors, history=histories,
+        precipitation=dict(getattr(provider, "precipitation", {})),
     )
 
 
@@ -171,6 +171,7 @@ def analyze(entries, params: dict) -> MicrowaveAnalysisResult:
     """Two selected point features as the link's endpoints -- unchanged
     behaviour for the 'Analyze: Microwave Weather Exposure' action."""
     (layer_a, feat_a), (layer_b, feat_b) = entries
+    _validate_endpoints(feature_to_latlon(layer_a, feat_a), feature_to_latlon(layer_b, feat_b), params)
     return analyze_sites(
         _build_site(layer_a, feat_a, "Selected site A"),
         _build_site(layer_b, feat_b, "Selected site B"),
@@ -179,20 +180,21 @@ def analyze(entries, params: dict) -> MicrowaveAnalysisResult:
 
 
 def build_link_params(link_attrs: dict) -> tuple:
-    """(params, origins) for a Fixed Service link record.
+    """(params, origins) for a Fixed Service link record (Canada: ISED; USA: FCC ULS).
 
     Only the frequency exists in the public record. Polarization and fade
-    margin are not published in ISED's Fixed Service extract, so they stay at
+    margin are not published in either register, so they stay at
     the engine defaults and are reported as assumptions -- never presented as
     observations from the record."""
+    labels = record_labels(link_attrs)
     frequency_ghz, frequency_note = frequency_ghz_from_record(link_attrs.get("frequencies_mhz"))
     defaults = {p["key"]: p["default"] for p in PARAM_SPEC}
     params = dict(defaults)
     origins = {
         "polarization": ("Assumed", f"Engine default ({defaults['polarization']}); not published in the "
-                                    "ISED Fixed Service extract."),
+                                    f"{labels.extract}."),
         "fade_margin_db": ("Assumed", f"Engine default ({defaults['fade_margin_db']:.0f} dB); not published in "
-                                      "the ISED Fixed Service extract."),
+                                      f"the {labels.extract}."),
     }
     if frequency_ghz is not None:
         params["frequency_ghz"] = frequency_ghz
@@ -203,20 +205,30 @@ def build_link_params(link_attrs: dict) -> tuple:
     return params, origins
 
 
-def analyze_link_record(site_a_latlon, site_b_latlon, link_attrs: dict, params: dict) -> MicrowaveAnalysisResult:
+def _validate_endpoints(latlon_a, latlon_b, params: dict) -> None:
+    """Explicit NO DATA validation BEFORE a MicrowaveSite is built (the library's own constructor raises on bad coordinates)."""
+    reasons = weather_input_reasons(latlon_a[0], latlon_a[1], latlon_b[0], latlon_b[1], params)
+    if reasons:
+        raise NoDataError("weather", reasons)
+
+
+def analyze_link_record(site_a_latlon, site_b_latlon, link_attrs: dict, params: dict,
+                        provider=None, history_fetcher=weather_history.fetch_weather_history) -> MicrowaveAnalysisResult:
     """Weather exposure for a Fixed Service link, using the endpoints the link
     record itself carries. The pairing comes from the shared authorization in
     ISED's extract -- it is never inferred from proximity."""
+    _validate_endpoints(site_a_latlon, site_b_latlon, params)
     lat_a, lon_a = site_a_latlon
     lat_b, lon_b = site_b_latlon
     authorization = link_attrs.get("authorization_number") or link_attrs.get("id") or "link"
-    source = link_attrs.get("source") or "ISED Fixed Service extract"
+    labels = record_labels(link_attrs)
+    source = link_attrs.get("source") or labels.extract
     return analyze_sites(
         endpoint_site(lat_a, lon_a, f"{authorization}-A", "Site A", source),
         endpoint_site(lat_b, lon_b, f"{authorization}-B", "Site B", source),
         params,
         link_provenance=Provenance.DERIVED,
-        link_source=(f"ISED Fixed Service authorization {authorization} -- endpoints and frequency from the "
+        link_source=(f"{labels.authorization} {authorization} -- endpoints and frequency from the "
                      "public record; polarization and fade margin are engine assumptions."),
-        link_id=str(authorization),
+        link_id=str(authorization), provider=provider, history_fetcher=history_fetcher,
     )

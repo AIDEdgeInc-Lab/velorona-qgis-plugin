@@ -342,6 +342,8 @@ LIFECYCLE_EVIDENCE = "evidence"
 # created instead of adding a second copy.
 SOURCE_FIXED_SITES = "fixed_sites"
 SOURCE_FIXED_LINKS = "fixed_links"
+SOURCE_US_SITES = "us_fixed_sites"       # USA (FCC ULS) layers are separate from Canada's and loaded per extent from a pack
+SOURCE_US_LINKS = "us_fixed_links"
 SOURCE_TOWERS = "towers"
 SOURCE_CELLULAR = "cellular"
 SOURCE_SATELLITES = "satellites"
@@ -354,6 +356,7 @@ SOURCE_BASEMAP = "basemap"
 # COLORS_* key fails loudly instead of silently mismatching).
 CLUSTERED_LAYER_COLOR_KEY = {
     SOURCE_FIXED_SITES: "fixed-sites",
+    SOURCE_US_SITES: "fixed-sites",
     SOURCE_TOWERS: "towers",
     SOURCE_CELLULAR: "cellular",
     SOURCE_SATELLITES: "satellites",
@@ -411,7 +414,7 @@ def _build_fields(field_specs: Sequence[Tuple[str, QMetaType.Type]]) -> List[Qgs
     return [QgsField(name, qtype) for name, qtype in field_specs]
 
 
-def _set_abstract(layer: QgsVectorLayer, abstract: str) -> None:
+def set_abstract(layer: QgsVectorLayer, abstract: str) -> None:
     """QgsMapLayer.setAbstract() is deprecated (3.38+, QGIS-Server-only);
     QgsLayerMetadata.abstract is the non-deprecated, Desktop-visible one
     (Layer Properties -> Metadata)."""
@@ -535,7 +538,7 @@ def build_point_layer(
     layer.setRenderer(_clustered_renderer(color_hex) if cluster else QgsSingleSymbolRenderer(_point_symbol(color_hex)))
     layer.setCustomProperty(VELORONA_KIND_PROPERTY, kind)
     if abstract:
-        _set_abstract(layer, abstract)
+        set_abstract(layer, abstract)
     return layer
 
 
@@ -577,7 +580,7 @@ def build_link_layer(
     layer.setRenderer(QgsSingleSymbolRenderer(symbol))
     layer.setCustomProperty(VELORONA_KIND_PROPERTY, "link")
     if abstract:
-        _set_abstract(layer, abstract)
+        set_abstract(layer, abstract)
     return layer
 
 

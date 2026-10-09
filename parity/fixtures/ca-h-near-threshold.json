@@ -1,0 +1,378 @@
+{
+ "schema": "velorona.parity-fixture/1",
+ "id": "ca-h-near-threshold",
+ "tags": [
+  "near-threshold",
+  "record-heights"
+ ],
+ "note": "next mid-length link, terrain sized to 0.65 [010018115-002, 26.71 km, 7.7 GHz]",
+ "selection": {
+  "rule": "see parity/build_ca_height_fixtures.py docstring",
+  "pack": "ca-ised-fixed",
+  "snapshot_sha256": "e10a3ad16d23c6ca07334bc66bf985b2574b5db8de777d4ce5978d1a0e88c50e",
+  "link_id": "010018115-002",
+  "licensee": "BC Hydro (Fixed)",
+  "published_frequencies_mhz": [
+   7220.0,
+   7395.0,
+   7550.0,
+   7700.0
+  ]
+ },
+ "link": {
+  "site_a": {
+   "id": "ised-fixed-49.11972,-122.13139",
+   "lat": 49.11972,
+   "lon": -122.13139,
+   "height_m": 33.0,
+   "height_origin": "Observed",
+   "height_source": "ISED Fixed Service record -- ISED SMS Authorization Data Extract, column 29 'Height above ground level [m]'; licensee-submitted record value, not a field measurement",
+   "description": "Chilliwack, BC SUMAS (CABLE SITE)"
+  },
+  "site_b": {
+   "id": "ised-fixed-49.17750,-121.77500",
+   "lat": 49.1775,
+   "lon": -121.775,
+   "height_m": 23.0,
+   "height_origin": "Observed",
+   "height_source": "ISED Fixed Service record -- ISED SMS Authorization Data Extract, column 29 'Height above ground level [m]'; licensee-submitted record value, not a field measurement",
+   "description": "ROSEDALE SS BC"
+  },
+  "frequency_ghz": 7.7,
+  "frequency_origin": "Observed",
+  "polarization": "V",
+  "polarization_origin": "Assumed",
+  "fade_margin_db": 32.0,
+  "fade_margin_origin": "Assumed"
+ },
+ "terrain": {
+  "mode": "samples",
+  "source": "SYNTHETIC: 100 m flat + triangular hump",
+  "hump_m": 7.084,
+  "target_percent_fresnel_clear": 0.65,
+  "samples": [
+   [
+    49.11972,
+    -122.13139,
+    100.0
+   ],
+   [
+    49.120910139,
+    -122.124125063,
+    100.289143
+   ],
+   [
+    49.122099823,
+    -122.116859777,
+    100.578286
+   ],
+   [
+    49.123289051,
+    -122.109594143,
+    100.867429
+   ],
+   [
+    49.124477823,
+    -122.102328161,
+    101.156571
+   ],
+   [
+    49.125666138,
+    -122.09506183,
+    101.445714
+   ],
+   [
+    49.126853998,
+    -122.08779515,
+    101.734857
+   ],
+   [
+    49.128041402,
+    -122.080528123,
+    102.024
+   ],
+   [
+    49.12922835,
+    -122.073260748,
+    102.313143
+   ],
+   [
+    49.130414841,
+    -122.065993025,
+    102.602286
+   ],
+   [
+    49.131600876,
+    -122.058724954,
+    102.891429
+   ],
+   [
+    49.132786456,
+    -122.051456535,
+    103.180571
+   ],
+   [
+    49.133971578,
+    -122.044187769,
+    103.469714
+   ],
+   [
+    49.135156245,
+    -122.036918655,
+    103.758857
+   ],
+   [
+    49.136340455,
+    -122.029649194,
+    104.048
+   ],
+   [
+    49.137524209,
+    -122.022379386,
+    104.337143
+   ],
+   [
+    49.138707506,
+    -122.01510923,
+    104.626286
+   ],
+   [
+    49.139890347,
+    -122.007838728,
+    104.915429
+   ],
+   [
+    49.141072732,
+    -122.000567878,
+    105.204571
+   ],
+   [
+    49.14225466,
+    -121.993296681,
+    105.493714
+   ],
+   [
+    49.143436131,
+    -121.986025138,
+    105.782857
+   ],
+   [
+    49.144617146,
+    -121.978753248,
+    106.072
+   ],
+   [
+    49.145797704,
+    -121.971481011,
+    106.361143
+   ],
+   [
+    49.146977805,
+    -121.964208428,
+    106.650286
+   ],
+   [
+    49.14815745,
+    -121.956935499,
+    106.939429
+   ],
+   [
+    49.149336637,
+    -121.949662223,
+    106.939429
+   ],
+   [
+    49.150515368,
+    -121.942388602,
+    106.650286
+   ],
+   [
+    49.151693642,
+    -121.935114634,
+    106.361143
+   ],
+   [
+    49.152871459,
+    -121.92784032,
+    106.072
+   ],
+   [
+    49.15404882,
+    -121.92056566,
+    105.782857
+   ],
+   [
+    49.155225723,
+    -121.913290655,
+    105.493714
+   ],
+   [
+    49.156402169,
+    -121.906015304,
+    105.204571
+   ],
+   [
+    49.157578158,
+    -121.898739608,
+    104.915429
+   ],
+   [
+    49.15875369,
+    -121.891463566,
+    104.626286
+   ],
+   [
+    49.159928765,
+    -121.884187178,
+    104.337143
+   ],
+   [
+    49.161103382,
+    -121.876910446,
+    104.048
+   ],
+   [
+    49.162277543,
+    -121.869633368,
+    103.758857
+   ],
+   [
+    49.163451246,
+    -121.862355945,
+    103.469714
+   ],
+   [
+    49.164624491,
+    -121.855078178,
+    103.180571
+   ],
+   [
+    49.16579728,
+    -121.847800065,
+    102.891429
+   ],
+   [
+    49.166969611,
+    -121.840521608,
+    102.602286
+   ],
+   [
+    49.168141484,
+    -121.833242807,
+    102.313143
+   ],
+   [
+    49.1693129,
+    -121.82596366,
+    102.024
+   ],
+   [
+    49.170483859,
+    -121.81868417,
+    101.734857
+   ],
+   [
+    49.17165436,
+    -121.811404335,
+    101.445714
+   ],
+   [
+    49.172824403,
+    -121.804124156,
+    101.156571
+   ],
+   [
+    49.173993989,
+    -121.796843633,
+    100.867429
+   ],
+   [
+    49.175163117,
+    -121.789562766,
+    100.578286
+   ],
+   [
+    49.176331787,
+    -121.782281555,
+    100.289143
+   ],
+   [
+    49.1775,
+    -121.775,
+    100.0
+   ]
+  ]
+ },
+ "weather": {
+  "mode": "snapshot",
+  "source": "SYNTHETIC raw Open-Meteo `current` object (units: mm per `interval` s; snowfall cm)",
+  "sites": {
+   "A": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 0.0,
+     "rain": 0.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 1
+    }
+   },
+   "B": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 0.0,
+     "rain": 0.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 1
+    }
+   }
+  }
+ },
+ "synthetic": [
+  "fade_margin_db",
+  "polarization",
+  "terrain",
+  "weather"
+ ],
+ "expected": {
+  "schema": "velorona.parity-expected/1",
+  "spec": "0.3",
+  "curvature": "canonical (bulge subtracted from clearance, P11)",
+  "terrain": {
+   "status": "WATCH",
+   "no_data": null,
+   "distance_km": 26.705482786757724,
+   "critical_index": 25,
+   "available_m": 10.468333759434131,
+   "required_m": 9.66343996505416,
+   "margin_m": 0.8048937943799714,
+   "ratio": 1.0832926781033156,
+   "percent_fresnel_clear": 0.6499756068619894,
+   "fresnel_radius_m": 16.105733275090266,
+   "near_threshold": true
+  },
+  "weather": {
+   "status": "CLEAR",
+   "no_data": null,
+   "attenuation_db": 0.0,
+   "ratio": 0.0,
+   "fade_margin_db": 32.0,
+   "precip": {
+    "class": "NONE",
+    "flags": [],
+    "rate_mm_h": 0.0,
+    "liquid_mm": 0.0
+   },
+   "status_without_r1": "CLEAR"
+  },
+  "overall": "WATCH"
+ },
+ "inputs_sha256": "4199394666c0c9192ce9c3bf371936e9820c9a0f33ecc8ccb46c506855e68eec"
+}

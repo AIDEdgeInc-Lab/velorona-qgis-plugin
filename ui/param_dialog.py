@@ -21,7 +21,11 @@ class ParamDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._spec = param_spec
+        self._defaults = defaults
         self._widgets = {}
+        # Float parameters the user actually changed. An UNTOUCHED field returns its exact default, not the spin box's rounded copy: a
+        # record's own value (e.g. 6.22689 GHz) must come back unaltered, and only a real edit makes it the user's value.
+        self._edited = set()
 
         form = QFormLayout()
         for p in param_spec:
@@ -38,11 +42,12 @@ class ParamDialog(QDialog):
                 # the operator had chosen it, which is the same defect as
                 # rounding their input. validate() refuses instead.
                 low, high = float(p.get("min", 0.1)), float(p.get("max", 100000.0))
-                widget.setDecimals(2)
+                widget.setDecimals(int(p.get("decimals", 2)))
                 widget.setRange(low - 1.0 if low > 1.0 else 0.0, high + 1.0)
                 if p.get("suffix"):
                     widget.setSuffix(p["suffix"])
                 widget.setValue(float(defaults.get(p["key"], p["default"])))
+                widget.valueChanged.connect(lambda _v, key=p["key"]: self._edited.add(key))
             elif p["type"] == "choice":
                 widget = QComboBox(self)
                 widget.addItems(p["choices"])
@@ -61,6 +66,12 @@ class ParamDialog(QDialog):
         layout.addLayout(form)
         layout.addWidget(buttons)
 
+    def _float_value(self, p) -> float:
+        key = p["key"]
+        if key in self._edited or key not in self._defaults:
+            return self._widgets[key].value()
+        return float(self._defaults[key])
+
     def out_of_range(self) -> list:
         """[(label, value, min, max, basis)] for every float outside its own
         envelope. Empty when the dialog's values are all usable."""
@@ -71,7 +82,7 @@ class ParamDialog(QDialog):
             low, high = p.get("min"), p.get("max")
             if low is None and high is None:
                 continue
-            value = self._widgets[p["key"]].value()
+            value = self._float_value(p)
             if (low is not None and value < low) or (high is not None and value > high):
                 bad.append((p["label"], value, low, high, p.get("basis", "")))
         return bad
@@ -96,5 +107,5 @@ class ParamDialog(QDialog):
         out = {}
         for p in self._spec:
             widget = self._widgets[p["key"]]
-            out[p["key"]] = widget.value() if p["type"] == "float" else widget.currentText()
+            out[p["key"]] = self._float_value(p) if p["type"] == "float" else widget.currentText()
         return out

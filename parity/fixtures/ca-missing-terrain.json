@@ -1,0 +1,117 @@
+{
+ "schema": "velorona.parity-fixture/1",
+ "id": "ca-missing-terrain",
+ "tags": [
+  "missing-terrain"
+ ],
+ "note": "elevation provider fails (synthetic HTTP 503)",
+ "selection": {
+  "rule": "see parity/README.md#how-links-were-chosen",
+  "pack": "ca-ised-fixed",
+  "snapshot_sha256": "f9daa05e51a38a8083d50513d63c7c173caa1ffd5257011af54aed11ce1387c8",
+  "link_id": "010028065-001",
+  "licensee": "Manitoba Hydro (Microwave Radio)",
+  "published_frequencies_mhz": [
+   7570.0,
+   7720.0
+  ]
+ },
+ "link": {
+  "site_a": {
+   "id": "ised-fixed-53.15889,-99.28278",
+   "lat": 53.15889,
+   "lon": -99.28278,
+   "height_m": 30.0,
+   "height_origin": "Assumed",
+   "description": "GRAND RAPIDS 230 KV, MANITOBA"
+  },
+  "site_b": {
+   "id": "ised-fixed-53.16333,-99.28806",
+   "lat": 53.16333,
+   "lon": -99.28806,
+   "height_m": 30.0,
+   "height_origin": "Assumed",
+   "description": "GRAND RAPIDS, MANITOBA"
+  },
+  "frequency_ghz": 7.72,
+  "frequency_origin": "Observed",
+  "polarization": "V",
+  "polarization_origin": "Assumed",
+  "fade_margin_db": 32.0,
+  "fade_margin_origin": "Assumed"
+ },
+ "terrain": {
+  "mode": "error",
+  "error": "HTTP 503 (synthetic provider failure)"
+ },
+ "weather": {
+  "mode": "snapshot",
+  "source": "SYNTHETIC raw Open-Meteo `current` object (units: mm per `interval` s; snowfall cm)",
+  "sites": {
+   "A": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 0.0,
+     "rain": 0.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 1
+    }
+   },
+   "B": {
+    "open_meteo_current": {
+     "time": "2026-10-07T15:45",
+     "interval": 900,
+     "temperature_2m": 8.0,
+     "wind_speed_10m": 12.0,
+     "precipitation": 0.0,
+     "rain": 0.0,
+     "showers": 0.0,
+     "snowfall": 0.0,
+     "weather_code": 1
+    }
+   }
+  }
+ },
+ "synthetic": [
+  "fade_margin_db",
+  "polarization",
+  "weather"
+ ],
+ "expected": {
+  "schema": "velorona.parity-expected/1",
+  "spec": "0.3",
+  "curvature": "canonical (bulge subtracted from clearance, P11)",
+  "terrain": {
+   "status": "NO DATA",
+   "no_data": "elevation provider failed (T1)"
+  },
+  "weather": {
+   "status": "CLEAR",
+   "no_data": null,
+   "attenuation_db": 0.0,
+   "ratio": 0.0,
+   "fade_margin_db": 32.0,
+   "precip": {
+    "class": "NONE",
+    "flags": [],
+    "rate_mm_h": 0.0,
+    "liquid_mm": 0.0
+   },
+   "status_without_r1": "CLEAR"
+  },
+  "overall": "NO DATA"
+ },
+ "pre_correction": {
+  "curvature": "legacy (bulge added to clearance)",
+  "terrain": {
+   "status": "NO DATA",
+   "no_data": "elevation provider failed (T1)"
+  },
+  "intended_class_when_built": null
+ },
+ "inputs_sha256": "13aaf13f04b67f5698105c38a91285bc9fdaa25c2d5ff62d7407b2ab77cd3d7b"
+}
