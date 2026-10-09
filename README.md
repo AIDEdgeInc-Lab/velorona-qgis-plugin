@@ -47,10 +47,13 @@ Three, all reused unmodified:
   are used; the frequency is typed Observed only while you leave it unchanged).
 - **Microwave Weather Exposure** (`aei_mw_exposure`) — ITU-R P.530
   rain-attenuation exposure between two selected sites, or for a selected
-  link, with live Open-Meteo/ECCC weather evidence. The rain-coefficient table
-  has not been verified against ITU-R P.838-3 (an independent check found
-  differing rows; see docs/RAIN_COEFFICIENTS_CAVEAT.md), so weather results
-  carry that caveat.
+  link, with live Open-Meteo/ECCC weather evidence. The rain coefficients come
+  from the library: `aei-microwave-link-exposure` up to 0.1.5 used a table that
+  differs from ITU-R P.838-3 in 21 of 24 rows (rain loss understated, most at
+  6-10 GHz); 0.2.0 evaluates the Recommendation's equations. Velorona spot-checks
+  the installed model against the Recommendation's Table 5 (6, 10 and 38 GHz) and
+  shows an open-issue notice on weather results while that check fails
+  (docs/RAIN_COEFFICIENTS_CAVEAT.md). The check is not a validation of the model.
 - **Satellite / Earth-Space** (`skyfield`/SGP4) — look-angle geometry
   (elevation, azimuth, slant range, visibility) between a selected ground
   station and satellite.

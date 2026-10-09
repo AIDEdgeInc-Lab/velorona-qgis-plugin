@@ -27,7 +27,7 @@
    "height_m": 30.5,
    "height_origin": "Observed",
    "description": "CENTRALIA, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "site_b": {
    "id": "fcc-site-42.45892,-79.30828",
@@ -36,7 +36,7 @@
    "height_m": 11.6,
    "height_origin": "Observed",
    "description": "Dunkirk, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "frequency_ghz": 0.9325875,
   "frequency_origin": "Observed",
@@ -385,5 +385,5 @@
   },
   "intended_class_when_built": null
  },
- "inputs_sha256": "df2a707f1ac13231c31bd0788cc900752c59113cedba4f38c6f0b9e8e27cd9c2"
+ "inputs_sha256": "1b70e157668e2d7c5646b082627b32222a609d3465340d666129befaa3b6e0c8"
 }

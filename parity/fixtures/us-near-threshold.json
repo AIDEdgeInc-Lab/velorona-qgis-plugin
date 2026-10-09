@@ -26,7 +26,7 @@
    "height_m": 39.6,
    "height_origin": "Observed",
    "description": "FAIRPORT, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "site_b": {
    "id": "fcc-site-43.05578,-77.12447",
@@ -35,7 +35,7 @@
    "height_m": 39.9,
    "height_origin": "Observed",
    "description": "Arcadia, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "frequency_ghz": 6.315840000000001,
   "frequency_origin": "Observed",
@@ -390,5 +390,5 @@
   },
   "intended_class_when_built": "WATCH"
  },
- "inputs_sha256": "848139a7116d8a301f7ea84af545717f01116b571ffc94e19b321f32baeb55aa"
+ "inputs_sha256": "37578ae5b5c825f8924f2a51486cee80e4d3c79ae2cbdce2b77612c364acb7b2"
 }

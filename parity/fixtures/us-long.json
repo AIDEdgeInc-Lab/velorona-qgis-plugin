@@ -26,7 +26,7 @@
    "height_m": 38.1,
    "height_origin": "Observed",
    "description": "Naples, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "site_b": {
    "id": "fcc-site-43.21128,-78.29758",
@@ -35,7 +35,7 @@
    "height_m": 79.3,
    "height_origin": "Observed",
    "description": "BARRE, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "frequency_ghz": 6.625,
   "frequency_origin": "Observed",
@@ -390,5 +390,5 @@
   },
   "intended_class_when_built": null
  },
- "inputs_sha256": "09c5d4b2a26f98a1307a7fd59832fa6a8621ed57536f84401ed1a814ae940078"
+ "inputs_sha256": "05f9d3118ef5e5afe3c44343d2933f07b28f1f30d2f91c8dd1ca753dcd955dce"
 }

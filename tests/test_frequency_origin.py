@@ -3,6 +3,7 @@ or changed is Assumed. Also: wording that names the register follows the record'
 carries the spec section G identity / source lines. No network: the elevation edge is faked, the library's own analysis runs."""
 import csv
 import io
+import os
 import sys
 import types
 
@@ -224,12 +225,80 @@ def test_non_numeric_record_height_is_treated_as_absent():
     assert TR.record_heights({**US_H, "site_a_height_m": True})[0] is None
 
 
-# --- the open rain-table caveat appears on weather exports only -------------------------------------------------------------------------------------
-def test_weather_exports_carry_the_rain_table_caveat_and_terrain_does_not():
+# --- the rain-model notice follows the INSTALLED model's behaviour (core/rain_check.py), on weather exports only -------------------------------------
+from core import rain_check  # noqa: E402
+
+
+def _weather_preamble(monkeypatch, verdict):
     from presentation_fixtures import weather_result
-    weather_pre = "\n".join(preamble(export.result_to_csv(weather_result())))
-    assert "NOT been verified against ITU-R P.838-3" in weather_pre and "Earth-curvature" not in weather_pre
+    monkeypatch.setitem(rain_check._cache, "v", verdict)
+    return "\n".join(preamble(export.result_to_csv(weather_result())))
+
+
+def test_notice_appears_when_the_installed_rain_model_fails_the_spot_check(monkeypatch):
+    pre = _weather_preamble(monkeypatch, False)
+    assert "NOT been verified against ITU-R P.838-3" in pre and "Earth-curvature" not in pre and "reproduced Recommendation" not in pre
+
+
+def test_notice_is_replaced_by_the_spot_check_statement_when_the_model_passes(monkeypatch):
+    pre = _weather_preamble(monkeypatch, True)
+    assert "NOT been verified" not in pre and "reproduced Recommendation ITU-R P.838-3 Table 5 at 6, 10 and 38 GHz" in pre and "not a validation" in pre
+
+
+def test_terrain_exports_never_mention_the_rain_model(monkeypatch):
+    monkeypatch.setitem(rain_check._cache, "v", False)
+    assert "P.838-3" not in "\n".join(preamble(export.result_to_csv(run(US, 11.245)))).replace("Earth-curvature", "")
+
+
+def test_link_investigation_export_carries_it_too(monkeypatch):
+    monkeypatch.setitem(rain_check._cache, "v", False)
     link = types.SimpleNamespace(kind="link-investigation", exposure=None, param_origins={}, weather_error="x",
                                  entry=types.SimpleNamespace(data=US, site_a_point=A, site_b_point=B))
     assert "NOT been verified against ITU-R P.838-3" in "\n".join(preamble(export.result_to_csv(link)))
-    assert "P.838-3" not in "\n".join(preamble(export.result_to_csv(run(US, 11.245)))).replace("Earth-curvature", "")
+
+
+def _fake_physics(monkeypatch, fn):
+    mod = types.ModuleType("aei_mw_exposure")
+    phys = types.ModuleType("aei_mw_exposure.physics")
+    if fn is not None:
+        phys.rain_coefficients = fn
+    mod.physics = phys
+    monkeypatch.setitem(sys.modules, "aei_mw_exposure", mod)
+    monkeypatch.setitem(sys.modules, "aei_mw_exposure.physics", phys)
+    rain_check._cache.clear()
+
+
+def test_spot_check_logic(monkeypatch):
+    table = {6.0: (0.0007056, 1.5900, 0.0004878, 1.5728), 10.0: (0.01217, 1.2571, 0.01129, 1.2156), 38.0: (0.4001, 0.8816, 0.3844, 0.8552)}
+
+    def right(f, pol):
+        r = table[f]
+        return (r[0], r[1]) if pol == "H" else (r[2], r[3])
+
+    def wrong_k(f, pol):
+        k, a = right(f, pol)
+        return (k * 0.8 if f == 38.0 else k), a
+
+    def wrong_alpha(f, pol):
+        k, a = right(f, pol)
+        return k, (a + 0.05 if f == 6.0 and pol == "V" else a)
+    try:
+        _fake_physics(monkeypatch, right)
+        assert rain_check.rain_model_matches_p838_3() is True
+        _fake_physics(monkeypatch, wrong_k)
+        assert rain_check.rain_model_matches_p838_3() is False
+        _fake_physics(monkeypatch, wrong_alpha)
+        assert rain_check.rain_model_matches_p838_3() is False
+        _fake_physics(monkeypatch, None)
+        assert rain_check.rain_model_matches_p838_3() is None            # nothing to test: nothing is claimed either way
+    finally:
+        rain_check._cache.clear()
+
+
+def test_the_reference_rows_are_the_documents_table_5():
+    """Guard against a typo in TABLE5: the independent calculator (constants from the PDF) must reproduce each row within rounding."""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "parity"))
+    import rain_independent as R
+    for f, (kh, ah, kv, av) in rain_check.TABLE5.items():
+        c = R.coeff(f)
+        assert abs(c["kH"] / kh - 1) < 2e-3 and abs(c["kV"] / kv - 1) < 2e-3 and abs(c["aH"] - ah) < 2e-3 * ah and abs(c["aV"] - av) < 2e-3 * av

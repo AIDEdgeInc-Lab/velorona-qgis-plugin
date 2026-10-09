@@ -11,6 +11,7 @@ import hashlib
 import os
 from importlib import metadata as importlib_metadata
 
+from . import rain_check
 from .record_source import is_fcc
 
 SPEC_VERSION = "0.3"
@@ -22,12 +23,19 @@ CURVATURE_CONVENTION = ("bulge-added-to-terrain: the effective-earth bulge (k = 
 RAIN_TABLE_CAVEAT = ("Open issue: the rain-attenuation coefficient table in aei-microwave-link-exposure has NOT been verified against "
                      "ITU-R P.838-3; an independent check (2026-10-08) found rows that differ, which can understate predicted attenuation, "
                      "mostly at 6-10 GHz. 'P.838-3' in this export names the method, not a verified table.")
+RAIN_MODEL_CHECKED = ("Rain model: the installed rain-coefficient model reproduced Recommendation ITU-R P.838-3 Table 5 at 6, 10 and 38 GHz (both polarizations, "
+                      "within 0.5 %) when this result was made; a spot check, not a validation of the model.")
 LIBRARIES = ("aei-link-clearance", "aei-microwave-link-exposure", "aei-geo-features")
 
 _PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Same file as core/sources/terrestrial_public.py FIXED_SERVICE_SNAPSHOT_PATH (that module imports QGIS, this one must not).
 FIXED_SERVICE_SNAPSHOT_PATH = os.path.join(_PLUGIN_ROOT, "data", "fixed_service_snapshot.json")
 _SNAPSHOT_SHA = {}
+
+
+def rain_table_notice() -> str:
+    """The open-issue notice, only while the installed rain model fails the P.838-3 spot check (core/rain_check.py). "" when it passes or cannot be tested."""
+    return RAIN_TABLE_CAVEAT if rain_check.rain_model_matches_p838_3() is False else ""
 
 
 def product_version() -> str:
@@ -71,7 +79,7 @@ def identity_lines(decision: bool = True, weather: bool = False) -> list:
     if decision:
         lines.append(f"Earth-curvature convention: {CURVATURE_CONVENTION}")
     if weather:
-        lines.append(RAIN_TABLE_CAVEAT)
+        lines.append(rain_table_notice() or RAIN_MODEL_CHECKED)
     return lines
 
 

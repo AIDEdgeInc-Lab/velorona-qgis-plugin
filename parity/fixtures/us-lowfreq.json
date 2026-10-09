@@ -24,7 +24,7 @@
    "height_m": 4.0,
    "height_origin": "Observed",
    "description": "ROCHESTER, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "site_b": {
    "id": "fcc-site-43.13817,-77.57467",
@@ -33,7 +33,7 @@
    "height_m": 4.3,
    "height_origin": "Observed",
    "description": "ROCHESTER, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "frequency_ghz": 4.945,
   "frequency_origin": "Observed",
@@ -388,5 +388,5 @@
   },
   "intended_class_when_built": null
  },
- "inputs_sha256": "e2586f723a4be54a0086ddb829616434456209a95347056d525c360fa58cc447"
+ "inputs_sha256": "d3b386d546eec0f366744ee0ea0b8a3e22baf95132a69b32e95caf80131c4931"
 }

@@ -24,7 +24,7 @@
    "height_m": 106.4,
    "height_origin": "Observed",
    "description": "Jamestown West, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "site_b": {
    "id": "fcc-site-42.14433,-79.57486",
@@ -33,7 +33,7 @@
    "height_m": 45.4,
    "height_origin": "Observed",
    "description": "Sherman, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "frequency_ghz": 6.2861899999999995,
   "frequency_origin": "Observed",
@@ -388,5 +388,5 @@
   },
   "intended_class_when_built": "CLEAR"
  },
- "inputs_sha256": "d8c352c7481fdb75368c6a58c9400a2b66682b73819b67674f1389e5d957f07e"
+ "inputs_sha256": "e72f94a590b96d8b0844ac7a2468db56e0adb62e36c1cb4bed9dfbf3353eb6c5"
 }

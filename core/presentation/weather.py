@@ -169,8 +169,9 @@ def exposure_brief(mw, param_origins: Optional[dict] = None, weather_error: Opti
     for s in sites:
         evidence.append(Fact(f"{s.site_label} weather source", s.source, s.kind, f"observation time {s.timestamp}"))
 
-    caveats = ["Model estimate of rain loss, not an outage prediction and not a hardware diagnosis.",
-               evidence_record.RAIN_TABLE_CAVEAT]
+    caveats = ["Model estimate of rain loss, not an outage prediction and not a hardware diagnosis."]
+    if evidence_record.rain_table_notice():
+        caveats.append(evidence_record.rain_table_notice())
     for site in (link.site_a, link.site_b):
         p = (getattr(mw, "precipitation", None) or {}).get(site.id)
         if p is None:

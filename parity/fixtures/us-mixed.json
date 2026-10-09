@@ -24,7 +24,7 @@
    "height_m": 86.9,
    "height_origin": "Observed",
    "description": "BUFFALO, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "site_b": {
    "id": "fcc-site-42.89450,-78.88781",
@@ -33,7 +33,7 @@
    "height_m": 8.2,
    "height_origin": "Observed",
    "description": "BUFFALO, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "frequency_ghz": 23.175,
   "frequency_origin": "Observed",
@@ -359,8 +359,8 @@
   "weather": {
    "status": "CLEAR",
    "no_data": null,
-   "attenuation_db": 1.73,
-   "ratio": 0.25,
+   "attenuation_db": 1.96,
+   "ratio": 0.283,
    "fade_margin_db": 6.92,
    "precip": {
     "class": "MIXED",
@@ -391,5 +391,5 @@
   },
   "intended_class_when_built": null
  },
- "inputs_sha256": "621abc84ba3177dd87f7e262abe106bcd6b9e49a2263c9b220e3861327260325"
+ "inputs_sha256": "8f8ac3e15a90f11eb4b0c4f6af7494d6c2b159f9506a3003d0c7c84e47fd7013"
 }

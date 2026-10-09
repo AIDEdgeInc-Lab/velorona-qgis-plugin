@@ -358,8 +358,8 @@
   "weather": {
    "status": "CRITICAL",
    "no_data": null,
-   "attenuation_db": 27.75,
-   "ratio": 1.393,
+   "attenuation_db": 28.32,
+   "ratio": 1.422,
    "fade_margin_db": 19.92,
    "precip": {
     "class": "RAIN",

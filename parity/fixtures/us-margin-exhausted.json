@@ -24,7 +24,7 @@
    "height_m": 25.9,
    "height_origin": "Observed",
    "description": "BELMONT, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "site_b": {
    "id": "fcc-site-42.22450,-78.03389",
@@ -33,7 +33,7 @@
    "height_m": 14.6,
    "height_origin": "Observed",
    "description": "BELMONT, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "frequency_ghz": 23.225,
   "frequency_origin": "Observed",
@@ -359,8 +359,8 @@
   "weather": {
    "status": "CRITICAL",
    "no_data": null,
-   "attenuation_db": 13.23,
-   "ratio": 1.5,
+   "attenuation_db": 13.55,
+   "ratio": 1.536,
    "fade_margin_db": 8.82,
    "precip": {
     "class": "RAIN",
@@ -389,5 +389,5 @@
   },
   "intended_class_when_built": null
  },
- "inputs_sha256": "87e5265b15497123cb48db57e082359f28f860ca520e41f6e9a757f6da00b930"
+ "inputs_sha256": "7cfe9ccb7fdf3806ae2f99037de5a38ff9e7681b87dec82892e77e3ea23e4da2"
 }

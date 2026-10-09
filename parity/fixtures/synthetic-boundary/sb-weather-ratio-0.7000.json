@@ -346,7 +346,7 @@
  "expected": {
   "schema": "velorona.parity-expected/1",
   "spec": "0.3",
-  "curvature": "canonical",
+  "curvature": "canonical (bulge subtracted from clearance, P11)",
   "terrain": {
    "status": "CLEAR",
    "no_data": null,
@@ -363,8 +363,8 @@
   "weather": {
    "status": "AT RISK",
    "no_data": null,
-   "attenuation_db": 13.5,
-   "ratio": 0.7,
+   "attenuation_db": 14.71,
+   "ratio": 0.763,
    "fade_margin_db": 19.28571428571429,
    "precip": {
     "class": "RAIN",
@@ -376,5 +376,22 @@
   },
   "overall": "AT RISK"
  },
- "inputs_sha256": "cf33241fb0173f92c39bc4eeeb225b171c1be5f9f3007a18aa7e683a2b42e50f"
+ "inputs_sha256": "cf33241fb0173f92c39bc4eeeb225b171c1be5f9f3007a18aa7e683a2b42e50f",
+ "pre_correction": {
+  "curvature": "legacy (bulge added to clearance)",
+  "terrain": {
+   "status": "CLEAR",
+   "no_data": null,
+   "distance_km": 2.294815693821296,
+   "critical_index": 24,
+   "available_m": 2.701486656734943,
+   "required_m": 0.8488554472831006,
+   "margin_m": 1.8526312094518422,
+   "ratio": 3.1825049428397834,
+   "percent_fresnel_clear": 1.9095029657038702,
+   "fresnel_radius_m": 1.4147590788051676,
+   "near_threshold": true
+  },
+  "intended_class_when_built": null
+ }
 }

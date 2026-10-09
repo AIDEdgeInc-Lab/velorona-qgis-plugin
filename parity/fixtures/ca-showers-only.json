@@ -357,8 +357,8 @@
   "weather": {
    "status": "CRITICAL",
    "no_data": null,
-   "attenuation_db": 6.21,
-   "ratio": 1.431,
+   "attenuation_db": 6.64,
+   "ratio": 1.53,
    "fade_margin_db": 4.34,
    "precip": {
     "class": "SHOWERS",

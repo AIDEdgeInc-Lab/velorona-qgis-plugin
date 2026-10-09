@@ -25,7 +25,7 @@
    "height_m": 15.2,
    "height_origin": "Observed",
    "description": "COLDEN, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "site_b": {
    "id": "fcc-site-42.95367,-78.87642",
@@ -389,5 +389,5 @@
   },
   "intended_class_when_built": null
  },
- "inputs_sha256": "58905417772703b78d8543a6ba69cb5033e8e38e48676aa969c6df49641db97e"
+ "inputs_sha256": "473e36c68175e18418f5524bccc7f84ff04f20ca612440b279de212798f1473d"
 }

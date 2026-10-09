@@ -24,7 +24,7 @@
    "height_m": 32.9,
    "height_origin": "Observed",
    "description": "Salamanaca, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "site_b": {
    "id": "fcc-site-42.25228,-78.80114",
@@ -33,7 +33,7 @@
    "height_m": 18.6,
    "height_origin": "Observed",
    "description": "LITTLE VALLEY, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "frequency_ghz": 10.765,
   "frequency_origin": "Observed",
@@ -115,5 +115,5 @@
   },
   "intended_class_when_built": null
  },
- "inputs_sha256": "1869934420c7cc842e900c72841c9871d90243d2560580e4b38f54f0c8684aab"
+ "inputs_sha256": "b4eee14b89c574f9a35fc75316858740be7a7da8667271cdaeef3827e5ab7047"
 }

@@ -347,7 +347,7 @@
  "expected": {
   "schema": "velorona.parity-expected/1",
   "spec": "0.3",
-  "curvature": "canonical",
+  "curvature": "canonical (bulge subtracted from clearance, P11)",
   "terrain": {
    "status": "CLEAR",
    "no_data": null,
@@ -377,5 +377,22 @@
   },
   "overall": "CLEAR"
  },
- "inputs_sha256": "67f77de8518a5c7977a70de10ed11f0d956f8f04f75231dab642b0177d60f758"
+ "inputs_sha256": "67f77de8518a5c7977a70de10ed11f0d956f8f04f75231dab642b0177d60f758",
+ "pre_correction": {
+  "curvature": "legacy (bulge added to clearance)",
+  "terrain": {
+   "status": "CLEAR",
+   "no_data": null,
+   "distance_km": 38.05650619931281,
+   "critical_index": 14,
+   "available_m": 52.32202491938443,
+   "required_m": 11.592528549689655,
+   "margin_m": 40.72949636969478,
+   "ratio": 4.5134264448962815,
+   "percent_fresnel_clear": 2.708055866937769,
+   "fresnel_radius_m": 19.320880916149427,
+   "near_threshold": false
+  },
+  "intended_class_when_built": null
+ }
 }

@@ -24,7 +24,7 @@
    "height_m": 45.7,
    "height_origin": "Observed",
    "description": "Depew, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "site_b": {
    "id": "fcc-site-42.90492,-78.68544",
@@ -33,7 +33,7 @@
    "height_m": 45.7,
    "height_origin": "Observed",
    "description": "Depew, NY, NY",
-   "height_source": "FCC ULS AN 'Height to Center RAAT' (m), licensee-reported record value, interpreted as above ground; not a field measurement"
+   "height_source": "antenna height to centre (FCC field 'Height to Center RAAT'), licensee-reported record value, metres, interpreted as above ground; not a field measurement"
   },
   "frequency_ghz": 23.325,
   "frequency_origin": "Observed",
@@ -388,5 +388,5 @@
   },
   "intended_class_when_built": null
  },
- "inputs_sha256": "5109ae835c859adcbf197e9e81e0b66824967ea25356804f2c9424f096130d00"
+ "inputs_sha256": "e9281f6aa1728950657ec76b189b40b5a0bc6ddd3155137495b113b4b10938b1"
 }

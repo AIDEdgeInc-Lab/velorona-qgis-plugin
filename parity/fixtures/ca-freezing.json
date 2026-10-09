@@ -357,8 +357,8 @@
   "weather": {
    "status": "CRITICAL",
    "no_data": null,
-   "attenuation_db": 2.5,
-   "ratio": 1.437,
+   "attenuation_db": 2.89,
+   "ratio": 1.661,
    "fade_margin_db": 1.74,
    "precip": {
     "class": "FREEZING",
