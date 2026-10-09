@@ -218,6 +218,43 @@ try:
     check("with no project entry the environment variable is used", plugin._configured_usa_source() == pack_dir)
     os.environ.pop(USA_PACK_ENV, None)
 
+    print("\n== Canada: optional ISED record heights (column 29) ==")
+    from velorona.core.countries.canada import CanadaProvider
+    from velorona.core.countries import ised_heights
+    plain = CanadaProvider().load_all()
+    check("by default NO heights are attached and nothing is reported", plain.heights_attached == 0 and not plain.heights_error and len(plain.links) == 16956)
+    bad = os.path.join(tempfile.mkdtemp(prefix="velorona-ca-heights-"), "bad.json")
+    open(bad, "w").write("{nope")
+    r = CanadaProvider(heights=bad).load_all()
+    check("an unusable optional heights file is reported, the records still load unchanged",
+          r.heights_attached == 0 and "not used" in r.heights_error and len(r.links) == 16956, r.heights_error)
+    real = os.environ.get("VELORONA_CA_HEIGHTS_TEST")
+    if real:
+        r = CanadaProvider(heights=real).load_all()
+        one = next(x for x in r.links if "site_a_height_m" in x)
+        check("with the real sidecar nearly every link gets both record heights", r.heights_attached > 16900, str(r.heights_attached))
+        check("a Canadian link carries heights and the ISED column-29 source text",
+              one["site_a_height_m"] > 0 and "column 29" in one["height_source"] and "record-reported" in one["height_source"])
+        from velorona.core.engines import terrestrial
+        import requests as _rq
+
+        class _R:
+            def raise_for_status(self): pass
+            def json(self): return {"elevation": [100.0] * 50}
+        _orig = _rq.get
+        _rq.get = lambda *a, **k: _R()
+        try:
+            params, ghz, note = terrestrial.build_link_params(one)
+            res = terrestrial.analyze_link_record(one, (one["site_a"]["latitude"], one["site_a"]["longitude"]),
+                                                  (one["site_b"]["latitude"], one["site_b"]["longitude"]), params)
+        except Exception as exc:        # a record height outside 0.1-1000 m is NO DATA by design; any other error is a failure
+            res = exc
+        finally:
+            _rq.get = _orig
+        check("analysis from that record types both heights Observed (or reports NO DATA for an out-of-range record height)",
+              (hasattr(res, "height_origins") and res.height_origins["a"][0] == "Observed" and res.height_origins["b"][0] == "Observed")
+              or type(res).__name__ == "NoDataError", repr(res)[:160])
+
     print("\n== unload leaves nothing behind ==")
     plugin.unload()
     check("unload completes", True)

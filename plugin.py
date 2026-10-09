@@ -27,7 +27,7 @@ from .core.colors import COLORS, layer_color
 from .core.countries import usa as usa_pack
 from .core.countries.base import PackError
 from .core.countries.canada import CanadaProvider
-from .core.countries.usa_fields import US_LINK_FIELDS, US_SITE_FIELDS
+from .core.countries.usa_fields import CA_HEIGHT_FIELDS, US_LINK_FIELDS, US_SITE_FIELDS
 from .core.engines import microwave_exposure, satellite_earth_space, terrestrial
 from .core import dependencies, inspector
 from .core.inspector import feature_to_entry
@@ -744,6 +744,9 @@ class VeloronaPlugin:
         try:
             loaded = CanadaProvider().load_all()      # identical to terrestrial_public.load_fixed_service_snapshot()
             sites, links = loaded.sites, loaded.links
+            link_fields = terrestrial_public.FIXED_LINK_FIELDS + (CA_HEIGHT_FIELDS if loaded.heights_attached else [])
+            if loaded.heights_error:
+                problems.append(loaded.heights_error)
             sites_layer = self._ensure_public_layer(
                 layer_helpers.SOURCE_FIXED_SITES, infra_group, visible=True, kind="site",
                 build=lambda: layer_helpers.build_point_layer(
@@ -756,10 +759,10 @@ class VeloronaPlugin:
                 layer_helpers.SOURCE_FIXED_LINKS, infra_group, visible=True, kind="link",
                 build=lambda: layer_helpers.build_link_layer(
                     f"Fixed Service links -- {PUBLIC_RECORDS_DISCLOSURE}", links,
-                    terrestrial_public.FIXED_LINK_FIELDS, layer_color("fixed-links", dark),
+                    link_fields, layer_color("fixed-links", dark),
                     abstract=f"ISED Fixed Service, static snapshot. {PUBLIC_RECORDS_DISCLOSURE.capitalize()}."),
                 refresh=lambda lyr: layer_helpers.replace_link_features(
-                    lyr, links, terrestrial_public.FIXED_LINK_FIELDS))
+                    lyr, links, link_fields))
             home_layers += [sites_layer, links_layer]
         except Exception as exc:
             problems.append(f"Fixed Service (ISED): {exc}")
