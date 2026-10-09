@@ -29,7 +29,7 @@ from .core.countries.base import PackError
 from .core.countries.canada import CanadaProvider
 from .core.countries.usa_fields import US_LINK_FIELDS, US_SITE_FIELDS
 from .core.engines import microwave_exposure, satellite_earth_space, terrestrial
-from .core import inspector
+from .core import dependencies, inspector
 from .core.inspector import feature_to_entry
 from .core.layers import LIFECYCLE_EVIDENCE, PUBLIC_RECORDS_DISCLOSURE
 from .core.sources import space_public, terrestrial_public
@@ -290,6 +290,11 @@ class VeloronaPlugin:
         # action is (re-)run -- it doesn't help a project that's already
         # open (at plugin activation, or right after the user opens a
         # .qgz file) and already contains Velorona's basemap layer.
+        # A library outside the supported range does not stop Velorona loading; the user is told once, here, instead of at the first analysis.
+        warning = dependencies.library_range_warning()
+        if warning:
+            self.iface.messageBar().pushMessage("Velorona", warning, level=Qgis.MessageLevel.Warning, duration=0)
+
         QgsProject.instance().readProject.connect(self._check_stale_project_crs)
         self._project_read_connected = True
         self._check_stale_project_crs()
