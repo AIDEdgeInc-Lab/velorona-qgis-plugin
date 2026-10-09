@@ -100,12 +100,15 @@ LINK_INK_LIGHT = {"color": COLORS_LIGHT["fixed-links"], "alpha": 128}
 
 
 def fade_link_with_scale(symbol, color) -> None:
-    """Fade and thin a link line as the view widens (see VIEW_SCALE_WIDE); full strength when zoomed in. The base colour stays the type hue; only the data-defined
-    stroke colour/width vary, so the symbol's own colour (what tests and exports read) is unchanged."""
+    """Fade and thin a link line as the view widens (see VIEW_SCALE_WIDE); full strength when zoomed in.
+    The base colour stays the type hue; only the data-defined stroke colour/width vary,
+    so the symbol's own colour (what tests and exports read) is unchanged."""
     layer = symbol.symbolLayer(0)
     a = color.alpha()
     layer.setDataDefinedProperty(QgsSymbolLayer.Property.StrokeColor, QgsProperty.fromExpression(
-        f"color_rgba({color.red()},{color.green()},{color.blue()}," + scale_case(round(a * LINK_ALPHA_FACTOR_WIDE), round(a * LINK_ALPHA_FACTOR_MEDIUM), round(a * LINK_ALPHA_FACTOR_CLOSE)) + ")"))
+        f"color_rgba({color.red()},{color.green()},{color.blue()},"
+        + scale_case(round(a * LINK_ALPHA_FACTOR_WIDE), round(a * LINK_ALPHA_FACTOR_MEDIUM), round(a * LINK_ALPHA_FACTOR_CLOSE))
+        + ")"))
     layer.setDataDefinedProperty(QgsSymbolLayer.Property.StrokeWidth, QgsProperty.fromExpression(
         scale_case(round(LINE_WIDTH_PX * LINK_WIDTH_FACTOR_WIDE, 2), LINE_WIDTH_PX, LINE_WIDTH_PX)))
 
@@ -237,7 +240,8 @@ CLUSTER_SIZE_EXPRESSION = (
 )
 
 # Zoom-dependent calm (1.1.7 UI polish). A wide view shows many clusters and, for the US, tens of thousands of link lines; drawn at full strength they read as a
-# dense mass. So the ink FADES and the discs SHRINK as the view widens, and return to the original strength when zoomed in, where there are few and each matters.
+# dense mass. So the ink FADES and the discs SHRINK as the view widens, and return to the original strength when zoomed in,
+# where there are few and each matters.
 # Nothing about the data, the clustering (tolerance, counts) or the selection changes; only how loudly the same things are drawn. Thresholds are map scales
 # (denominators), PROPOSED from rendering the US pack at ~1:1,000,000 (regional), ~1:200,000 (medium) and ~1:20,000 (close-up).
 VIEW_SCALE_WIDE = 600000             # wider than 1:600,000

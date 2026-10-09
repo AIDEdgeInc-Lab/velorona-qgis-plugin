@@ -171,7 +171,8 @@ tbl.set_layers({})  # dataset goes away
 tbl.set_layers({L.SOURCE_FIXED_LINKS: ll})
 check("preference is remembered per dataset for the session", tbl.hidden_columns() == {"Licensee"})
 tbl.populate_licensees({"Op": 3, "Zed": 3})
-check("operator hint states operators and records", "2 operator" in tbl.operator_hint.text() and "6 records" in tbl.operator_hint.text(), tbl.operator_hint.text())
+hint = tbl.operator_hint.text()
+check("operator hint states operators and records", "2 operator" in hint and "6 records" in hint, hint)
 check("first operator item has no count that could contradict the footer", tbl.licensee_combo.itemText(0) == "All operators")
 check("controls have accessible names", all(w.accessibleName() for w in (tbl.licensee_combo, tbl.search_edit, tbl.columns_button, tbl.dataset_combo)))
 
