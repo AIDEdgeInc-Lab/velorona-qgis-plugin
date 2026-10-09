@@ -102,7 +102,7 @@ plugin._warn = lambda m: warnings.append(m)
 plugin._error = lambda m: warnings.append("ERROR: " + m)
 plugin.initGui()
 check("plugin enables without traceback", True)
-# 5 + the two USA actions (Load USA Links in View, Set USA Data Pack Source)
+# 5 + the two USA actions (Load USA Links in View, USA Data Setup)
 check("toolbar/menu actions registered", len(plugin.actions) == 7,
       f"{len(plugin.actions)} actions: {[a.text() for a in plugin.actions]}")
 check("no duplicate action labels",

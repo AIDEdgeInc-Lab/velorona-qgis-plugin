@@ -1,6 +1,6 @@
 # Velorona for QGIS
 
-**Velorona QGIS Plugin 1.1.5** — Telecom link evidence, inside QGIS.
+**Velorona QGIS Plugin 1.1.6** — Telecom link evidence, inside QGIS.
 
 ## Explore → Select → Analyze → Evidence → Export
 
@@ -30,12 +30,12 @@ satellites (global), SatNOGS ground/earth stations (global). Import your
 own point data via QGIS's native Add Layer — it appears on the same map,
 analyzed the same way as public data.
 
-**United States (FCC ULS microwave links).** Not bundled — the dataset is far larger than the plugin and the FCC refreshes it weekly. Point
-Velorona at a Velorona USA data pack (a folder on your computer or an https address) with **Explore: Set USA Data Pack Source**, then zoom to the
-area you want and run **Explore: Load USA Links in View**. Only the map tiles that touch the view are read, never the whole country, and a view
-that would load more than 20,000 links is refused with a request to zoom in. Source: U.S. Federal Communications Commission, Universal Licensing
-System (ULS) public access database (`l_micro`); the source-file date, pack date and attribution are shown on the layer and written into every
-export. It is licensee-reported record data, not a field measurement. See [docs/USA.md](docs/USA.md).
+**United States (FCC ULS microwave links).** The USA data is a separate download and is **not included in the plugin** (size; the FCC refreshes it weekly). **Canada works without it.**
+To use it, open **Explore: USA Data Setup…** (or press **Explore: Load USA Links in View** the first time — the same guided window opens). Press **Use Velorona's online USA data**,
+or **Choose a folder…** on your computer, or paste an https address; the window checks the data and shows *Ready* with the link count, or says what is wrong and what to do.
+Then zoom to the area you want and run **Load USA Links in View**: only the map tiles under the view are read, never the whole country, and a view that would load more than
+20,000 links is refused with a request to zoom in. Source: U.S. Federal Communications Commission, Universal Licensing System (ULS) public access database (`l_micro`); the
+source-file date, pack date and attribution are shown on the layer and written into every export. It is licensee-reported record data, not a field measurement. See [docs/USA.md](docs/USA.md).
 
 ## Analysis engines (Analyze)
 
@@ -128,8 +128,8 @@ preference that affects every plugin and project.
 ## Install
 
 Velorona is distributed via the project's GitHub Release, not the QGIS
-Plugin Repository. Download `velorona-1.1.5.zip` from the
-[v1.1.5 release](https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/releases/tag/v1.1.5),
+Plugin Repository. Download `velorona-1.1.6.zip` from the
+[v1.1.6 release](https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/releases/tag/v1.1.6),
 then in QGIS: Plugins → Manage and Install Plugins → Install from ZIP, and
 pick that file.
 
@@ -139,6 +139,6 @@ See [CHANGELOG.md](CHANGELOG.md) (what changed in 1.1.5 compared with 1.1.4) and
 
 ## Status
 
-Version 1.1.5. Packaged and clean-profile install tested for QGIS 4.x.
+Version 1.1.6. Packaged and clean-profile install tested for QGIS 4.x.
 Distributed via GitHub Release; not yet submitted to the QGIS Plugin
 Repository.
