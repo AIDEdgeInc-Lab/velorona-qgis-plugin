@@ -259,7 +259,8 @@ class VeloronaPlugin:
         )
         self.action_set_usa_source = self._make_action(
             "Explore: USA Data Setup…",
-            "Choose where the USA (FCC) data comes from: a folder on this computer, or Velorona's online data. Opens only when you ask; Canada works without it.",
+            "Choose where the USA (FCC) data comes from: a folder on this computer, or Velorona's online data. Opens only when you ask; Canada works "
+            "without it.",
             self.set_usa_pack_source,
         )
         self.action_terrestrial = self._make_action(
