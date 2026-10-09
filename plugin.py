@@ -17,7 +17,7 @@ from qgis.core import (
 )
 from qgis.PyQt.QtCore import Qt, QTimer
 from qgis.PyQt.QtGui import QColor
-from qgis.PyQt.QtWidgets import QAction, QApplication, QInputDialog, QLineEdit, QMessageBox, QWIDGETSIZE_MAX
+from qgis.PyQt.QtWidgets import QAction, QApplication, QMessageBox, QWIDGETSIZE_MAX
 
 from .core import basemap_labels
 from .core import layers as layer_helpers
@@ -39,6 +39,7 @@ from .ui import records_table
 from .ui import theme
 from .ui.param_dialog import ParamDialog
 from .ui.results_dock import VeloronaResultsDock
+from .ui.usa_setup_dialog import UsaSetupDialog
 
 MENU_NAME = "&Velorona"
 # Folder or https address of the Velorona USA pack (the pack is NOT bundled). Kept in the QGIS PROJECT (a custom entry saved with it), never in the
@@ -253,12 +254,13 @@ class VeloronaPlugin:
         self.action_load_usa = self._make_action(
             "Explore: Load USA Links in View (FCC ULS)",
             "Loads the FCC ULS microwave links and sites that touch the current map view from the Velorona USA data pack. The pack is not "
-            "bundled: set its folder or https address first (Explore: Set USA Data Pack Source).",
+            "bundled: set its folder or https address first (Explore: USA Data Setup).",
             self.load_usa_view,
         )
         self.action_set_usa_source = self._make_action(
-            "Explore: Set USA Data Pack Source",
-            "Folder on this computer, or https address, of the Velorona USA data pack (it contains index.json and a tiles folder).",
+            "Explore: USA Data Setup…",
+            "Choose where the USA (FCC) data comes from: a folder on this computer, or Velorona's online data. Opens only when you ask; Canada works "
+            "without it.",
             self.set_usa_pack_source,
         )
         self.action_terrestrial = self._make_action(
@@ -1258,28 +1260,20 @@ class VeloronaPlugin:
 
     # -- USA (FCC ULS) data pack ----------------------------------------------------------------------------------------
 
-    def set_usa_pack_source(self):
-        """Ask for the pack's folder or https address, validate it NOW (index.json readable, schema understood), and only then keep it."""
-        text, ok = QInputDialog.getText(
-            self.iface.mainWindow(), "Velorona -- USA data pack",
-            "Folder on this computer, or https address, of the Velorona USA data pack\n(the folder that contains index.json and tiles/):",
-            QLineEdit.EchoMode.Normal, self._configured_usa_source())
-        if not ok:
+    def set_usa_pack_source(self, intro: bool = False):
+        """The guided USA data setup (ui/usa_setup_dialog.py): folder picker, Velorona's online data, or a web address; a source is kept only after a real
+        check (index.json + one tile). Cancel changes nothing. Returns True when a source was chosen and saved."""
+        dialog = UsaSetupDialog(self.iface.mainWindow(), self._configured_usa_source(), intro=intro)
+        if dialog.exec() != dialog.DialogCode.Accepted:
             return False
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        try:
-            provider = usa_pack.make_provider(text.strip())
-            provider.index()
-            attribution = provider.attribution()
-        except PackError as exc:
-            self._error(str(exc))
+        if dialog.remove_requested:
+            QgsProject.instance().writeEntry(USA_PACK_SCOPE, USA_PACK_KEY, "")
+            self._usa_provider = None
+            self.iface.messageBar().pushInfo("Velorona", "The saved USA data setting was removed. Canada is unaffected.")
             return False
-        finally:
-            QApplication.restoreOverrideCursor()
-        QgsProject.instance().writeEntry(USA_PACK_SCOPE, USA_PACK_KEY, text.strip())
-        self._usa_provider = provider
-        self.iface.messageBar().pushSuccess(
-            "Velorona", f"USA data pack found: {provider.link_count:,} links, source file dated {attribution.source_file_updated}.")
+        QgsProject.instance().writeEntry(USA_PACK_SCOPE, USA_PACK_KEY, dialog.chosen_source)
+        self._usa_provider = None                 # rebuilt from the saved source on the next load
+        self.iface.messageBar().pushSuccess("Velorona", "USA data is ready. Zoom to the United States and use Explore: Load USA Links in View.")
         return True
 
     @staticmethod
@@ -1291,9 +1285,11 @@ class VeloronaPlugin:
     def _usa_pack_provider(self):
         source = self._configured_usa_source()
         if not source:
-            if not self.set_usa_pack_source():
+            if not self.set_usa_pack_source(intro=True):       # first use: explain, offer the easy options; Cancel just returns (Canada is unaffected)
+                self.iface.messageBar().pushInfo("Velorona", "USA data is not set up, so no US links were loaded. Canada works as usual. "
+                                                 "Set it up any time from Explore: USA Data Setup.")
                 return None
-            return self._usa_provider
+            source = self._configured_usa_source()
         if self._usa_provider is None or self._usa_provider.source != source:
             self._usa_provider = usa_pack.make_provider(source)     # PackError (e.g. folder gone) is handled by the caller
         return self._usa_provider
@@ -1315,7 +1311,7 @@ class VeloronaPlugin:
         try:
             loaded = provider.load_bbox(self._current_extent_bbox_wgs84())
         except PackError as exc:
-            self._error(str(exc))
+            self._error(f"{exc}\n\nIf the data itself is the problem, open Explore: USA Data Setup to check or change it. Canada is unaffected.")
             return
         finally:
             QApplication.restoreOverrideCursor()

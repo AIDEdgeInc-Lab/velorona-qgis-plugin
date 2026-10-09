@@ -148,7 +148,7 @@ def test_fcc_detection():
 # --- spec G identity / source lines -------------------------------------------------------------------------------------------------
 def test_terrain_export_carries_identity_convention_and_data_source():
     pre = "\n".join(preamble(export.result_to_csv(run(US, 11.245))))
-    assert "Product: Velorona for QGIS 1.1.5; decision spec 0.3" in pre
+    assert "Product: Velorona for QGIS 1.1.6; decision spec 0.3" in pre
     assert "aei-link-clearance 0." in pre
     assert "Earth-curvature convention: bulge-added-to-terrain" in pre
     assert ATTRIBUTION in pre and "source file dated 2026-09-27" in pre and "pack built 2026-10-03" in pre
@@ -174,7 +174,7 @@ def test_single_record_exports_carry_the_attribution():
 
 
 def test_product_version_comes_from_metadata():
-    assert evidence_record.product_version() == "1.1.5"
+    assert evidence_record.product_version() == "1.1.6"
 
 
 # --- antenna heights: the same rule (spec F.2: Observed only if the record carries it; F.1: overridden -> Assumed) ---------------------------------

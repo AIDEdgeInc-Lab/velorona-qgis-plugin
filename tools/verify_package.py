@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Verifies a built plugin zip (tools/package.sh) WITHOUT installing it. Pure stdlib. Exit 1 on any failed check.
 
-    python3 tools/verify_package.py dist/velorona-1.1.5.zip [expected-version]
+    python3 tools/verify_package.py dist/velorona-<version>.zip [expected-version]
 
 Checks: exactly one top-level folder named velorona; metadata.txt version (and the expected one, if given); the files QGIS needs; the runtime
 modules the USA support adds; NOTHING development-only (tests, parity, tools, .git, caches); NO USA data of any kind (no tile folders, no FCC/US

@@ -5,11 +5,14 @@ Status: **first release; not validated.** Parity with Velorona Map is demonstrat
 ## Source
 U.S. Federal Communications Commission, Universal Licensing System (ULS) public access database, microwave services (`l_micro`). The data is a public record; it is **licensee-reported record data, not a field measurement**. Attribution used on the layer and in exports (from the pack's own metadata): *"Source: U.S. Federal Communications Commission, Universal Licensing System (ULS) public access database, microwave services (l_micro). Data as published; not endorsed by the FCC."* The source-file date and the pack-build date are shown with it.
 
-## Getting the data in
-1. Obtain a Velorona USA data pack (the Velorona Map project builds it; see its `docs/USA_FCC_ULS_PACK.md`). It is a folder containing `index.json` and `tiles/`, about 14 MB, refreshed when the FCC file is. It is **not** inside the plugin (size and update cadence).
-2. **Explore: Set USA Data Pack Source** — a folder path or an https address. The source is checked immediately and the result (found, missing, corrupt, wrong version, unreachable) is shown. It is saved in the QGIS **project** (Velorona never writes your global QGIS settings); if the project has none, the environment variable `VELORONA_USA_PACK` is used.
-3. Zoom to an area and **Explore: Load USA Links in View**. Only the 1° tiles touching the view are read. The index's own counts are checked first: more than 20,000 links or 36 tiles is refused ("zoom in"). Links that cross a tile edge appear once.
-4. A `.json` source (instead of a folder) is read as a *regional extract* (`velorona.usa-extract/1`). Its raw FCC antenna-height values are ignored (see below).
+## Getting the data in (guided)
+Nothing here runs at plugin start. Open **Explore: USA Data Setup…**, or press **Explore: Load USA Links in View** the first time; the same window opens.
+1. **Use Velorona's online USA data** — the pack Velorona Map serves at `https://map.velorona.ai/data/us/`. Nothing is downloaded until you load a view. Or
+2. **Choose a folder…** — a USA data pack on your computer: one folder that directly contains `index.json` and `tiles/` (about 14 MB). If you pick the folder above it, Velorona finds the pack inside when there is exactly one. Or
+3. **A web address (https)** — the address that serves `index.json`.
+The window then checks the data (index plus one real tile) and shows **Ready** with the link count and source date from the data itself, or **Problem** with what to do (folder not found, `index.json` missing, incomplete or damaged data, a data version this release does not understand, address unreachable). **Use this data** is enabled only after a successful check; **Cancel** changes nothing; **Forget the saved setting** removes it. The setting is saved in the QGIS project (never in your global QGIS settings); the environment variable `VELORONA_USA_PACK` is the fallback.
+4. Zoom to an area and **Explore: Load USA Links in View**. Only the 1° tiles touching the view are read. The index's own counts are checked first: more than 20,000 links or 36 tiles is refused ("zoom in"). Links that cross a tile edge appear once. If you cancel the first-time window, a note says that nothing was loaded and Canada is unaffected.
+A `.json` source (an older regional-extract file, set through the environment variable or a project that already uses it) is still read; its raw FCC antenna-height values are ignored (see below).
 
 ## What is analysed, and what is assumed
 * **Frequency** — highest of the record's frequencies, in MHz ÷ 1000 → GHz. Observed while unchanged; Assumed once you change it.

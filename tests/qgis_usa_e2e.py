@@ -218,6 +218,94 @@ try:
     check("with no project entry the environment variable is used", plugin._configured_usa_source() == pack_dir)
     os.environ.pop(USA_PACK_ENV, None)
 
+    print("\n== guided USA setup: never at startup, Cancel is harmless, every state is honest ==")
+    import velorona.plugin as plugin_mod
+    from velorona.core.countries.canada import CanadaProvider
+    from velorona.core.countries import usa_setup
+    from velorona.ui.usa_setup_dialog import UsaSetupDialog as RealDialog
+    opened = []
+
+    class SpyDialog(RealDialog):
+        script = None                                  # what "the user does": "accept" / "cancel" / "remove"
+
+        def __init__(self, parent, current="", intro=False, **kw):
+            opened.append({"current": current, "intro": intro})
+            super().__init__(parent, current, intro=intro, **kw)
+
+        def exec(self):
+            if SpyDialog.script == "accept":
+                self.chosen_source = pack_dir
+                return self.DialogCode.Accepted
+            if SpyDialog.script == "remove":
+                self.remove_requested = True
+                return self.DialogCode.Accepted
+            return self.DialogCode.Rejected
+    plugin_mod.UsaSetupDialog = SpyDialog
+    plugin2 = VeloronaPlugin(iface)
+    plugin2._warn = lambda m: SHOWN.append(m)
+    plugin2._error = lambda m: SHOWN.append(m)
+    set_source("")
+    os.environ.pop(USA_PACK_ENV, None)
+    plugin2.initGui()
+    check("normal plugin start opens NO USA dialog and asks for no path", opened == [])
+    check("a Canada engine runs with no USA data configured",
+          len(CanadaProvider().load_all().links) == 16956 and plugin2._configured_usa_source() == "")
+    _reset_messages()
+    before_links = links.featureCount()
+    SpyDialog.script = "cancel"
+    plugin2.load_usa_view()
+    check("Load USA Links with nothing set up opens the GUIDED dialog (with the explanation), once", len(opened) == 1 and opened[0]["intro"] is True, str(opened))
+    check("Cancel: no layers, nothing saved, no error box, a calm note that Canada is unaffected",
+          links.featureCount() == before_links and plugin2._configured_usa_source() == "" and not SHOWN
+          and any("Canada works as usual" in m for m in messages()), str(messages()))
+    plugin2.set_usa_pack_source()
+    check("USA Data Setup (menu) opens without the first-use intro", len(opened) == 2 and opened[1]["intro"] is False)
+    SpyDialog.script = "accept"
+    check("accepting a checked source saves it in the project", plugin2.set_usa_pack_source() is True and plugin2._configured_usa_source() == pack_dir)
+    check("an existing setting is offered back to the dialog (nothing lost)", (plugin2.set_usa_pack_source(), opened[-1]["current"])[1] == pack_dir)
+    SpyDialog.script = "remove"
+    plugin2.set_usa_pack_source()
+    check("'Forget the saved setting' clears it and leaves Canada alone", plugin2._configured_usa_source() == "")
+    SpyDialog.script = "cancel"
+    set_source(pack_dir)
+    plugin2.set_usa_pack_source()
+    check("Cancel never changes an existing setting", plugin2._configured_usa_source() == pack_dir)
+
+    # the real dialog's own behaviour (no stubs except the native folder picker)
+    picks = {"next": pack_dir}
+    d = RealDialog(iface.mainWindow(), "", intro=True, pick_folder=lambda start: picks["next"])
+    check("fresh dialog: 'Not set up yet', 'Use this data' disabled, Forget hidden, help hidden",
+          "Not set up yet" in d.status.text() and not d.btn_use.isEnabled() and not d.btn_remove.isVisibleTo(d) and not d.help.isVisibleTo(d))
+    check("the dialog says the data is separate and that Canada works without it", "not included in the plugin" in d.lead.text() and "Canada works without it" in d.lead.text())
+    d.btn_folder.click()
+    check("choosing a valid pack folder: Ready, the pack's own count, 'Use this data' enabled",
+          "Ready" in d.status.text() and "3 US links" in d.status.text() and d.btn_use.isEnabled(), d.status.text())
+    picks["next"] = os.path.join(os.path.dirname(pack_dir), "does-not-exist")
+    d.btn_folder.click()
+    check("choosing a bad folder: a Problem with a next step, and 'Use this data' is disabled again",
+          "Problem" in d.status.text() and "Check the folder" in d.status.text() and not d.btn_use.isEnabled(), d.status.text())
+    picks["next"] = pack_dir
+    d.btn_folder.click()
+    picks["next"] = ""
+    d.btn_folder.click()
+    check("cancelling the native picker leaves the last good state alone", "Ready" in d.status.text() and d.btn_use.isEnabled())
+    d.btn_use.click()
+    check("'Use this data' hands back exactly the checked source", d.chosen_source == pack_dir)
+    d.btn_help.click()
+    check("'How do I get the data?' shows the guide", d.help.isVisibleTo(d) and "online USA data" in d.help.toPlainText())
+    seen = []
+    d2 = RealDialog(iface.mainWindow(), "", check=lambda t: (seen.append(t), usa_setup.SetupCheck(usa_setup.ERROR, message="x", next_step="y"))[1])
+    d2.btn_online.click()
+    check("'Use Velorona's online USA data' checks Velorona's published address (opt-in, nothing downloaded before)", seen == [usa_setup.VELORONA_ONLINE_PACK])
+    d2.address.setText("http://insecure.example/")
+    d2.btn_check.click()
+    check("typing a web address and pressing Check runs the check on it", seen[-1] == "http://insecure.example/")
+    d3 = RealDialog(iface.mainWindow(), pack_dir)
+    check("opening with an existing setting re-checks it and shows Ready; 'Forget' is available",
+          "Ready" in d3.status.text() and d3.btn_use.isEnabled() and d3.btn_remove.isVisibleTo(d3))
+    plugin_mod.UsaSetupDialog = RealDialog
+    set_source(pack_dir)
+
     print("\n== Canada: record antenna heights from the bundled snapshot /1.1 (ISED column 29) ==")
     from velorona.core.countries.canada import CanadaProvider
     loaded_ca = CanadaProvider().load_all()

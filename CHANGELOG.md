@@ -3,6 +3,20 @@
 Canonical human-readable version history. (The plugin manager shows the shorter `changelog=` text in `metadata.txt`; this file is the detailed record.)
 Compare any two releases: https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/compare/v1.1.4...v1.1.5
 
+## 1.1.6 — 2026-10-09 (compared with 1.1.5)
+
+Why it matters: setting up USA data no longer starts with an unexplained box asking you to type a folder path or web address. Nothing about calculations, statuses, data or Canada changes.
+
+### Changed (user experience)
+- **Guided USA data setup.** *Explore: USA Data Setup…* opens a window that says what the USA data is (a separate download, not included in the plugin; Canada works without it) and offers *Use Velorona's online USA data*, *Choose a folder…* (the normal folder picker) or an https address, with a built-in "How do I get the data?" guide. Previously, pressing *Load USA Links in View* with nothing set up opened a bare text box ("Folder on this computer, or https address…").
+- **Honest status.** *Not set up yet* / *Ready* (link count and dates read from the data itself, after the index and one real tile were validated) / *Problem* (what is wrong and what to do: missing folder, `index.json` not found, incomplete or damaged tiles, a newer data version, unreachable address, plain http). *Use this data* is enabled only after a successful check.
+- **Safe to back out.** Cancel changes nothing; *Forget the saved setting* removes it; a cancelled first-time window ends with a calm note that Canada is unaffected. Small slips are forgiven (typing `index.json`, quotes, choosing the folder above the pack).
+- **Never unprompted.** The window opens only when you ask for US data; starting Velorona, loading Canada and every Canadian analysis never open it (covered by an end-to-end test).
+- The action *Explore: Set USA Data Pack Source* is now *Explore: USA Data Setup…*. The setting is still saved in the QGIS project (never global QGIS settings), with `VELORONA_USA_PACK` as the fallback; existing projects keep working.
+
+### Not changed
+Calculations, the five-level status contract, parity fixtures, Canadian data and heights, US antenna heights (30 m, Assumed), data limits (20,000 links / 36 tiles per view), the required library versions.
+
 ## 1.1.5 — 2026-10-09 (compared with 1.1.4)
 
 Why it matters: 1.1.5 changes numbers. Terrain clearance on long paths is lower, weather rain loss is higher (mostly 6–10 GHz), many Canadian terrain statuses move because real antenna heights replace a 30 m assumption, and anything that cannot be decided now says NO DATA instead of guessing. Re-run saved analyses.
