@@ -95,10 +95,10 @@ Python). On macOS that interpreter is:
 
 ```
 /Applications/QGIS-final-4_2_2.app/Contents/MacOS/python3.12 -m pip install \
-    skyfield aei-microwave-link-exposure 'aei-link-clearance>=0.2.0,<0.3' aei-geo-features
+    skyfield 'aei-microwave-link-exposure>=0.2.0,<0.3' 'aei-link-clearance>=0.2.0,<0.3' aei-geo-features
 ```
 
-`aei-link-clearance` must be 0.2.0 or newer (0.2.x): 0.2.0 corrects the earth-curvature sign, and the plugin
+`aei-microwave-link-exposure` must be 0.2.0 or newer (0.2.x): 0.2.0 evaluates the ITU-R P.838-3 rain equations. `aei-link-clearance` must be 0.2.0 or newer (0.2.x): 0.2.0 corrects the earth-curvature sign, and the plugin
 refuses to run against an older release rather than show overstated clearance.
 
 The ISED Fixed Service and SatNOGS snapshots the Explore step needs are

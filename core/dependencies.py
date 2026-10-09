@@ -12,7 +12,7 @@ from importlib.util import find_spec
 # (import name, pip requirement)
 REQUIREMENTS = [
     ("aei_link_clearance", "aei-link-clearance>=0.2.0,<0.3"),
-    ("aei_mw_exposure", "aei-microwave-link-exposure>=0.1.4"),
+    ("aei_mw_exposure", "aei-microwave-link-exposure>=0.2.0,<0.3"),
     ("aei_geo_features", "aei-geo-features"),
     ("skyfield", "skyfield"),
 ]
@@ -38,6 +38,13 @@ def missing_requirements() -> list[str]:
 LC_DIST = "aei-link-clearance"
 LC_MIN, LC_BELOW = (0, 2, 0), (0, 3)
 LC_REQUIREMENT = "aei-link-clearance>=0.2.0,<0.3"
+MW_DIST = "aei-microwave-link-exposure"
+MW_REQUIREMENT = "aei-microwave-link-exposure>=0.2.0,<0.3"   # 0.2.0 evaluates ITU-R P.838-3; <= 0.1.5 used a table that was wrong in 21 of 24 rows
+# (distribution, minimum, exclusive upper bound, pip requirement, why it matters)
+RANGES = [
+    (LC_DIST, LC_MIN, LC_BELOW, LC_REQUIREMENT, "Terrain clearance will be refused until it is upgraded (older releases get the earth-curvature sign wrong)."),
+    (MW_DIST, (0, 2, 0), (0, 3), MW_REQUIREMENT, "Older releases use a rain-coefficient table that differs from ITU-R P.838-3 and understate rain loss, most at 6-10 GHz."),
+]
 
 
 def console_install_command(requirements) -> str:
@@ -62,18 +69,22 @@ def _version_tuple(text: str) -> tuple:
 
 
 def library_range_warning() -> str:
-    """A start-up WARNING (never a refusal) when the installed aei-link-clearance is outside the supported range; "" when it is inside, not
-    installed (the missing-package path reports that), or its version cannot be read (editable / vendored installs): unknown is not a problem report."""
-    try:
-        version = _metadata.version(LC_DIST)
-    except _metadata.PackageNotFoundError:
+    """A start-up WARNING (never a refusal) naming every installed library that is outside its supported range; "" when all are inside, not installed (the
+    missing-package path reports that), or their version cannot be read (editable / vendored installs): unknown is not a problem report."""
+    parts, fix = [], []
+    for dist, low, below, requirement, why in RANGES:
+        try:
+            version = _metadata.version(dist)
+        except _metadata.PackageNotFoundError:
+            continue
+        v = _version_tuple(version)
+        if not v or (low <= v[:3] and v[:2] < below):
+            continue
+        parts.append(f"{dist} {version} is installed but Velorona needs {requirement}. {why}")
+        fix.append(requirement)
+    if not parts:
         return ""
-    v = _version_tuple(version)
-    if not v or (LC_MIN <= v[:3] and v[:2] < LC_BELOW):
-        return ""
-    return (f"Velorona: aei-link-clearance {version} is installed but Velorona needs {LC_REQUIREMENT}. Terrain clearance will be refused until it is "
-            f"upgraded (older releases get the earth-curvature sign wrong). In QGIS: Plugins > Python Console, run:  "
-            f"{console_install_command([LC_REQUIREMENT])}  then restart QGIS.")
+    return ("Velorona: " + " ".join(parts) + " In QGIS: Plugins > Python Console, run:  " + console_install_command(fix) + "  then restart QGIS.")
 
 
 def install_message(missing: list[str], detail: str = "") -> str:
