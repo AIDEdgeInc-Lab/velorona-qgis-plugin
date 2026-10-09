@@ -3,12 +3,17 @@
 Canonical human-readable version history. (The plugin manager shows the shorter `changelog=` text in `metadata.txt`; this file is the detailed record.)
 Compare any two releases: https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/compare/v1.1.4...v1.1.5
 
-## Unreleased — UI polish (not yet released; no version bump)
+## 1.1.7 — UI polish (compared with 1.1.6; 1.1.6 was never published separately, so 1.1.7 also carries the 1.1.6 guided USA data setup below)
 
 ### Changed (appearance only)
 - **Calmer USA map.** Cluster discs and link lines now fade with map scale: more transparent and slightly smaller at regional zoom (so dense areas read as a soft density cue instead of a solid blue mass), progressively stronger at medium and close zoom. Hues, cluster logic, counts, tolerance and selection symbols are unchanged; no data is hidden.
 - **Records tab.** The "Operator" label is readable on the dark theme; the operator list no longer shows a record count that contradicts the table footer (the total moved into the hint line); cells have full-value tooltips.
 - **Evidence view.** Endpoint name and coordinates no longer run together ("Site A49.16072").
+- **Link title.** The on-screen title leads with the authorization number when the record carries one ("<authorization> · Site A ↔ Site B"); a missing or placeholder value shows the plain endpoint pair. The exported location text is unchanged.
+- **NO DATA.** The status line gives the reason once; the repeated plain-language answer is dropped for NO DATA only. Status semantics are unchanged.
+- **What changed.** Hourly comparisons are grouped by baseline (each baseline in its own table) instead of interleaved.
+- **Narrow windows.** Records tab: search on its own row, wrapping hints, size-adjusting dropdowns, accessible names.
+- **Records columns.** A *Columns* menu (and header right-click) shows or hides columns per dataset for the session. Display only: search, sorting, selection and exports still use every column; the last visible column cannot be hidden.
 
 ### Not changed
 Calculations, five-level status contract, provenance, parity fixtures, exports, data limits.
