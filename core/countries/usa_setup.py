@@ -133,4 +133,3 @@ reference of its height field.</li>
 def help_html() -> str:
     """The USA data help page. Plain template substitution (not string formatting) with the two URLs escaped for HTML text and attributes."""
     return _HELP_TEMPLATE.substitute(online_pack=html.escape(VELORONA_ONLINE_PACK, quote=True), help_doc=html.escape(HELP_DOC, quote=True))
-
