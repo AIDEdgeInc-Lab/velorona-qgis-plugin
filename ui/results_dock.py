@@ -608,7 +608,7 @@ def _render_endpoint_weather(label, rep, point, precipitation=None) -> str:
     instead of dropping them, and the endpoint is named once."""
     lat, lon = point or (None, None)
     coords = f"{lat:.5f}, {lon:.5f}" if lat is not None else NOT_DETERMINED
-    head = f"<div class='site'>{_esc(label)}<span class='coord'>{_esc(coords)}</span></div>"
+    head = f"<div class='site'>{_esc(label)}<span class='coord'> &nbsp;&middot;&nbsp; {_esc(coords)}</span></div>"
     if rep is None:
         return head + f"<p class='caveat'>{NOT_DETERMINED} &mdash; no weather evidence retrieved for this endpoint.</p>"
 

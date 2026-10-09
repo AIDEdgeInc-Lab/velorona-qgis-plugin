@@ -181,7 +181,12 @@ class RecordsModel(QAbstractTableModel):
         return 0 if parent.isValid() else len(self._columns)
 
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
-        if not index.isValid() or role != Qt.ItemDataRole.DisplayRole:
+        if not index.isValid():
+            return None
+        if role == Qt.ItemDataRole.ToolTipRole:
+            # Full value for cells the column width may elide.
+            return self._rows[index.row()][index.column()] or None
+        if role != Qt.ItemDataRole.DisplayRole:
             return None
         return self._rows[index.row()][index.column()]
 
@@ -240,6 +245,7 @@ class VeloronaRecordsTable(QWidget):
         # communicates "not ready yet" without making the control disappear
         # and reappear as the operator switches tabs.
         self.operator_label = QLabel("Operator", self)
+        self.operator_label.setObjectName("veloronaOperatorLabel")
         self.licensee_combo = QComboBox(self)
         self.licensee_combo.setEditable(True)
         self.licensee_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
@@ -247,6 +253,7 @@ class VeloronaRecordsTable(QWidget):
         self.licensee_combo.setToolTip(
             "Show only this operator's records across Fixed Service sites, Fixed Service "
             "links and Cellular sites. Counts are record counts.")
+        self.licensee_combo.setAccessibleName("Operator filter")
         self.licensee_combo.setEnabled(False)
         self.licensee_combo.addItem("Load Public Data to populate", "")
         # Web Map parity: "N operator(s) from currently-loaded data"
@@ -342,14 +349,15 @@ class VeloronaRecordsTable(QWidget):
         self.licensee_combo.blockSignals(True)
         self.licensee_combo.clear()
         total = sum(counts.values())
-        self.licensee_combo.addItem(f"All operators ({total:,} records)", "")
+        self.licensee_combo.addItem("All operators", "")
         for name, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
             self.licensee_combo.addItem(f"{name} ({count:,})", name)
         index = self.licensee_combo.findData(current) if current else 0
         self.licensee_combo.setCurrentIndex(max(0, index))
         self.licensee_combo.blockSignals(False)
         self.licensee_combo.setEnabled(bool(counts))
-        self.operator_hint.setText(f"{len(counts):,} operator(s) from currently-loaded data.")
+        self.operator_hint.setText(
+            f"{len(counts):,} operator(s), {total:,} records in currently-loaded data.")
         self.operator_hint.setVisible(bool(counts))
 
     def _on_licensee_changed(self, _index):

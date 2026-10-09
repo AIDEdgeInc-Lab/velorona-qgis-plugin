@@ -3,6 +3,16 @@
 Canonical human-readable version history. (The plugin manager shows the shorter `changelog=` text in `metadata.txt`; this file is the detailed record.)
 Compare any two releases: https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/compare/v1.1.4...v1.1.5
 
+## Unreleased — UI polish (not yet released; no version bump)
+
+### Changed (appearance only)
+- **Calmer USA map.** Cluster discs and link lines now fade with map scale: more transparent and slightly smaller at regional zoom (so dense areas read as a soft density cue instead of a solid blue mass), progressively stronger at medium and close zoom. Hues, cluster logic, counts, tolerance and selection symbols are unchanged; no data is hidden.
+- **Records tab.** The "Operator" label is readable on the dark theme; the operator list no longer shows a record count that contradicts the table footer (the total moved into the hint line); cells have full-value tooltips.
+- **Evidence view.** Endpoint name and coordinates no longer run together ("Site A49.16072").
+
+### Not changed
+Calculations, five-level status contract, provenance, parity fixtures, exports, data limits.
+
 ## 1.1.6 — 2026-10-09 (compared with 1.1.5)
 
 Why it matters: setting up USA data no longer starts with an unexplained box asking you to type a folder path or web address. Nothing about calculations, statuses, data or Canada changes.

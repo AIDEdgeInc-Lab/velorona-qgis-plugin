@@ -141,6 +141,7 @@ def widget_stylesheet(dark: bool = True) -> str:
     }}
     QLabel#veloronaRecordsStatus {{ color: {TEXT_FAINT}; font-size: 10.5px; padding: 2px; }}
     QLabel#veloronaOperatorHint {{ color: {TEXT_FAINT}; font-size: 10px; padding: 0 2px; }}
+    QLabel#veloronaOperatorLabel {{ color: {TEXT_MUTED}; font-size: 11px; }}
     QWidget#veloronaHeader {{ background: {BG}; }}
     QLabel#veloronaHeaderLabel {{ color: {TEXT_FAINT}; font-size: 10px;
                                   letter-spacing: 0.1em; text-transform: uppercase; }}
@@ -179,7 +180,7 @@ h3 {{ margin: 0 0 10px; font-size: 15px; color: {TEXT}; font-weight: 600; letter
        margin: 9px 0 3px; }}
 .site {{ font-size: 12.5px; font-weight: 600; color: {ACCENT_STRONG}; margin: 12px 0 3px;
         border-left: 2px solid {ACCENT}; padding-left: 7px; }}
-.site .coord {{ font-weight: normal; color: {TEXT_FAINT}; font-size: 10.5px; float: right; }}
+.site .coord {{ font-weight: normal; color: {TEXT_FAINT}; font-size: 10.5px; }}
 table {{ border-collapse: collapse; width: 100%; margin-bottom: 2px; }}
 td {{ padding: 2px 8px 2px 0; vertical-align: top; }}
 td.fk {{ color: {TEXT_MUTED}; white-space: nowrap; width: 42%; }}
