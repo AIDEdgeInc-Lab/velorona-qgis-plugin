@@ -4,14 +4,16 @@ CITATION (verified by the QGIS workstream, 2026-10-09; not only taken from the M
 - Field Descriptions", https://ised-isde.canada.ca/site/spectrum-management-system/sites/default/files/attachments/2022/tafl_description_ltaf.pdf
 (21 pages, file sha256 8ee1ef262e44e512b8fb914a4b292575cdb442acc5a207a9422ad54f45c6ab5c; the same 61-column table covers all seven service files).
 Its column table lists: 1 Station function (TX/RX) · 2 Frequency [MHz] · 29 **Height above ground level [m]** · 41 Latitude (WGS84) · 42 Longitude (WGS84) ·
-43 Ground elevation above mean sea level [m] · 44 Antenna structure height above ground level [m] · 48 Authorization number. NOT stated by the document: whether the
+43 Ground elevation above mean sea level [m] · 44 Antenna structure height above ground level [m] · 48 Authorization number. NOT stated by the
+document: whether the
 height is to the antenna centre or tip, and what several values at one endpoint mean (UNKNOWN).
 
 The CSV has NO header row, so a column shift would be silent. Every row is therefore checked against the documented layout (61 columns; column 1 is TX or RX;
 2, 41, 42 numeric; 29 empty or numeric); a violation raises ``PackCorruptError`` naming the row, never a shifted read.
 
 The plugin ships NO heights by default. ``tools/build_ca_heights.py`` turns the raw file into a small sidecar (``velorona.ca-heights/1``) that
-``CanadaProvider`` uses when it is present; with it, a Canadian link record carries ``site_a_height_m`` / ``site_b_height_m`` / ``height_source`` and the existing
+``CanadaProvider`` uses when it is present; with it, a Canadian link record carries ``site_a_height_m`` / ``site_b_height_m`` / ``height_source`` and
+the existing
 record-height channel (core/record_source.py) types them Observed while unchanged, Assumed once overridden.
 """
 
@@ -35,7 +37,8 @@ SIDECAR_SCHEMA = "velorona.ca-heights/1"
 FIELD_DOC_URL = "https://ised-isde.canada.ca/site/spectrum-management-system/sites/default/files/attachments/2022/tafl_description_ltaf.pdf"
 FIELD_DOC_SHA256 = "8ee1ef262e44e512b8fb914a4b292575cdb442acc5a207a9422ad54f45c6ab5c"
 RULE = ("per endpoint (authorization x coordinate at 5 decimals): the MINIMUM of the in-range values (0.1-1000 m) in file rows for that endpoint; if none is "
-        "in range, the smallest raw value (the analysis then reports NO DATA, nothing is clamped). PROPOSED rule: ISED does not say what several values mean, and "
+        "in range, the smallest raw value (the analysis then reports NO DATA, nothing is clamped). PROPOSED rule: ISED does not say what several "
+        "values mean, and "
         "the lowest antenna is the conservative reading for clearance.")
 
 
@@ -78,7 +81,8 @@ def build_sidecar(path: str, source_file_updated: str) -> dict:
     for n, row in enumerate(csv.reader(_open_rows(path)), start=1):
         rows = n
         if len(row) != COLUMNS:
-            raise PackCorruptError(f"Row {n} of the ISED extract has {len(row)} columns; the documented layout has {COLUMNS}. Refusing to read heights by position.")
+            raise PackCorruptError(f"Row {n} of the ISED extract has {len(row)} columns; the documented layout has {COLUMNS}. "
+                                   "Refusing to read heights by position.")
         if row[COL_FUNCTION - 1] not in ("TX", "RX"):
             raise PackCorruptError(f"Row {n}: column 1 (Station function) is {row[COL_FUNCTION - 1]!r}, expected TX or RX; the columns look shifted.")
         lat, lon, freq = _num(row[COL_LAT - 1]), _num(row[COL_LON - 1]), _num(row[COL_FREQ - 1])
@@ -117,7 +121,8 @@ class HeightIndex:
                             f"record-reported value, source file dated {src['source_file_updated']}")
 
     def lookup(self, auth: str, lat: float, lon: float) -> Tuple[Optional[float], str]:
-        """(height_m or None, source text). None when the extract has no height for this endpoint. The text names the rule when the endpoint has several values."""
+        """(height_m or None, source text). None when the extract has no height for this endpoint.
+        The text names the rule when the endpoint has several values."""
         e = self.endpoints.get(endpoint_key(auth, lat, lon))
         if e is None:
             return None, ""

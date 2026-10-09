@@ -29,7 +29,8 @@ class CanadaProvider:
     country = "CA"
 
     def __init__(self, path=None, heights=None):
-        """``heights``: None = look for a sidecar (env / bundled); False = never; a path = that sidecar. A sidecar that exists but is invalid raises PackError."""
+        """``heights``: None = look for a sidecar (env / bundled); False = never; a path = that sidecar.
+        A sidecar that exists but is invalid raises PackError."""
         self.path = path
         self.heights = heights
 
