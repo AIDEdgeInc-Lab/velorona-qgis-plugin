@@ -1377,8 +1377,13 @@ class VeloronaPlugin:
                 f"{len(ground_stations)} ground station(s), {len(satellites)} satellite(s) selected."
             )
             return
+        # Time, window and minimum elevation are the user's to set (defaults: now, 24 h, 10 deg -- typed Assumed in the evidence).
+        dialog = ParamDialog(self.iface.mainWindow(), "Velorona -- Satellite / Earth-Space geometry",
+                             satellite_earth_space.PARAM_SPEC, satellite_earth_space.build_params())
+        if dialog.exec() != dialog.DialogCode.Accepted:
+            return
         try:
-            result = satellite_earth_space.analyze(ground_stations[0], satellites[0])
+            result = satellite_earth_space.analyze(ground_stations[0], satellites[0], dialog.values())
         except Exception as exc:
             self._error(f"Analysis failed:\n{exc}")
             return
