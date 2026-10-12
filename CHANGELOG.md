@@ -3,6 +3,14 @@
 Canonical human-readable version history. (The plugin manager shows the shorter `changelog=` text in `metadata.txt`; this file is the detailed record.)
 Compare any two releases: https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/compare/v1.1.4...v1.1.5
 
+## Unreleased -- Batch terrain clearance (Processing algorithm; not yet released, `metadata.txt` version unchanged)
+
+### Added
+- **Terrain clearance for many links**: a native Processing algorithm (`velorona:terrain_clearance_batch`, Processing Toolbox > Velorona, and Analyze: Terrain Clearance for Many Links) runs the existing single-link analysis for every link of a layer or its selected links. One row per link, each equal to the single-link result; per-row status and reason (CLEAR / WATCH / AT RISK / CRITICAL / NO DATA / ERROR / NOT RUN); one failing link never stops the run; optional CSV. See `docs/BATCH_TERRAIN.md`.
+
+### Tests
+- `tests/test_terrain_batch.py` (QGIS-free) compares every batch row with an independent single-link analysis on all shared parity fixtures. `tests/qgis_batch_e2e.py` is the QGIS runtime test of the Processing layer; **it has not been run yet** (needs QGIS 4).
+
 ## 1.1.7 — UI polish (compared with 1.1.6; 1.1.6 was never published separately, so 1.1.7 also carries the 1.1.6 guided USA data setup below)
 
 ### Changed (appearance only)

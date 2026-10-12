@@ -4,6 +4,8 @@
 |---|---|---|
 | `test_viewport_cache.py` | no | Viewport cache: TTL, negative caching, LRU eviction, bound, key separation |
 | `test_presentation_terrain.py`, `_weather.py`, `_ask.py`, `_workbook.py` | no | Operational output layer: status mapping against the real libraries, history changes, station provenance, Ask answers, Excel values equal to engine values exactly |
+| `test_terrain_batch.py` | no | Batch terrain clearance (core/batch.py): every row equals an independent single-link analysis on the shared parity fixtures; failing link, incomplete input, empty input, limit/cancel, CSV |
+| `qgis_batch_e2e.py` | yes | The batch Processing algorithm in a real QGIS (provider, validation, reprojected and selected-only input, output table, CSV, empty input) |
 | `qgis_e2e.py` | yes | Real plugin through a real `QgsProject`/`QgsMapCanvas`: CRS, extent, layers, basemap, render, pan/zoom, inspector, dock, engines, exports, Qt6 idioms, ownership markers, unload lifecycle |
 | `benchmark_viewport.py` | yes | Load / render / navigation timings, HTTP counts, canvas-refresh counts |
 

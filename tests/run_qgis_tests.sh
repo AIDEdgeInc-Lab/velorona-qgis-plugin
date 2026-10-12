@@ -52,6 +52,10 @@ echo
 echo "== QGIS USA support end-to-end test (synthetic pack, no network) =="
 "$QGISPY" "$HERE/qgis_usa_e2e.py"
 
+echo
+echo "== QGIS batch terrain-clearance Processing test (no network) =="
+"$QGISPY" "$HERE/qgis_batch_e2e.py"
+
 if [ "$1" = "--bench" ]; then
     echo
     echo "== performance benchmark =="
