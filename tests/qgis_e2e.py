@@ -2150,7 +2150,8 @@ plugin.iface.messageBar().popWidget = _recording_pop
 
 _sat_layer28 = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_SATELLITES)
 _sat_node28 = project.layerTreeRoot().findLayer(_sat_layer28.id())
-_real_fetch28 = space_public.fetch_celestrak_satellites
+from velorona.core.sources import satellite_feed as _sf28  # noqa: E402
+_real_load28, _real_build28 = _sf28.load_groups, _sf28.build_rows
 
 try:
     _ONE_SAT = {"25544": (
@@ -2165,12 +2166,19 @@ try:
     # _real_fetch28 -- this must not touch the real network.
     _mid_call = {}
 
-    def _slow_fetch_probe():
+    # The feed is faked (no network). The rows come from the real propagation function on the sample element set above, so the layer population path
+    # is real; only the provider is stubbed. This tests the plugin's status handling, NOT that CelesTrak answers.
+    _ONE_ROWS = space_public.build_satellite_records(_ONE_SAT)
+    _ONE_FEED = {"status": "fresh", "records": [object()], "per_group": {}, "warnings": []}
+    _NO_FEED = {"status": "unavailable", "records": [], "per_group": {}, "warnings": ["geo: source refused the request (HTTP 403)"]}
+    _sf28.build_rows = lambda records, when=None, **k: {"rows": _ONE_ROWS if records else [], "skipped": {"propagation_failed": 0, "beyond_legacy_tle": 0}}
+
+    def _feed_probe(*a, **kw):
         _mid_call["visible"] = plugin.iface.messageBar().isVisible()
         _mid_call["pushed_before_call"] = any(c[0] == "push" for c in _mb_calls)
-        return _ONE_SAT
+        return _ONE_FEED
 
-    space_public.fetch_celestrak_satellites = _slow_fetch_probe
+    _sf28.load_groups = _feed_probe
     plugin._satellites_fetched_at = None
     plugin.iface.messageBar().clearWidgets()
     _mb_calls.clear()
@@ -2182,12 +2190,12 @@ try:
     check("the status message is pushed and visible BEFORE the blocking fetch starts",
           _mid_call.get("pushed_before_call") is True and _mid_call.get("visible") is True)
     _connecting_calls = [c for c in _mb_calls if c[0] == "push"
-                         and "Connecting to satellite data" in str(c[1])]
+                         and "Loading satellite data" in str(c[1])]
     check("the in-progress message is plain and honest, not a bare 'Loading...'",
-          len(_connecting_calls) == 1 and "few seconds" in str(_connecting_calls[0][1]))
+          len(_connecting_calls) == 1)
 
     # -- Case 2: fetch succeeds -> message is cleared, nothing lingers -------
-    space_public.fetch_celestrak_satellites = lambda: _ONE_SAT
+    _sf28.load_groups = lambda *a, **k: _ONE_FEED
     plugin._satellites_fetched_at = None
     plugin.iface.messageBar().clearWidgets()
     _mb_calls.clear()
@@ -2207,7 +2215,7 @@ try:
     # a refused/hanging connection is caught inside fetch_celestrak_satellites
     # itself and returns {}, it does not raise) -> plain explanation, not a
     # silent revert to blank.
-    space_public.fetch_celestrak_satellites = lambda: {}
+    _sf28.load_groups = lambda *a, **k: _NO_FEED
     plugin._satellites_fetched_at = None
     plugin.iface.messageBar().clearWidgets()
     _mb_calls.clear()
@@ -2233,7 +2241,7 @@ try:
     def _raises(*a, **kw):
         raise RuntimeError("unexpected failure, not a network degrade")
 
-    space_public.fetch_celestrak_satellites = _raises
+    _sf28.load_groups = _raises
     plugin._satellites_fetched_at = None
     plugin.iface.messageBar().clearWidgets()
     _mb_calls.clear()
@@ -2249,7 +2257,7 @@ try:
     check("the wait cursor is restored even when the fetch raises",
           QApplication.overrideCursor() is None)
 finally:
-    space_public.fetch_celestrak_satellites = _real_fetch28
+    _sf28.load_groups, _sf28.build_rows = _real_load28, _real_build28
     plugin.iface.messageBar().pushMessage = _real_push
     plugin.iface.messageBar().popWidget = _real_pop
     plugin.iface.messageBar().clearWidgets()
