@@ -168,65 +168,62 @@ def look_angles_at(sat: EarthSatellite, station: dict, when) -> dict:
     return out
 
 
-def _elev(sat, station, ms):
-    r = look_angles_at(sat, station, _from_ms(ms))
-    return r if r["ok"] else None
+def _batch(sat, station, ms_list):
+    """Elevation, azimuth and range for many instants in ONE Skyfield evaluation (a scalar evaluation costs ~5 ms, mostly the nutation series, so
+    refining crossings and maxima point by point made a 24 h search take about a second on the GUI thread). Returns three float arrays; NaN where
+    propagation failed."""
+    grid = _TS.from_datetimes([_from_ms(int(ms)) for ms in ms_list])
+    alt, az, dist = (sat - _observer(station)).at(grid).altaz()
+    return (np.asarray(alt.degrees, dtype=float), np.asarray(az.degrees, dtype=float) % 360.0, np.asarray(dist.km, dtype=float))
 
 
 def _bisect(sat, station, lo, hi, mask, rising, refine_ms):
-    # [lo, hi] brackets one crossing: below the mask at one end, at/above at the other.
-    while hi - lo > refine_ms:
-        mid = (lo + hi) // 2
-        r = _elev(sat, station, mid)
-        if r is None:
-            break
-        above = r["elevation_deg"] >= mask
-        if (above if rising else not above):
-            hi = mid
-        else:
-            lo = mid
-    return hi if rising else lo
+    """The crossing inside [lo, hi] (below the mask at one end, at/above at the other), to refine_ms. Evaluated on a refine_ms grid in one call:
+    the first grid instant at/above the mask (rising) or the last one (falling) -- the same bracket the Map's bisection ends in."""
+    ms = list(range(int(lo), int(hi), int(refine_ms))) + [int(hi)]
+    el, _az, _rng = _batch(sat, station, ms)
+    ok = np.where(np.isfinite(el) & (el >= mask))[0]
+    if ok.size == 0:
+        return hi if rising else lo
+    return ms[int(ok[0])] if rising else ms[int(ok[-1])]
 
 
 def _peak(sat, station, lo, hi):
-    phi = (math.sqrt(5) - 1) / 2
-
-    def f(ms):
-        r = _elev(sat, station, int(math.floor(ms + 0.5)))
-        return r["elevation_deg"] if r else -math.inf
-
-    a, b = float(lo), float(hi)
-    c, d = b - phi * (b - a), a + phi * (b - a)
-    fc, fd = f(c), f(d)
-    while b - a > 500:
-        if fc > fd:
-            b, d, fd = d, c, fc
-            c = b - phi * (b - a)
-            fc = f(c)
-        else:
-            a, c, fc = c, d, fd
-            d = a + phi * (b - a)
-            fd = f(d)
-    ms = int(math.floor((a + b) / 2 + 0.5))
-    r = _elev(sat, station, ms)
-    return {"ms": ms, **r} if r else None
+    """The instant of maximum elevation in [lo, hi] to 1 s: one grid call when the window is short, otherwise a coarse grid then a 1 s grid around the best."""
+    lo, hi = int(lo), int(hi)
+    width = hi - lo
+    step = 1000 if width <= 1_800_000 else int(math.ceil(width / 1800 / 1000) * 1000)
+    ms = list(range(lo, hi, step)) + [hi]
+    el, _az, _rng = _batch(sat, station, ms)
+    if not np.isfinite(el).any():
+        return None
+    best = ms[int(np.nanargmax(el))]
+    if step > 1000:
+        fine = list(range(max(lo, best - step), min(hi, best + step) + 1, 1000))
+        el2, _a, _r = _batch(sat, station, fine)
+        if not np.isfinite(el2).any():
+            return None
+        best = fine[int(np.nanargmax(el2))]
+    return best
 
 
 def _finish(sat, station, rise_ms, set_ms, start_ms, end_ms):
     lo = start_ms if rise_ms is None else rise_ms
     hi = end_ms if set_ms is None else set_ms
-    peak = _peak(sat, station, lo, hi)
-    rise = _elev(sat, station, rise_ms) if rise_ms is not None else None
-    setr = _elev(sat, station, set_ms) if set_ms is not None else None
+    peak_ms = _peak(sat, station, lo, hi)
+    want = [m for m in (rise_ms, peak_ms, set_ms) if m is not None]
+    el, az, rng = _batch(sat, station, want) if want else (np.array([]),) * 3
+    at = {m: (float(el[i]), float(az[i]), float(rng[i])) for i, m in enumerate(want)}
+    peak = at.get(peak_ms)
     return {
         "rise_utc": None if rise_ms is None else iso_ms(_from_ms(rise_ms)),
-        "rise_azimuth_deg": rise["azimuth_deg"] if rise else None,
-        "max_utc": iso_ms(_from_ms(peak["ms"])) if peak else None,
-        "max_elevation_deg": peak["elevation_deg"] if peak else None,
-        "max_azimuth_deg": peak["azimuth_deg"] if peak else None,
-        "min_range_km": peak["range_km"] if peak else None,
+        "rise_azimuth_deg": at[rise_ms][1] if rise_ms is not None else None,
+        "max_utc": iso_ms(_from_ms(peak_ms)) if peak else None,
+        "max_elevation_deg": peak[0] if peak else None,
+        "max_azimuth_deg": peak[1] if peak else None,
+        "min_range_km": peak[2] if peak else None,
         "set_utc": None if set_ms is None else iso_ms(_from_ms(set_ms)),
-        "set_azimuth_deg": setr["azimuth_deg"] if setr else None,
+        "set_azimuth_deg": at[set_ms][1] if set_ms is not None else None,
         "duration_sec": int(math.floor((set_ms - rise_ms) / 1000 + 0.5)) if rise_ms is not None and set_ms is not None else None,
         "open_at_start": rise_ms is None, "open_at_end": set_ms is None,
     }
