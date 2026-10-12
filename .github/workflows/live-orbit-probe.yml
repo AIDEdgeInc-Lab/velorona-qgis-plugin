@@ -1,21 +1,46 @@
-# One-shot live check of the orbital source from a GitHub-hosted runner, through the plugin's QGIS-free feed code. Runs ONLY when this file or the
-# probe script changes on the probe branch (so it cannot re-request the source on every push). 5 requests (one per GEO group); publishes nothing.
-name: Live orbit probe (QGIS feed code)
+# Real-source + real-QGIS verification on a GitHub-hosted runner (the build sandbox can reach neither). Runs ONLY when this file, the probe script or the
+# test files change on the probe branch, so it cannot re-request the source on every push. Source requests: 5 (one per GEO group), made once by the
+# probe; every later step reads that cache or is blocked from the source. Publishes and deploys nothing.
+#   1. probe        tools/live_orbit_probe.py   real response -> the plugin's own feed code (cache, validation, SGP4); prints counts and headers
+#   2. unit tests   pytest tests                (inside the QGIS image; nothing skipped is accepted silently)
+#   3. feed e2e     tests/qgis_satellite_feed_e2e.py   REAL QGIS 4.x runtime, plugin pointed at the cache from step 1
+#   4. full e2e     tests/qgis_e2e.py           existing end-to-end suite, with the orbital source blocked (so it cannot send a second set of requests)
+name: Live orbit probe + real QGIS runtime
 on:
   push:
     branches: [claude/qgis-live-probe]
-    paths: [".github/workflows/live-orbit-probe.yml", "tools/live_orbit_probe.py"]
+    paths: [".github/workflows/live-orbit-probe.yml", "tools/live_orbit_probe.py", "tests/qgis_satellite_feed_e2e.py"]
 permissions:
   contents: read
 jobs:
-  probe:
+  qgis:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12"
-      - run: python -m pip install --quiet requests skyfield sgp4
-      - name: Probe
-        run: python tools/live_orbit_probe.py
+      - name: Prepare
+        run: |
+          mkdir -p /tmp/orbitcache && chmod 777 /tmp/orbitcache
+          docker pull qgis/qgis:4.0
+          docker run --rm qgis/qgis:4.0 python3 -c "from qgis.core import Qgis; import sys; print('QGIS', Qgis.version(), 'python', sys.version.split()[0])"
+      - name: 1. probe (real source, one request per GEO group)
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE":/work/velorona -v /tmp/orbitcache:/orbitcache -e ORBIT_CACHE_DIR=/orbitcache -w /work/velorona qgis/qgis:4.0 bash -c 'set -o pipefail
+            python3 -m pip install --quiet --break-system-packages requests skyfield sgp4 "aei-link-clearance>=0.2.0,<0.3" "aei-microwave-link-exposure>=0.2.0,<0.3" aei-geo-features pytest
+            python3 tools/live_orbit_probe.py'
+      - name: 2. unit tests (QGIS image)
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE":/work/velorona -w /work/velorona qgis/qgis:4.0 bash -c 'set -o pipefail
+            python3 -m pip install --quiet --break-system-packages requests skyfield sgp4 "aei-link-clearance>=0.2.0,<0.3" "aei-microwave-link-exposure>=0.2.0,<0.3" aei-geo-features pytest
+            python3 -m pytest tests -q -rs -p no:cacheprovider 2>&1 | tail -15'
+      - name: 3. satellite feed e2e (real QGIS, real cached records)
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE":/work/velorona -v /tmp/orbitcache:/orbitcache -e ORBIT_CACHE_DIR=/orbitcache -e QT_QPA_PLATFORM=offscreen -w /work/velorona qgis/qgis:4.0 bash -c 'set -o pipefail
+            python3 -m pip install --quiet --break-system-packages requests skyfield sgp4 "aei-link-clearance>=0.2.0,<0.3" "aei-microwave-link-exposure>=0.2.0,<0.3" aei-geo-features
+            python3 tests/qgis_satellite_feed_e2e.py 2>&1 | tail -60'
+      - name: 4. full existing e2e suite (orbital source blocked)
+        continue-on-error: true
+        run: |
+          docker run --rm --add-host celestrak.org:127.0.0.1 -v "$GITHUB_WORKSPACE":/work/velorona -e QT_QPA_PLATFORM=offscreen -w /work/velorona qgis/qgis:4.0 bash -c 'set -o pipefail
+            python3 -m pip install --quiet --break-system-packages requests skyfield sgp4 "aei-link-clearance>=0.2.0,<0.3" "aei-microwave-link-exposure>=0.2.0,<0.3" aei-geo-features
+            python3 tests/qgis_e2e.py 2>&1 | tail -70'

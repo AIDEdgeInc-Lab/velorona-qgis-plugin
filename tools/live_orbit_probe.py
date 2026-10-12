@@ -23,7 +23,8 @@ def counting_fetch(url):
     return r
 
 
-cache = orbit_data.OrbitCache(tempfile.mkdtemp())
+import os  # noqa: E402
+cache = orbit_data.OrbitCache(os.environ.get("ORBIT_CACHE_DIR") or tempfile.mkdtemp())   # the real-QGIS test reuses this directory
 now = datetime.now(timezone.utc)
 feed = sf.load_groups(sf.GEO_GROUPS, cache, now, counting_fetch)
 n_first = len(calls)
