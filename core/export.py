@@ -12,9 +12,10 @@ Single-feature (site/link) exports stay their own simpler shape --
 raw records, not analysis results, so O/C/I framing doesn't apply the
 same way; unchanged from the previous pass.
 
-Satellite-earth-space results are excluded, same judgment call already
-made in space.js (a computed geometry snapshot at one instant, not a raw
-record or a link result with a stable identity to export)."""
+Satellite-earth-space results export as the same evidence table (analysis
+time, minimum elevation, orbital-data age, station listing status, windows),
+built by core/presentation/satellite.py -- the same rows and typing as Velorona
+Map's satellite export. CSV only (no Excel workbook for satellite geometry)."""
 
 from __future__ import annotations
 
@@ -24,6 +25,7 @@ from datetime import datetime, timezone
 
 from .evidence_record import identity_lines, source_lines
 from .record_source import record_labels
+from .presentation import satellite as psatellite
 from .presentation.terrain import ratio_meaning, ratio_value, terrain_explanation, terrain_status
 from .presentation.weather import weather_status
 
@@ -249,10 +251,29 @@ def result_to_csv(result) -> str:
         return link_feature_to_csv(result.data, result.site_a_point, result.site_b_point)
     if result.kind in ("site", "satellite", "ground-station"):
         return feature_to_csv(result.data, result.latitude, result.longitude)
-    raise NotExportable(
-        "Satellite / Earth-Space analysis results are a computed geometry snapshot at one "
-        "instant, not a raw record -- excluded from export, same as Velorona Map's web app."
-    )
+    if result.kind == "satellite-earth-space":
+        return _satellite_to_csv(result)
+    raise NotExportable(f"A result of kind {result.kind!r} has no export.")
+
+
+def _satellite_to_csv(result) -> str:
+    preamble = _preamble([
+        "Velorona QGIS -- Satellite / Earth-Space look-angle and visibility-window export",
+        f"Station <-> satellite: {result.station_name} <-> {result.satellite_name}",
+        "Geometry only (elevation, azimuth, slant range, visibility, windows above a minimum elevation). Predictions from an element set at a stated UTC time; "
+        "positions degrade with time from each epoch. Not a statement that a link works.",
+        f"Analysis time (UTC): {result.analysis_time_utc}; minimum elevation {result.min_elevation_mask_deg:g} deg ({result.mask_type}); window {result.window_hours:g} h; "
+        f"element-set epoch {result.tle_epoch} ({result.epoch_level}).",
+        *identity_lines(decision=False),
+        f"Calculation run: {result.computed_at}",
+    ])
+    buf = io.StringIO()
+    buf.write(preamble)
+    writer = csv.writer(buf)
+    writer.writerow(EVIDENCE_HEADER)
+    for row in psatellite.evidence_rows(result):
+        writer.writerow(row)
+    return buf.getvalue()
 
 
 def _ratio_note(r) -> str:
@@ -274,7 +295,7 @@ def result_to_xlsx(result) -> bytes:
     if context_for(result) is None:
         raise NotExportable(
             "An Excel workbook is available for terrain clearance, weather exposure and Fixed Service link "
-            "results. Single records and selections export as CSV; satellite geometry is not exported.")
+            "results. Single records, selections and satellite geometry export as CSV.")
     return build_workbook(result, result_to_csv(result))
 
 

@@ -229,7 +229,7 @@ class VeloronaResultsDock(QDockWidget):
             self.ask_input.setCompleter(completer)
         kind = getattr(self._result, "kind", None)
         self.excel_button.setVisible(has_brief)
-        self.export_button.setVisible(kind not in (None, "satellite-earth-space"))
+        self.export_button.setVisible(kind is not None)
 
     def show_result(self, result) -> None:
         self._result = result
@@ -895,24 +895,51 @@ def _render_microwave(result) -> str:
 # ---------------------------------------------------------------------
 
 def _render_satellite_analysis(result) -> str:
+    from ..core.engines import satellite_geometry as geom
+    from ..core.presentation.satellite import MAX_WINDOW_ROWS, fmt_utc, window_text
     badge_color = theme.CLEAR if result.visible else theme.OBSTRUCTED
-    geometry = (
-        _field_row("Elevation angle", f"{result.elevation_deg:.2f}°")
-        + _field_row("Azimuth", f"{result.azimuth_deg:.2f}°")
-        + _field_row("Slant range", f"{result.slant_range_km:.1f} km")
-    )
-    return (
-        "<div class='kicker'>SATELLITE / EARTH-SPACE ANALYSIS</div>"
-        f"<h3>{_esc(result.station_name)} &harr; {_esc(result.satellite_name)} "
-        f"<b style='color:{badge_color}'>{'VISIBLE' if result.visible else 'NOT VISIBLE'}</b></h3>"
-        + _section_html("Geometry", geometry)
-        + f"<p class='caveat'>Method: Geometry only (elevation, slant range, azimuth, visibility) -- SGP4 "
-          f"propagation + observer-relative look angles (skyfield). No propagation loss, no link budget, "
-          f"no weather exposure -- out of scope for this phase.</p>"
-        + f"<p class='caveat'>Minimum elevation mask: {result.min_elevation_mask_deg}° (standard practice "
-          f"range is 5-10°; the more conservative end was used since Phase 1 has no per-site "
-          f"horizon-obstruction survey).</p>"
-        + f"<p class='caveat'>Satellite TLE epoch: {_esc(result.tle_epoch)} -- position accuracy degrades with "
-          f"time since this epoch.</p>"
-        + "<p class='caveat'>Not exportable: a computed geometry snapshot at this instant, not a raw record.</p>"
-    )
+    hours = f"{result.window_hours:g}"
+    mask = f"{result.min_elevation_mask_deg:g}"
+    parts = ["<div class='kicker'>SATELLITE / EARTH-SPACE ANALYSIS</div>"
+             f"<h3>{_esc(result.station_name)} &harr; {_esc(result.satellite_name)} "
+             f"<b style='color:{badge_color}'>{'VISIBLE' if result.visible else 'NOT VISIBLE'}</b></h3>"]
+    # The same result in three registers (field technician / planner / data analyst): same facts, different words (core/engines/satellite_geometry.plain_readings).
+    if result.analysis_time_utc:
+        try:
+            readings = geom.plain_readings(result.__dict__ if hasattr(result, "__dict__") else dict(result))
+        except Exception:
+            readings = None
+        if readings:
+            parts.append(_section_html("In plain words (same result, three readings)",
+                                       _field_row("Field technician", readings["field"]) + _field_row("Planner", readings["planner"])
+                                       + _field_row("Data analyst", readings["analyst"])))
+    when = (f"{fmt_utc(result.analysis_time_utc)} ({'entered by you' if result.time_origin == 'user' else 'now'})" if result.analysis_time_utc else None)
+    parts.append(_section_html("Geometry", (_field_row("Analysis time (UTC)", when) if when else "")
+                               + _field_row("Elevation angle", f"{result.elevation_deg:.2f}°")
+                               + _field_row("Azimuth", f"{result.azimuth_deg:.2f}° (from true north, clockwise)")
+                               + _field_row("Slant range", f"{result.slant_range_km:.1f} km")))
+    if result.windows_error:
+        win_rows = _field_row("Summary", f"Not computed: {result.windows_error}")
+    else:
+        state = (f"Above {mask}° for the whole {hours} h checked." if result.window_state == "always-above"
+                 else f"Never above {mask}° in the {hours} h checked." if result.window_state == "never-above"
+                 else f"{len(result.windows)} window{'' if len(result.windows) == 1 else 's'} in the next {hours} h (UTC).")
+        win_rows = _field_row("Summary", state)
+        for i, w in enumerate(result.windows[:MAX_WINDOW_ROWS]):
+            win_rows += _field_row(f"Window {i + 1}", window_text(w))
+        if len(result.windows) > MAX_WINDOW_ROWS:
+            win_rows += _field_row("More", f"{len(result.windows) - MAX_WINDOW_ROWS} further windows are in the export.")
+    if result.analysis_time_utc:
+        parts.append(_section_html("Visibility windows", win_rows))
+        parts.append(_section_html("Data quality", _field_row("Orbital data", result.epoch_note or None)
+                                   + _field_row("Station listing", (f"{result.station_status} -- a public listing, not verification that the station is operating or authorised"
+                                                                    if result.station_status else None))))
+    basis = {"station": ", the station's declared horizon", "user": ", entered by you"}.get(
+        result.mask_origin, "; the conservative end of the 5-10° standard-practice range; no per-site horizon survey")
+    parts += [
+        "<p class='caveat'>Method: Geometry only (elevation, slant range, azimuth, visibility, windows above a minimum elevation) -- SGP4 "
+        "propagation + observer-relative look angles (Skyfield). No propagation loss, no link budget, no weather exposure.</p>",
+        f"<p class='caveat'>Minimum elevation mask: {mask}° ({_esc(result.mask_type)}{_esc(basis)}).</p>",
+        f"<p class='caveat'>Satellite element-set epoch: {_esc(result.tle_epoch)} -- position accuracy degrades with time from this epoch.</p>",
+    ]
+    return "".join(parts)

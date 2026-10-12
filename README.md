@@ -56,7 +56,10 @@ Three, all reused unmodified:
   (docs/RAIN_COEFFICIENTS_CAVEAT.md). The check is not a validation of the model.
 - **Satellite / Earth-Space** (`skyfield`/SGP4) — look-angle geometry
   (elevation, azimuth, slant range, visibility) between a selected ground
-  station and satellite.
+  station and satellite at a UTC time you choose, plus the windows above a
+  minimum elevation over the next 1-72 h, the age of the orbital data and the
+  station's listing status. Geometry only: not a statement that a link works.
+  Exports as CSV. See `docs/SATELLITE_GEOMETRY.md`.
 
 ## Status, NO DATA and where a value came from
 

@@ -1,0 +1,953 @@
+{
+ "_note": "SYNTHETIC orbits and station coordinates; reference computed by Skyfield (independent of satellite.js). See parity/build_satgeo_reference.py.",
+ "epoch": "2026-10-01T00:00:00.000000",
+ "geo_subpoint_epoch": {
+  "altitude_km": 35777.05283853982,
+  "latitude": 0.01763896801706692,
+  "longitude": -9.769307764420299
+ },
+ "orbits": {
+  "geo": {
+   "ARG_OF_PERICENTER": 0.0,
+   "BSTAR": 0,
+   "CLASSIFICATION_TYPE": "U",
+   "ECCENTRICITY": 0.0002,
+   "ELEMENT_SET_NO": 999,
+   "EPHEMERIS_TYPE": 0,
+   "EPOCH": "2026-10-01T00:00:00.000000",
+   "INCLINATION": 0.05,
+   "MEAN_ANOMALY": 0.0,
+   "MEAN_MOTION": 1.0027379,
+   "MEAN_MOTION_DDOT": 0,
+   "MEAN_MOTION_DOT": 0,
+   "NORAD_CAT_ID": 99003,
+   "OBJECT_ID": "2026-001A",
+   "OBJECT_NAME": "SYNTH-GEO",
+   "RA_OF_ASC_NODE": 0.0,
+   "REV_AT_EPOCH": 1
+  },
+  "issish": {
+   "ARG_OF_PERICENTER": 30.0,
+   "BSTAR": 0,
+   "CLASSIFICATION_TYPE": "U",
+   "ECCENTRICITY": 0.0005,
+   "ELEMENT_SET_NO": 999,
+   "EPHEMERIS_TYPE": 0,
+   "EPOCH": "2026-10-01T00:00:00.000000",
+   "INCLINATION": 51.64,
+   "MEAN_ANOMALY": 60.0,
+   "MEAN_MOTION": 15.5,
+   "MEAN_MOTION_DDOT": 0,
+   "MEAN_MOTION_DOT": 0,
+   "NORAD_CAT_ID": 99002,
+   "OBJECT_ID": "2026-001A",
+   "OBJECT_NAME": "SYNTH-ISS-ISH",
+   "RA_OF_ASC_NODE": 120.0,
+   "REV_AT_EPOCH": 1
+  },
+  "leo53": {
+   "ARG_OF_PERICENTER": 0.0,
+   "BSTAR": 0,
+   "CLASSIFICATION_TYPE": "U",
+   "ECCENTRICITY": 0.0001,
+   "ELEMENT_SET_NO": 999,
+   "EPHEMERIS_TYPE": 0,
+   "EPOCH": "2026-10-01T00:00:00.000000",
+   "INCLINATION": 53.0,
+   "MEAN_ANOMALY": 0.0,
+   "MEAN_MOTION": 15.06,
+   "MEAN_MOTION_DDOT": 0,
+   "MEAN_MOTION_DOT": 0,
+   "NORAD_CAT_ID": 99001,
+   "OBJECT_ID": "2026-001A",
+   "OBJECT_NAME": "SYNTH-LEO-53",
+   "RA_OF_ASC_NODE": 40.0,
+   "REV_AT_EPOCH": 1
+  }
+ },
+ "reference_impl": {
+  "sgp4": "2.27",
+  "skyfield": "1.55"
+ },
+ "samples": [
+  {
+   "azimuth_deg": 78.41296548455037,
+   "elevation_deg": -48.5704814130616,
+   "orbit": "leo53",
+   "range_km": 10277.365766836081,
+   "station": "ottawa",
+   "time": "2026-10-01T00:00:00Z"
+  },
+  {
+   "azimuth_deg": 306.06330851520323,
+   "elevation_deg": -37.6037140139525,
+   "orbit": "leo53",
+   "range_km": 8645.14917051705,
+   "station": "ottawa",
+   "time": "2026-10-01T00:37:00Z"
+  },
+  {
+   "azimuth_deg": 114.86582946469574,
+   "elevation_deg": -30.445301946528836,
+   "orbit": "leo53",
+   "range_km": 7437.33491347655,
+   "station": "ottawa",
+   "time": "2026-10-01T03:11:00Z"
+  },
+  {
+   "azimuth_deg": 81.88158806318424,
+   "elevation_deg": -54.11432906392987,
+   "orbit": "leo53",
+   "range_km": 11000.292534532635,
+   "station": "ottawa",
+   "time": "2026-10-01T12:00:00Z"
+  },
+  {
+   "azimuth_deg": 61.6035507154433,
+   "elevation_deg": -44.6576990342604,
+   "orbit": "leo53",
+   "range_km": 9726.516527847489,
+   "station": "ottawa",
+   "time": "2026-10-01T23:59:00Z"
+  },
+  {
+   "azimuth_deg": 90.15687299978394,
+   "elevation_deg": -6.409156241735522,
+   "orbit": "leo53",
+   "range_km": 3505.963741327233,
+   "station": "equator",
+   "time": "2026-10-01T00:00:00Z"
+  },
+  {
+   "azimuth_deg": 10.371105674716128,
+   "elevation_deg": -73.409354420843,
+   "orbit": "leo53",
+   "range_km": 12792.025246592577,
+   "station": "equator",
+   "time": "2026-10-01T00:37:00Z"
+  },
+  {
+   "azimuth_deg": 268.53737301664864,
+   "elevation_deg": 4.863859327108923,
+   "orbit": "leo53",
+   "range_km": 2214.675908535826,
+   "station": "equator",
+   "time": "2026-10-01T03:11:00Z"
+  },
+  {
+   "azimuth_deg": 106.86163369822185,
+   "elevation_deg": -10.916571352143857,
+   "orbit": "leo53",
+   "range_km": 4173.323718664397,
+   "station": "equator",
+   "time": "2026-10-01T12:00:00Z"
+  },
+  {
+   "azimuth_deg": 64.33148453888016,
+   "elevation_deg": -14.10538069424096,
+   "orbit": "leo53",
+   "range_km": 4666.1511644446855,
+   "station": "equator",
+   "time": "2026-10-01T23:59:00Z"
+  },
+  {
+   "azimuth_deg": 251.23089500961638,
+   "elevation_deg": -56.087869881,
+   "orbit": "leo53",
+   "range_km": 11239.3982005693,
+   "station": "sydney",
+   "time": "2026-10-01T00:00:00Z"
+  },
+  {
+   "azimuth_deg": 20.573354546009423,
+   "elevation_deg": -30.837632817574523,
+   "orbit": "leo53",
+   "range_km": 7480.813236877234,
+   "station": "sydney",
+   "time": "2026-10-01T00:37:00Z"
+  },
+  {
+   "azimuth_deg": 197.6391124005993,
+   "elevation_deg": -71.30771577583606,
+   "orbit": "leo53",
+   "range_km": 12665.957845747076,
+   "station": "sydney",
+   "time": "2026-10-01T03:11:00Z"
+  },
+  {
+   "azimuth_deg": 246.35117941322898,
+   "elevation_deg": -50.805305938249745,
+   "orbit": "leo53",
+   "range_km": 10586.689261404845,
+   "station": "sydney",
+   "time": "2026-10-01T12:00:00Z"
+  },
+  {
+   "azimuth_deg": 271.33070345462875,
+   "elevation_deg": -57.68733240731766,
+   "orbit": "leo53",
+   "range_km": 11413.269578036641,
+   "station": "sydney",
+   "time": "2026-10-01T23:59:00Z"
+  },
+  {
+   "azimuth_deg": 90.14366887131183,
+   "elevation_deg": -13.514083962156326,
+   "orbit": "leo53",
+   "range_km": 4576.075269316363,
+   "station": "under_geo",
+   "time": "2026-10-01T00:00:00Z"
+  },
+  {
+   "azimuth_deg": 354.43965236737756,
+   "elevation_deg": -73.61671719672786,
+   "orbit": "leo53",
+   "range_km": 12804.578976037044,
+   "station": "under_geo",
+   "time": "2026-10-01T00:37:00Z"
+  },
+  {
+   "azimuth_deg": 266.8453294412512,
+   "elevation_deg": 23.74083931769194,
+   "orbit": "leo53",
+   "range_km": 1159.618795061572,
+   "station": "under_geo",
+   "time": "2026-10-01T03:11:00Z"
+  },
+  {
+   "azimuth_deg": 103.88894191879984,
+   "elevation_deg": -17.225826811654944,
+   "orbit": "leo53",
+   "range_km": 5190.690612697529,
+   "station": "under_geo",
+   "time": "2026-10-01T12:00:00Z"
+  },
+  {
+   "azimuth_deg": 68.24589819834839,
+   "elevation_deg": -19.817313492128672,
+   "orbit": "leo53",
+   "range_km": 5618.143293989337,
+   "station": "under_geo",
+   "time": "2026-10-01T23:59:00Z"
+  },
+  {
+   "azimuth_deg": 309.3839733467247,
+   "elevation_deg": -22.69733554642723,
+   "orbit": "issish",
+   "range_km": 5876.049303633678,
+   "station": "ottawa",
+   "time": "2026-10-01T00:00:00Z"
+  },
+  {
+   "azimuth_deg": 152.36715131864932,
+   "elevation_deg": -43.53051327387613,
+   "orbit": "issish",
+   "range_km": 9355.453432519353,
+   "station": "ottawa",
+   "time": "2026-10-01T00:37:00Z"
+  },
+  {
+   "azimuth_deg": 312.56136711372545,
+   "elevation_deg": -29.339887072657167,
+   "orbit": "issish",
+   "range_km": 7049.600375830705,
+   "station": "ottawa",
+   "time": "2026-10-01T03:11:00Z"
+  },
+  {
+   "azimuth_deg": 174.16385818189914,
+   "elevation_deg": -17.637839610210875,
+   "orbit": "issish",
+   "range_km": 4948.519740011242,
+   "station": "ottawa",
+   "time": "2026-10-01T12:00:00Z"
+  },
+  {
+   "azimuth_deg": 131.42956894673554,
+   "elevation_deg": -60.99613234743282,
+   "orbit": "issish",
+   "range_km": 11615.899541341027,
+   "station": "ottawa",
+   "time": "2026-10-01T23:59:00Z"
+  },
+  {
+   "azimuth_deg": 344.60982714126357,
+   "elevation_deg": -61.88939261134657,
+   "orbit": "issish",
+   "range_km": 11710.111294243534,
+   "station": "equator",
+   "time": "2026-10-01T00:00:00Z"
+  },
+  {
+   "azimuth_deg": 217.8673676898391,
+   "elevation_deg": -22.791574163070116,
+   "orbit": "issish",
+   "range_km": 5890.312062541591,
+   "station": "equator",
+   "time": "2026-10-01T00:37:00Z"
+  },
+  {
+   "azimuth_deg": 357.17774082223906,
+   "elevation_deg": -65.60141541777003,
+   "orbit": "issish",
+   "range_km": 12064.137139547744,
+   "station": "equator",
+   "time": "2026-10-01T03:11:00Z"
+  },
+  {
+   "azimuth_deg": 271.41789064375,
+   "elevation_deg": -33.331267709405736,
+   "orbit": "issish",
+   "range_km": 7716.516440972192,
+   "station": "equator",
+   "time": "2026-10-01T12:00:00Z"
+  },
+  {
+   "azimuth_deg": 169.01334881781622,
+   "elevation_deg": -22.809432785681153,
+   "orbit": "issish",
+   "range_km": 5891.923325984512,
+   "station": "equator",
+   "time": "2026-10-01T23:59:00Z"
+  },
+  {
+   "azimuth_deg": 28.23853359905478,
+   "elevation_deg": -46.31318502211902,
+   "orbit": "issish",
+   "range_km": 9750.110892051462,
+   "station": "sydney",
+   "time": "2026-10-01T00:00:00Z"
+  },
+  {
+   "azimuth_deg": 171.67477644326445,
+   "elevation_deg": -51.71935177642075,
+   "orbit": "issish",
+   "range_km": 10564.319397055955,
+   "station": "sydney",
+   "time": "2026-10-01T00:37:00Z"
+  },
+  {
+   "azimuth_deg": 21.13959993569626,
+   "elevation_deg": -41.115124313529805,
+   "orbit": "issish",
+   "range_km": 8962.828962347547,
+   "station": "sydney",
+   "time": "2026-10-01T03:11:00Z"
+  },
+  {
+   "azimuth_deg": 119.98126161421189,
+   "elevation_deg": -63.28383325271414,
+   "orbit": "issish",
+   "range_km": 11858.801051557668,
+   "station": "sydney",
+   "time": "2026-10-01T12:00:00Z"
+  },
+  {
+   "azimuth_deg": 205.0243212990542,
+   "elevation_deg": -41.21278633115804,
+   "orbit": "issish",
+   "range_km": 9048.56187052611,
+   "station": "sydney",
+   "time": "2026-10-01T23:59:00Z"
+  },
+  {
+   "azimuth_deg": 338.33706563227594,
+   "elevation_deg": -60.260979961858304,
+   "orbit": "issish",
+   "range_km": 11541.478905650796,
+   "station": "under_geo",
+   "time": "2026-10-01T00:00:00Z"
+  },
+  {
+   "azimuth_deg": 211.13004479633932,
+   "elevation_deg": -19.52890841736759,
+   "orbit": "issish",
+   "range_km": 5315.553570137284,
+   "station": "under_geo",
+   "time": "2026-10-01T00:37:00Z"
+  },
+  {
+   "azimuth_deg": 348.38007497844325,
+   "elevation_deg": -64.95201299010095,
+   "orbit": "issish",
+   "range_km": 12005.849315940995,
+   "station": "under_geo",
+   "time": "2026-10-01T03:11:00Z"
+  },
+  {
+   "azimuth_deg": 271.51658547445993,
+   "elevation_deg": -27.93933767853607,
+   "orbit": "issish",
+   "range_km": 6781.502401181816,
+   "station": "under_geo",
+   "time": "2026-10-01T12:00:00Z"
+  },
+  {
+   "azimuth_deg": 162.17495807956035,
+   "elevation_deg": -24.22755719117941,
+   "orbit": "issish",
+   "range_km": 6142.739366181039,
+   "station": "under_geo",
+   "time": "2026-10-01T23:59:00Z"
+  },
+  {
+   "azimuth_deg": 107.61019072952246,
+   "elevation_deg": 8.048980034946764,
+   "orbit": "geo",
+   "range_km": 40783.23996987346,
+   "station": "ottawa",
+   "time": "2026-10-01T00:00:00Z"
+  },
+  {
+   "azimuth_deg": 107.6045930915598,
+   "elevation_deg": 8.049022853419705,
+   "orbit": "geo",
+   "range_km": 40783.34551351188,
+   "station": "ottawa",
+   "time": "2026-10-01T00:37:00Z"
+  },
+  {
+   "azimuth_deg": 107.58724410420211,
+   "elevation_deg": 8.046333409345698,
+   "orbit": "geo",
+   "range_km": 40786.33706376117,
+   "station": "ottawa",
+   "time": "2026-10-01T03:11:00Z"
+  },
+  {
+   "azimuth_deg": 107.62964832522889,
+   "elevation_deg": 8.023559140123641,
+   "orbit": "geo",
+   "range_km": 40803.09882476408,
+   "station": "ottawa",
+   "time": "2026-10-01T12:00:00Z"
+  },
+  {
+   "azimuth_deg": 107.60405507353799,
+   "elevation_deg": 8.039036151832136,
+   "orbit": "geo",
+   "range_km": 40784.309534237036,
+   "station": "ottawa",
+   "time": "2026-10-01T23:59:00Z"
+  },
+  {
+   "azimuth_deg": 270.10384792568124,
+   "elevation_deg": 78.50247502667183,
+   "orbit": "geo",
+   "range_km": 35885.86606342349,
+   "station": "equator",
+   "time": "2026-10-01T00:00:00Z"
+  },
+  {
+   "azimuth_deg": 270.12512516657523,
+   "elevation_deg": 78.50713615557636,
+   "orbit": "geo",
+   "range_km": 35885.88505328365,
+   "station": "equator",
+   "time": "2026-10-01T00:37:00Z"
+  },
+  {
+   "azimuth_deg": 270.17700944873104,
+   "elevation_deg": 78.52424074338325,
+   "orbit": "geo",
+   "range_km": 35888.229132825676,
+   "station": "equator",
+   "time": "2026-10-01T03:11:00Z"
+  },
+  {
+   "azimuth_deg": 269.906153791631,
+   "elevation_deg": 78.50930462570388,
+   "orbit": "geo",
+   "range_km": 35902.68099758191,
+   "station": "equator",
+   "time": "2026-10-01T12:00:00Z"
+  },
+  {
+   "azimuth_deg": 270.08449631364863,
+   "elevation_deg": 78.51525349166528,
+   "orbit": "geo",
+   "range_km": 35885.62170510032,
+   "station": "equator",
+   "time": "2026-10-01T23:59:00Z"
+  },
+  {
+   "azimuth_deg": 211.72352982813163,
+   "elevation_deg": -56.473429907319115,
+   "orbit": "geo",
+   "range_km": 47329.993466070606,
+   "station": "sydney",
+   "time": "2026-10-01T00:00:00Z"
+  },
+  {
+   "azimuth_deg": 211.73182867295398,
+   "elevation_deg": -56.4747565192937,
+   "orbit": "geo",
+   "range_km": 47330.191341026526,
+   "station": "sydney",
+   "time": "2026-10-01T00:37:00Z"
+  },
+  {
+   "azimuth_deg": 211.75900517444578,
+   "elevation_deg": -56.475867110406696,
+   "orbit": "geo",
+   "range_km": 47332.93980831206,
+   "station": "sydney",
+   "time": "2026-10-01T03:11:00Z"
+  },
+  {
+   "azimuth_deg": 211.70737591617146,
+   "elevation_deg": -56.44295736428145,
+   "orbit": "geo",
+   "range_km": 47344.8893816384,
+   "station": "sydney",
+   "time": "2026-10-01T12:00:00Z"
+  },
+  {
+   "azimuth_deg": 211.73698787558385,
+   "elevation_deg": -56.46658100723875,
+   "orbit": "geo",
+   "range_km": 47329.51683069805,
+   "station": "sydney",
+   "time": "2026-10-01T23:59:00Z"
+  },
+  {
+   "azimuth_deg": 348.7201999170828,
+   "elevation_deg": 89.99995322802167,
+   "orbit": "geo",
+   "range_km": 35777.05283854162,
+   "station": "under_geo",
+   "time": "2026-10-01T00:00:00Z"
+  },
+  {
+   "azimuth_deg": 47.438830426139944,
+   "elevation_deg": 89.99365767770074,
+   "orbit": "geo",
+   "range_km": 35777.159879660256,
+   "station": "under_geo",
+   "time": "2026-10-01T00:37:00Z"
+  },
+  {
+   "azimuth_deg": 56.095715182403566,
+   "elevation_deg": 89.97381375150147,
+   "orbit": "geo",
+   "range_km": 35779.82614988574,
+   "station": "under_geo",
+   "time": "2026-10-01T03:11:00Z"
+  },
+  {
+   "azimuth_deg": 171.32317951910983,
+   "elevation_deg": 89.96007616876011,
+   "orbit": "geo",
+   "range_km": 35793.99040842647,
+   "station": "under_geo",
+   "time": "2026-10-01T12:00:00Z"
+  },
+  {
+   "azimuth_deg": 106.69685428726827,
+   "elevation_deg": 89.98662840095736,
+   "orbit": "geo",
+   "range_km": 35777.04997591826,
+   "station": "under_geo",
+   "time": "2026-10-01T23:59:00Z"
+  }
+ ],
+ "stations": {
+  "equator": {
+   "altitude_m": 0,
+   "latitude": 0.0,
+   "longitude": 0.0
+  },
+  "ottawa": {
+   "altitude_m": 70,
+   "latitude": 45.4215,
+   "longitude": -75.6972
+  },
+  "sydney": {
+   "altitude_m": 20,
+   "latitude": -33.9,
+   "longitude": 151.2
+  },
+  "under_geo": {
+   "altitude_m": 0,
+   "latitude": 0.0176,
+   "longitude": -9.7693
+  }
+ },
+ "windows": [
+  {
+   "above_at_end": false,
+   "above_at_start": false,
+   "end": "2026-10-02T00:00:00Z",
+   "events": [
+    {
+     "elevation_deg": 10.002265905671457,
+     "event": 0,
+     "time": "2026-10-01T08:09:13.210304Z"
+    },
+    {
+     "elevation_deg": 10.890519753058651,
+     "event": 1,
+     "time": "2026-10-01T08:10:19.226039Z"
+    },
+    {
+     "elevation_deg": 9.999778048915264,
+     "event": 2,
+     "time": "2026-10-01T08:11:25.383073Z"
+    },
+    {
+     "elevation_deg": 10.00003982147712,
+     "event": 0,
+     "time": "2026-10-01T09:45:04.553842Z"
+    },
+    {
+     "elevation_deg": 63.121355160406914,
+     "event": 1,
+     "time": "2026-10-01T09:49:09.373073Z"
+    },
+    {
+     "elevation_deg": 9.999404622005198,
+     "event": 2,
+     "time": "2026-10-01T09:53:15.540517Z"
+    },
+    {
+     "elevation_deg": 10.000129005281313,
+     "event": 0,
+     "time": "2026-10-01T11:25:01.346179Z"
+    },
+    {
+     "elevation_deg": 37.87171611440133,
+     "event": 1,
+     "time": "2026-10-01T11:28:54.363503Z"
+    },
+    {
+     "elevation_deg": 9.99793931035404,
+     "event": 2,
+     "time": "2026-10-01T11:32:48.203554Z"
+    },
+    {
+     "elevation_deg": 10.000506602764695,
+     "event": 0,
+     "time": "2026-10-01T13:05:36.188441Z"
+    },
+    {
+     "elevation_deg": 28.195875870331808,
+     "event": 1,
+     "time": "2026-10-01T13:09:13.630995Z"
+    },
+    {
+     "elevation_deg": 9.99846108801613,
+     "event": 2,
+     "time": "2026-10-01T13:12:51.203583Z"
+    },
+    {
+     "elevation_deg": 10.000723342404322,
+     "event": 0,
+     "time": "2026-10-01T14:45:21.170583Z"
+    },
+    {
+     "elevation_deg": 52.34721523805212,
+     "event": 1,
+     "time": "2026-10-01T14:49:25.186077Z"
+    },
+    {
+     "elevation_deg": 9.999595305636367,
+     "event": 2,
+     "time": "2026-10-01T14:53:28.526056Z"
+    },
+    {
+     "elevation_deg": 10.00197988523998,
+     "event": 0,
+     "time": "2026-10-01T16:25:04.993206Z"
+    },
+    {
+     "elevation_deg": 35.17511868889673,
+     "event": 1,
+     "time": "2026-10-01T16:28:52.609472Z"
+    },
+    {
+     "elevation_deg": 9.999213481475119,
+     "event": 2,
+     "time": "2026-10-01T16:32:39.227314Z"
+    }
+   ],
+   "mask_deg": 10,
+   "orbit": "leo53",
+   "start": "2026-10-01T00:00:00Z",
+   "station": "ottawa"
+  },
+  {
+   "above_at_end": false,
+   "above_at_start": false,
+   "end": "2026-10-02T00:00:00Z",
+   "events": [
+    {
+     "elevation_deg": 25.017700770962133,
+     "event": 0,
+     "time": "2026-10-01T09:46:54.464330Z"
+    },
+    {
+     "elevation_deg": 63.121355160406914,
+     "event": 1,
+     "time": "2026-10-01T09:49:09.373073Z"
+    },
+    {
+     "elevation_deg": 24.995885489851897,
+     "event": 2,
+     "time": "2026-10-01T09:51:24.869421Z"
+    },
+    {
+     "elevation_deg": 25.00125468330196,
+     "event": 0,
+     "time": "2026-10-01T11:27:06.871791Z"
+    },
+    {
+     "elevation_deg": 37.87171611440133,
+     "event": 1,
+     "time": "2026-10-01T11:28:54.363503Z"
+    },
+    {
+     "elevation_deg": 24.997185674683372,
+     "event": 2,
+     "time": "2026-10-01T11:30:42.138175Z"
+    },
+    {
+     "elevation_deg": 25.000063024006348,
+     "event": 0,
+     "time": "2026-10-01T13:08:10.393559Z"
+    },
+    {
+     "elevation_deg": 28.195875870331808,
+     "event": 1,
+     "time": "2026-10-01T13:09:13.630995Z"
+    },
+    {
+     "elevation_deg": 24.9985479351746,
+     "event": 2,
+     "time": "2026-10-01T13:10:17.017213Z"
+    },
+    {
+     "elevation_deg": 25.004210552010445,
+     "event": 0,
+     "time": "2026-10-01T14:47:15.705266Z"
+    },
+    {
+     "elevation_deg": 52.34721523805212,
+     "event": 1,
+     "time": "2026-10-01T14:49:25.186077Z"
+    },
+    {
+     "elevation_deg": 24.99894811714936,
+     "event": 2,
+     "time": "2026-10-01T14:51:34.553108Z"
+    },
+    {
+     "elevation_deg": 25.003111427885685,
+     "event": 0,
+     "time": "2026-10-01T16:27:14.005300Z"
+    },
+    {
+     "elevation_deg": 35.17511868889673,
+     "event": 1,
+     "time": "2026-10-01T16:28:52.609472Z"
+    },
+    {
+     "elevation_deg": 24.986882676313883,
+     "event": 2,
+     "time": "2026-10-01T16:30:31.078904Z"
+    }
+   ],
+   "mask_deg": 25,
+   "orbit": "leo53",
+   "start": "2026-10-01T00:00:00Z",
+   "station": "ottawa"
+  },
+  {
+   "above_at_end": false,
+   "above_at_start": false,
+   "end": "2026-10-02T00:00:00Z",
+   "events": [
+    {
+     "elevation_deg": 10.019444388496801,
+     "event": 0,
+     "time": "2026-10-01T15:17:54.673726Z"
+    },
+    {
+     "elevation_deg": 64.07584717863762,
+     "event": 1,
+     "time": "2026-10-01T15:21:12.227312Z"
+    },
+    {
+     "elevation_deg": 9.999823243048851,
+     "event": 2,
+     "time": "2026-10-01T15:24:31.260028Z"
+    },
+    {
+     "elevation_deg": 10.002441600760957,
+     "event": 0,
+     "time": "2026-10-01T16:55:02.138638Z"
+    },
+    {
+     "elevation_deg": 33.95165650355343,
+     "event": 1,
+     "time": "2026-10-01T16:58:07.701622Z"
+    },
+    {
+     "elevation_deg": 9.99979571147951,
+     "event": 2,
+     "time": "2026-10-01T17:01:13.855954Z"
+    },
+    {
+     "elevation_deg": 10.000164122303776,
+     "event": 0,
+     "time": "2026-10-01T18:32:30.591084Z"
+    },
+    {
+     "elevation_deg": 27.92095216785118,
+     "event": 1,
+     "time": "2026-10-01T18:35:27.934197Z"
+    },
+    {
+     "elevation_deg": 9.997841519800465,
+     "event": 2,
+     "time": "2026-10-01T18:38:25.530579Z"
+    },
+    {
+     "elevation_deg": 10.001644450589094,
+     "event": 0,
+     "time": "2026-10-01T20:09:16.247101Z"
+    },
+    {
+     "elevation_deg": 66.98212715862032,
+     "event": 1,
+     "time": "2026-10-01T20:12:36.931911Z"
+    },
+    {
+     "elevation_deg": 9.998361020305309,
+     "event": 2,
+     "time": "2026-10-01T20:15:57.161724Z"
+    },
+    {
+     "elevation_deg": 10.001996658826478,
+     "event": 0,
+     "time": "2026-10-01T21:46:30.259392Z"
+    },
+    {
+     "elevation_deg": 20.753616011249257,
+     "event": 1,
+     "time": "2026-10-01T21:49:05.567461Z"
+    },
+    {
+     "elevation_deg": 9.997661229821949,
+     "event": 2,
+     "time": "2026-10-01T21:51:40.587783Z"
+    }
+   ],
+   "mask_deg": 10,
+   "orbit": "issish",
+   "start": "2026-10-01T00:00:00Z",
+   "station": "ottawa"
+  },
+  {
+   "above_at_end": false,
+   "above_at_start": false,
+   "end": "2026-10-02T00:00:00Z",
+   "events": [
+    {
+     "elevation_deg": 10.009056477989782,
+     "event": 0,
+     "time": "2026-10-01T11:21:50.344761Z"
+    },
+    {
+     "elevation_deg": 64.61650414919853,
+     "event": 1,
+     "time": "2026-10-01T11:25:13.028715Z"
+    },
+    {
+     "elevation_deg": 9.99740355753509,
+     "event": 2,
+     "time": "2026-10-01T11:28:37.960494Z"
+    },
+    {
+     "elevation_deg": 10.000358092048732,
+     "event": 0,
+     "time": "2026-10-01T13:01:59.289839Z"
+    },
+    {
+     "elevation_deg": 10.275105865084587,
+     "event": 1,
+     "time": "2026-10-01T13:02:32.220941Z"
+    },
+    {
+     "elevation_deg": 9.99978762268985,
+     "event": 2,
+     "time": "2026-10-01T13:03:05.416295Z"
+    },
+    {
+     "elevation_deg": 10.001421357602773,
+     "event": 0,
+     "time": "2026-10-01T17:54:08.992141Z"
+    },
+    {
+     "elevation_deg": 25.201837252547126,
+     "event": 1,
+     "time": "2026-10-01T17:57:03.756392Z"
+    },
+    {
+     "elevation_deg": 9.998792481576618,
+     "event": 2,
+     "time": "2026-10-01T17:59:56.583457Z"
+    },
+    {
+     "elevation_deg": 10.001884151314947,
+     "event": 0,
+     "time": "2026-10-01T19:30:51.425324Z"
+    },
+    {
+     "elevation_deg": 26.208768163644784,
+     "event": 1,
+     "time": "2026-10-01T19:33:45.707340Z"
+    },
+    {
+     "elevation_deg": 9.997636448922234,
+     "event": 2,
+     "time": "2026-10-01T19:36:37.875386Z"
+    }
+   ],
+   "mask_deg": 10,
+   "orbit": "issish",
+   "start": "2026-10-01T00:00:00Z",
+   "station": "sydney"
+  },
+  {
+   "above_at_end": true,
+   "above_at_start": true,
+   "end": "2026-10-02T00:00:00Z",
+   "events": [
+    {
+     "elevation_deg": 89.97310931315283,
+     "event": 1,
+     "time": "2026-10-01T08:55:23.422395Z"
+    },
+    {
+     "elevation_deg": 89.98781225560059,
+     "event": 1,
+     "time": "2026-10-01T23:31:30.394763Z"
+    }
+   ],
+   "mask_deg": 10,
+   "orbit": "geo",
+   "start": "2026-10-01T00:00:00Z",
+   "station": "under_geo"
+  },
+  {
+   "above_at_end": false,
+   "above_at_start": false,
+   "end": "2026-10-02T00:00:00Z",
+   "events": [],
+   "mask_deg": 10,
+   "orbit": "geo",
+   "start": "2026-10-01T00:00:00Z",
+   "station": "sydney"
+  }
+ ]
+}

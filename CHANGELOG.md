@@ -3,6 +3,21 @@
 Canonical human-readable version history. (The plugin manager shows the shorter `changelog=` text in `metadata.txt`; this file is the detailed record.)
 Compare any two releases: https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/compare/v1.1.4...v1.1.5
 
+## Unreleased -- Satellite geometry: explicit time, visibility windows, data-age flag, evidence export (not yet released; `metadata.txt` version unchanged)
+
+Geometry only -- no link, signal, availability or service-quality claim. Same semantics as Velorona Map's satellite analysis (see `docs/SATELLITE_GEOMETRY.md`).
+
+### Added
+- **Time, window and minimum elevation are inputs.** Analyze > Satellite now asks for the analysis time (hours from now, UTC), the window to search (1-72 h) and the minimum elevation (default 10 deg, typed Assumed). The station's own declared minimum horizon (SatNOGS) is used as the mask only if chosen, and then typed Observed.
+- **Visibility windows**: rise, time and value of maximum elevation, set, per window, with windows already open at either end reported as such; a satellite above the minimum for the whole interval (GEO-type) is reported as that, not as an invented pass.
+- **Orbital-data age and freshness** (fresh <= 3 d, stale > 14 d: an assumed convention) and the **station listing status** (a listing, not verification that a station operates).
+- **Three readings of one result** (field technician / planner / data analyst) in the Evidence view, generated from the same fields.
+- **CSV export for satellite results** (the evidence table, with the same rows and typing as the Map). Excel is not offered for satellite geometry.
+- A malformed or checksum-failing TLE is refused instead of being computed (Skyfield will parse arbitrary text into a numerically valid satellite).
+
+### Tests
+- `tests/test_satellite_geometry.py`, `tests/test_satellite_evidence.py` (QGIS-free). Look angles and window boundaries are compared with the Map's JavaScript output and an independent Skyfield reference on shared SYNTHETIC inputs (`tests/fixtures/satgeo/`). The QGIS dialog/dock path is not covered by them (needs a QGIS runtime: `tests/qgis_e2e.py`).
+
 ## 1.1.7 — UI polish (compared with 1.1.6; 1.1.6 was never published separately, so 1.1.7 also carries the 1.1.6 guided USA data setup below)
 
 ### Changed (appearance only)

@@ -101,9 +101,15 @@ CALCULATIONS: List[Calculation] = [
     Calculation("status.weather", "Weather status", "fade>=margin->CRITICAL; high->AT RISK; moderate->WATCH; low->CLEAR",
                 "predicted fade, fade margin, severity", "status", "Velorona presentation layer", "library 0.3 / 0.7 bands",
                 "Operator status for weather."),
-    Calculation("satellite.look_angles", "Satellite look angles", "SGP4 propagation, topocentric alt/az/range", "TLE, station lat/lon/altitude, now (UTC)",
-                "deg, km", "skyfield (core.engines.satellite_earth_space)", "visible if elevation >= 10 deg mask",
-                "Geometry only; not exported."),
+    Calculation("satellite.look_angles", "Satellite look angles", "SGP4 propagation, topocentric alt/az/range", "element set (TLE), station lat/lon/altitude, analysis time (UTC)",
+                "deg, km", "skyfield (core.engines.satellite_geometry)", "visible if elevation >= the minimum elevation (default 10 deg, Assumed)",
+                "Geometry only; exported as an evidence table."),
+    Calculation("satellite.windows", "Satellite visibility windows", "elevation scanned every 20 s, each crossing of the minimum elevation refined by bisection to 1 s",
+                "element set, station, analysis time, window length (1-72 h), minimum elevation", "UTC times, deg", "skyfield (core.engines.satellite_geometry)",
+                "a pass shorter than the scan step can be missed", "Geometry only; not a statement that a link is usable."),
+    Calculation("satellite.data_age", "Orbital data age", "analysis time - element-set epoch (signed, days)", "element-set epoch, analysis time", "days",
+                "core.engines.satellite_geometry.epoch_status", "fresh <= 3 d, aging <= 14 d, stale > 14 d (an assumed convention)",
+                "How far the prediction is from the element set's own epoch."),
 ]
 
 _FIELD_LIST = [
