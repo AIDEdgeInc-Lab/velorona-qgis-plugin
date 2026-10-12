@@ -58,6 +58,9 @@ Three, all reused unmodified:
   (elevation, azimuth, slant range, visibility) between a selected ground
   station and satellite.
 
+- **Many links at once** (Processing algorithm `Velorona > Terrain clearance for many Fixed Service links`, or Analyze: Terrain Clearance for Many Links) — the Terrestrial Path
+  Clearance above for every link of a layer or its selected links, one row per link with its status and reason; each row equals the single-link result. See `docs/BATCH_TERRAIN.md`.
+
 ## Status, NO DATA and where a value came from
 
 Every result has a status: **CLEAR, WATCH, AT RISK, CRITICAL or NO DATA**. NO DATA means a required input was missing or invalid (invalid

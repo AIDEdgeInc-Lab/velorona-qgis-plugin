@@ -5,6 +5,7 @@ import time
 
 from qgis.core import (
     Qgis,
+    QgsApplication,
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
     QgsLayerTreeLayer,
@@ -213,6 +214,7 @@ class VeloronaPlugin:
         self.iface = iface
         self.dock = None
         self.actions = []
+        self.processing_provider = None
         self.layer_group = None
         self.towers_layer = None
         self.cellular_layer = None
@@ -279,11 +281,19 @@ class VeloronaPlugin:
             "Select exactly one Ground/Earth Station feature and one Satellite feature.",
             self.run_satellite,
         )
+        self.action_batch_terrain = self._make_action(
+            "Analyze: Terrain Clearance for Many Links (batch)",
+            "Opens the Processing algorithm that runs Terrestrial Path Clearance for every link of a Fixed Service link layer (or its selected links), one row per link with its "
+            "status and reason. Also in the Processing Toolbox under Velorona.",
+            self.run_batch_terrain,
+        )
         self.action_show_dock = self._make_action(
             "Show Velorona Panel",
             "Reopens the Velorona Records / Results panel if it was closed.",
             self.show_panel,
         )
+
+        self._register_processing_provider()
 
         # Guard against a stale/pre-existing project: one saved before
         # PROJECT_CRS was forced to EPSG:3857, or one whose CRS was later
@@ -300,6 +310,23 @@ class VeloronaPlugin:
         QgsProject.instance().readProject.connect(self._check_stale_project_crs)
         self._project_read_connected = True
         self._check_stale_project_crs()
+
+    def _register_processing_provider(self):
+        """Velorona's Processing algorithms (Processing Toolbox, Graphical Modeler, batch mode, qgis_process). A failure here must not stop the plugin loading."""
+        try:
+            from .core.processing.provider import VeloronaProcessingProvider
+            self.processing_provider = VeloronaProcessingProvider()
+            QgsApplication.processingRegistry().addProvider(self.processing_provider)
+        except Exception as exc:
+            self.processing_provider = None
+            self.iface.messageBar().pushMessage("Velorona", f"The Velorona Processing algorithms could not be registered: {exc}", level=Qgis.MessageLevel.Warning, duration=0)
+
+    def run_batch_terrain(self):
+        if self.processing_provider is None:
+            self._warn("The Velorona Processing algorithms are not available in this session (see the message shown when Velorona loaded).")
+            return
+        from qgis import processing
+        processing.execAlgorithmDialog("velorona:terrain_clearance_batch", {})
 
     def show_panel(self):
         """Reopens the one Velorona dock. QGIS also lists it under View >
@@ -334,6 +361,9 @@ class VeloronaPlugin:
         return action
 
     def unload(self):
+        if self.processing_provider is not None:
+            QgsApplication.processingRegistry().removeProvider(self.processing_provider)
+            self.processing_provider = None
         for action in self.actions:
             self.iface.removePluginMenu(MENU_NAME, action)
             self.iface.removeToolBarIcon(action)
