@@ -18,9 +18,9 @@ Not done (needs a real QGIS to verify, so deliberately left out): the network ad
 
 What changed for the Satellites layer (the five GEO groups the plugin already used):
 - the provider is asked **at most once per group per 2 h cache window**, and not again after a failed request until its persisted back-off passes. Before: every 10 minutes, and again on every layer toggle after a failure;
-- after the first failed request in a run, no further group is requested (stop after any non-200); other groups are served from their cache or reported unavailable;
-- records are validated before use; ids keep all digits (ids above 99999 cannot be written as the TLE lines the satellite-earth-space engine re-propagates from, so they are skipped and counted, not truncated);
-- SGP4 error codes are honoured. Before, a decayed element set produced a number (a position below the surface) instead of being rejected;
+- after a failed request, **no group is requested** until the back-off passes -- within the run and on later layer toggles (the groups share one host). Other groups are served from their cache (labelled stale once older than the window) or reported unavailable, and that never writes or extends a back-off;
+- records are validated before use; ids keep all digits. Ids above 99999 have no valid TLE (exporting one gives a non-standard alpha-numeric id), so those rows carry no TLE lines and are propagated from the stored OMM record (`omm_json`), in the layer and in the satellite-earth-space engine; they are counted as `omm_only`. TLE and OMM propagation agree within 1 km in a test;
+- SGP4 error codes are honoured, in the layer and in the engine at analysis time. Before, a decayed element set produced a number (a position below the surface) instead of being rejected. (A below-surface radius check also exists; no test case reaches it without an SGP4 error, so it is not mutation-covered);
 - each row carries `retrieved_at` and `data_status` (`fresh` | `stale`), and the source text includes the retrieval time; positions are recomputed from cached elements every 10 minutes without network I/O;
 - status is stated in the QGIS message bar: fresh is silent; stale, partial, unavailable and "some element sets not shown" are reported. Nothing is substituted when the source is unavailable.
 

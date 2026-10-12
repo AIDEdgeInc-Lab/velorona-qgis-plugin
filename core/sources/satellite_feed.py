@@ -14,6 +14,7 @@ Not verified: no live CelesTrak response has been obtained in the build environm
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Callable, Dict, List, Optional, Sequence
 
@@ -25,6 +26,7 @@ USER_AGENT = "VeloronaQGIS (+https://velorona.ai)"
 TIMEOUT = (5.0, 20.0)                      # (connect, read) seconds, as before
 REFRESH_SECONDS = orbit_data.DEFAULT_TTL_S  # the cache window; the plugin must not ask the provider more often than this
 
+EARTH_RADIUS_KM = 6371.0
 LEO_MAX_ALTITUDE_KM = 2000
 GEO_PERIOD_MIN = 1436.07
 GEO_PERIOD_TOLERANCE_MIN = 30
@@ -50,6 +52,23 @@ def classify_orbit(altitude_km: float, period_minutes: float) -> str:
     return "MEO"
 
 
+def _cache_only(group: str, cache: OrbitCache, now: datetime, ttl_s: int) -> dict:
+    """What a group shows when no request may be made (a failure/back-off is in force): its cache if it has one -- fresh if still inside the window,
+    otherwise stale -- else unavailable. Never writes the cache (so it cannot extend or invent a back-off)."""
+    cached = cache.read(group)
+    has = bool(cached and cached.get("raw") is not None and orbit_data.parse_epoch_utc(cached.get("retrieved_at_utc")))
+    if not has:
+        return {"status": "unavailable", "group": group, "records": [], "reason": "not_requested",
+                "warnings": ["not requested: the source is in a back-off after an earlier failed request"]}
+    age = now.timestamp() - orbit_data.parse_epoch_utc(cached["retrieved_at_utc"]).timestamp()
+    fresh = age < ttl_s
+    out = orbit_data._result("fresh" if fresh else "stale", cached, now, {"from_cache": True})
+    if not fresh:
+        out["reason"] = "backoff"
+        out["warnings"] = ["not requested: back-off in force; showing cached data older than its refresh window"]
+    return out
+
+
 def load_groups(groups: Sequence[str], cache: OrbitCache, now: datetime, fetch: Callable[[str], FetchResult] = http_fetch,
                 ttl_s: int = REFRESH_SECONDS) -> dict:
     """Loads every group through orbit_data.load_group.
@@ -63,7 +82,11 @@ def load_groups(groups: Sequence[str], cache: OrbitCache, now: datetime, fetch: 
       partial      some groups have no data at all, the rest are usable
       unavailable  no usable record from any group
     Records are de-duplicated across groups by catalog id, newest element-set epoch wins (ties keep the first group listed)."""
-    halted = {"flag": False}
+    # One host serves every group. If ANY group is inside a back-off from an earlier failed request, no group is requested now (stop after any
+    # non-200 holds across runs and layer toggles, not just within one call).
+    t_now = now.timestamp()
+    host_blocked = any(((cache.read(g) or {}).get("not_before") or 0) > t_now for g in groups)
+    halted = {"flag": host_blocked}
 
     def guarded(url: str) -> FetchResult:
         if halted["flag"]:
@@ -76,11 +99,12 @@ def load_groups(groups: Sequence[str], cache: OrbitCache, now: datetime, fetch: 
     per_group: Dict[str, dict] = {}
     warnings: List[str] = []
     for g in groups:
-        res = orbit_data.load_group(g, guarded, cache, now, ttl_s)
+        if halted["flag"]:
+            res = _cache_only(g, cache, now, ttl_s)
+        else:
+            res = orbit_data.load_group(g, guarded, cache, now, ttl_s)
         per_group[g] = {k: res.get(k) for k in ("status", "reason", "retrieved_at_utc", "age_seconds", "from_cache", "upstream_status", "warnings")}
         per_group[g]["record_count"] = len(res.get("records") or [])
-        if res.get("reason") == "skipped":
-            per_group[g]["warnings"] = ["not requested: an earlier group failed in this run (stop after any failure)"]
         for w in per_group[g]["warnings"] or []:
             warnings.append(f"{g}: {w}")
         per_group[g]["_records"] = res.get("records") or []
@@ -107,36 +131,65 @@ def load_groups(groups: Sequence[str], cache: OrbitCache, now: datetime, fetch: 
     return {"status": overall, "records": records, "per_group": per_group, "warnings": warnings}
 
 
+def earth_satellite(line1: Optional[str], line2: Optional[str], omm_json: Optional[str], name: str, ts):
+    """A skyfield EarthSatellite from TLE lines when the row has them, otherwise from the stored OMM record. Catalog ids above 99999 have no valid
+    TLE (exporting one yields a non-standard alpha-numeric id), so those rows carry only the OMM record and are propagated from it."""
+    from sgp4 import omm
+    from sgp4.api import Satrec
+    from skyfield.api import EarthSatellite
+    if line1 and line2:
+        return EarthSatellite(line1, line2, name, ts)
+    if omm_json:
+        satrec = Satrec()
+        omm.initialize(satrec, json.loads(omm_json))
+        sat = EarthSatellite.from_satrec(satrec, ts)
+        sat.name = name
+        return sat
+    raise ValueError("no orbital elements on this record")
+
+
+def ensure_propagates(sat, when: datetime) -> None:
+    """Raises ValueError if SGP4 reports an error at `when` (e.g. decayed). skyfield would otherwise return a number."""
+    from sgp4.api import jday
+    u = when.astimezone(timezone.utc)
+    jd, fr = jday(u.year, u.month, u.day, u.hour, u.minute, u.second + u.microsecond / 1e6)
+    code, pos, _vel = sat.model.sgp4(jd, fr)
+    if code != 0:
+        raise ValueError(f"orbital elements cannot be propagated at this time (SGP4 error {code})")
+    if (pos[0] ** 2 + pos[1] ** 2 + pos[2] ** 2) ** 0.5 < EARTH_RADIUS_KM:
+        raise ValueError("orbital elements place the satellite below the Earth's surface at this time")
+
+
 def build_rows(records: Sequence[dict], when: Optional[datetime] = None, source_label: str = orbit_data.SOURCE_NAME) -> dict:
     """Layer rows (the shape space_public.SATELLITE_FIELDS expects) computed with SGP4 from validated OMM records.
 
-    A record that cannot be propagated, or whose catalog id does not fit the TLE lines the satellite-earth-space engine re-propagates from, is skipped
-    and counted -- never silently kept with invented values. Returns {rows, skipped: {propagation_failed, beyond_legacy_tle}}."""
+    Every row carries its OMM record (`omm_json`). TLE lines are added only for catalog ids up to 99999; larger ids have no valid TLE, so the row has
+    no TLE lines and is propagated from the OMM record (counted as `omm_only`). A record SGP4 cannot propagate at `when` (error code, NaN, or below the
+    surface) is skipped and counted -- never kept with invented values. Returns {rows, skipped: {propagation_failed}, omm_only}."""
     from sgp4 import exporter, omm
-    from sgp4.api import Satrec, jday
-    from skyfield.api import EarthSatellite, load
+    from sgp4.api import Satrec
+    from skyfield.api import load
     ts = load.timescale()
     when = when or datetime.now(timezone.utc)
     t = ts.from_datetime(when)
-    utc = when.astimezone(timezone.utc)
-    jd, fr = jday(utc.year, utc.month, utc.day, utc.hour, utc.minute, utc.second + utc.microsecond / 1e6)
     rows: List[dict] = []
-    skipped = {"propagation_failed": 0, "beyond_legacy_tle": 0}
+    skipped = {"propagation_failed": 0}
+    omm_only = 0
     for rec in records:
-        if not rec.get("legacy_tle_compatible"):
-            skipped["beyond_legacy_tle"] += 1
-            continue
         try:
-            satrec = Satrec()
-            omm.initialize(satrec, rec["gp"])
-            line1, line2 = exporter.export_tle(satrec)
+            # sgp4's OMM reader wants a naive ISO epoch; use the epoch our own validation parsed (UTC) rather than the provider's spelling.
+            gp = {**rec["gp"], "EPOCH": rec["orbit_epoch_utc"].rstrip("Zz")}
+            line1 = line2 = None
+            if rec.get("legacy_tle_compatible"):
+                satrec = Satrec()
+                omm.initialize(satrec, gp)
+                line1, line2 = exporter.export_tle(satrec)
+            omm_json = json.dumps(gp, separators=(",", ":"), sort_keys=True)
             name = rec.get("satellite_name") or f"NORAD {rec['satellite_id_text']}"
-            if satrec.sgp4(jd, fr)[0] != 0:               # SGP4's own error code (e.g. 6 = decayed): skyfield would still return a number
-                skipped["propagation_failed"] += 1
-                continue
-            sat = EarthSatellite.from_satrec(satrec, ts)
+            sat = earth_satellite(line1, line2, omm_json, name, ts)
+            ensure_propagates(sat, when)
             sub = sat.at(t).subpoint()
-            period = (2 * 3.141592653589793) / satrec.no_kozai
+            period = (2 * 3.141592653589793) / sat.model.no_kozai
         except (ValueError, KeyError, TypeError, ZeroDivisionError):
             skipped["propagation_failed"] += 1
             continue
@@ -145,6 +198,8 @@ def build_rows(records: Sequence[dict], when: Optional[datetime] = None, source_
         if not (lat == lat and lon == lon and alt == alt) or alt < 0:   # NaN or below the surface: not a valid position
             skipped["propagation_failed"] += 1
             continue
+        if line1 is None:
+            omm_only += 1
         rows.append({
             "id": f"sat-{rec['satellite_id_text']}", "latitude": lat, "longitude": lon, "altitude_km": alt,
             "norad_cat_id": rec["satellite_id_text"], "name": name,
@@ -154,6 +209,6 @@ def build_rows(records: Sequence[dict], when: Optional[datetime] = None, source_
             "retrieved_at": rec.get("retrieved_at_utc"), "data_status": rec.get("data_status", "fresh"),
             "coverage": "CelesTrak GP element sets, cached up to 2 hours; positions recomputed locally with SGP4 at the time shown. "
                         "Element-set age is the difference between that time and the epoch.",
-            "tle_line1": line1, "tle_line2": line2,
+            "tle_line1": line1, "tle_line2": line2, "omm_json": omm_json,
         })
-    return {"rows": rows, "skipped": skipped}
+    return {"rows": rows, "skipped": skipped, "omm_only": omm_only}

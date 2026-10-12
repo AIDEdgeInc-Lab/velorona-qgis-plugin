@@ -55,6 +55,8 @@ SATELLITE_FIELDS = [
     # feature, without needing a separate in-memory cache tied to session
     # state.
     ("tle_line1", QVariant.String), ("tle_line2", QVariant.String),
+    # the validated OMM record (JSON). Rows with a catalog id above 99999 have no valid TLE, so the analysis engine propagates from this instead.
+    ("omm_json", QVariant.String),
 ]
 
 GROUND_STATION_FIELDS = [

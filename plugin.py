@@ -936,7 +936,7 @@ class VeloronaPlugin:
         self._satellites_fetched_at = now
         status = feed["status"]
         detail = "; ".join(feed["warnings"][:3])
-        skipped = sum(built["skipped"].values())
+        skipped = built["skipped"]["propagation_failed"]
         if status == "fresh" and rows:
             pass
         elif status == "unavailable" or not rows:
@@ -950,7 +950,7 @@ class VeloronaPlugin:
                 bar.pushMessage("Velorona", f"Satellite data is {label}.", Qgis.MessageLevel.Warning, 8)
             self._warn(f"Satellites: {label}. {detail}")
         if skipped:
-            self._warn(f"{skipped} element set(s) were not shown (could not be propagated, or catalog id has more than 5 digits).")
+            self._warn(f"{skipped} element set(s) were not shown (SGP4 could not propagate them to this time).")
         if self.dock is not None:
             self.dock.records.refresh_current()
 
