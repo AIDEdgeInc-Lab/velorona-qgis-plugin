@@ -1,0 +1,29 @@
+# Finds out whether a real QGIS 4.x runtime is available on a GitHub-hosted runner (the plugin needs QGIS >= 4.0; see metadata.txt).
+# Experiment only: runs when this file changes on the probe branch; prints versions; publishes nothing.
+name: QGIS runtime probe
+on:
+  push:
+    branches: [claude/qgis-runtime-probe]
+    paths: [".github/workflows/qgis-runtime-probe.yml"]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Which QGIS docker tags exist
+        run: |
+          for t in latest ltr stable release-4_0 release-4_2 release-4_4 4.0 4.2 4.4 master; do
+            if docker manifest inspect qgis/qgis:$t >/dev/null 2>&1; then echo "EXISTS qgis/qgis:$t"; else echo "missing qgis/qgis:$t"; fi
+          done
+      - name: QGIS version in the candidate images
+        run: |
+          for t in latest release-4_0 4.0 master; do
+            if docker manifest inspect qgis/qgis:$t >/dev/null 2>&1; then
+              echo "== qgis/qgis:$t"; docker run --rm qgis/qgis:$t python3 -c "from qgis.core import Qgis; import sys; print('QGIS', Qgis.version(), 'python', sys.version.split()[0])" || true
+            fi
+          done
+      - name: apt candidates
+        run: |
+          sudo apt-get update -qq >/dev/null 2>&1; apt-cache policy qgis python3-qgis 2>/dev/null | head -12
