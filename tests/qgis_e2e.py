@@ -2130,6 +2130,19 @@ print("\n== 28. satellite fetch: status message on the map's own message bar =="
 # reverting to blank on failure. plugin.py:_populate_satellites is the only
 # thing touched; Ground/Earth Stations, colours, filter, export and CRS are
 # untouched by this pass.
+import threading as _th28  # noqa: E402
+
+
+def _wait_sat_task(timeout=60):
+    """The load runs in a QgsTask worker thread; its result is applied in the GUI thread when the event loop runs."""
+    t0 = time.monotonic()
+    while plugin._satellites_task is not None and time.monotonic() - t0 < timeout:
+        qgs.processEvents()
+        time.sleep(0.02)
+    qgs.processEvents()
+    return plugin._satellites_task is None
+
+
 _mb_calls = []
 _real_push = plugin.iface.messageBar().pushMessage
 _real_pop = plugin.iface.messageBar().popWidget
@@ -2173,9 +2186,11 @@ try:
     _NO_FEED = {"status": "unavailable", "records": [], "per_group": {}, "warnings": ["geo: source refused the request (HTTP 403)"]}
     _sf28.build_rows = lambda records, when=None, **k: {"rows": _ONE_ROWS if records else [], "skipped": {"propagation_failed": 0, "beyond_legacy_tle": 0}}
 
+    _gate = _th28.Event()
+
     def _feed_probe(*a, **kw):
-        _mid_call["visible"] = plugin.iface.messageBar().isVisible()
-        _mid_call["pushed_before_call"] = any(c[0] == "push" for c in _mb_calls)
+        _mid_call["on_gui_thread"] = _th28.current_thread() is _th28.main_thread()
+        _gate.wait(10)                       # hold the worker until the test has looked at the GUI
         return _ONE_FEED
 
     _sf28.load_groups = _feed_probe
@@ -2184,15 +2199,18 @@ try:
     _mb_calls.clear()
     _sat_node28.setItemVisibilityChecked(False)
     qgs.processEvents()
+    _t_toggle = time.monotonic()
     _sat_node28.setItemVisibilityChecked(True)
     qgs.processEvents()
-
-    check("the status message is pushed and visible BEFORE the blocking fetch starts",
-          _mid_call.get("pushed_before_call") is True and _mid_call.get("visible") is True)
-    _connecting_calls = [c for c in _mb_calls if c[0] == "push"
-                         and "Loading satellite data" in str(c[1])]
-    check("the in-progress message is plain and honest, not a bare 'Loading...'",
-          len(_connecting_calls) == 1)
+    _toggle_seconds = time.monotonic() - _t_toggle
+    check("the layer toggle returns at once while the load is still running (the GUI thread is not blocked)",
+          plugin._satellites_task is not None and _toggle_seconds < 1.5, f"{_toggle_seconds:.2f}s, task running={plugin._satellites_task is not None}")
+    _connecting_calls = [c for c in _mb_calls if c[0] == "push" and "Loading satellite data" in str(c[1])]
+    check("the in-progress message is pushed while the worker is still running", len(_connecting_calls) == 1, str(_mb_calls))
+    _gate.set()
+    check("the load finishes", _wait_sat_task())
+    check("the retrieval ran in a worker thread, not the GUI thread", _mid_call.get("on_gui_thread") is False, str(_mid_call))
+    check("the layer was filled when the task finished", _sat_layer28.featureCount() == len(_ONE_ROWS), str(_sat_layer28.featureCount()))
 
     # -- Case 2: fetch succeeds -> message is cleared, nothing lingers -------
     _sf28.load_groups = lambda *a, **k: _ONE_FEED
@@ -2203,6 +2221,7 @@ try:
     qgs.processEvents()
     _sat_node28.setItemVisibilityChecked(True)
     qgs.processEvents()
+    _wait_sat_task()
 
     check("a successful fetch pops the in-progress message (cleanup happens)",
           any(c[0] == "pop" for c in _mb_calls))
@@ -2223,6 +2242,7 @@ try:
     qgs.processEvents()
     _sat_node28.setItemVisibilityChecked(True)
     qgs.processEvents()
+    _wait_sat_task()
 
     _failure_pushes = [c for c in _mb_calls if c[0] == "push"
                        and "unavailable" in str(c[1]).lower()]
@@ -2249,6 +2269,7 @@ try:
     qgs.processEvents()
     _sat_node28.setItemVisibilityChecked(True)
     qgs.processEvents()
+    _wait_sat_task()
 
     _exc_pushes = [c for c in _mb_calls if c[0] == "push"
                   and "unavailable" in str(c[1]).lower()]

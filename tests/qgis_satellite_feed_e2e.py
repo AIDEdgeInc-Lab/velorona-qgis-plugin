@@ -10,6 +10,7 @@ with its TLE fields cleared (the real GEO groups currently contain no catalog id
 
 import json
 import math
+import threading
 import os
 import shutil
 import sys
@@ -115,11 +116,34 @@ names = [f.name() for f in sat_layer.fields()]
 check("layer has the provenance and OMM fields", all(n in names for n in ("retrieved_at", "data_status", "omm_json", "tle_epoch", "norad_cat_id")), str(names))
 
 
+def wait_task(timeout=90):
+    """The load runs in a QgsTask worker thread; its result is applied in the GUI thread when the event loop runs."""
+    t0 = time.monotonic()
+    while plugin._satellites_task is not None and time.monotonic() - t0 < timeout:
+        qgs.processEvents()
+        time.sleep(0.02)
+    qgs.processEvents()
+    return plugin._satellites_task is None
+
+
+worker_on_gui_thread = []
+_orig_load = satellite_feed.load_groups
+
+
+def _spy_load(*a, **k):
+    worker_on_gui_thread.append(threading.current_thread() is threading.main_thread())
+    return _orig_load(*a, **k)
+
+
+satellite_feed.load_groups = _spy_load
+
+
 def toggle_on():
     plugin._satellites_fetched_at = None
-    node.setItemVisibilityChecked(False); qgs.processEvents()
+    node.setItemVisibilityChecked(False); qgs.processEvents(); wait_task()
     pushes.clear(); warnings.clear()
     node.setItemVisibilityChecked(True); qgs.processEvents()
+    return wait_task()
 
 
 print("\n== 2. REAL cached records -> layer (no network allowed) ==")
@@ -130,6 +154,7 @@ check("real records populate the layer without any request (cache hit)", n > 100
 feats = list(sat_layer.getFeatures())
 f0 = feats[0]
 ids = [str(f["norad_cat_id"]) for f in feats]
+check("the load ran in a worker thread, not the GUI thread", worker_on_gui_thread and not any(worker_on_gui_thread), str(worker_on_gui_thread))
 check("catalog ids are kept as full text and are unique", len(ids) == len(set(ids)) and all(i.isdigit() for i in ids), ids[:3])
 check("every feature carries retrieval time, status and the OMM record", all(f["retrieved_at"] and f["data_status"] == "fresh" and json.loads(f["omm_json"])["NORAD_CAT_ID"] for f in feats))
 check("positions are finite and on Earth", all(abs(f.geometry().asPoint().y()) <= 90 and abs(f.geometry().asPoint().x()) <= 180 for f in feats))
@@ -201,6 +226,35 @@ for _ in range(3):
 check("three more toggles make no further request (back-off)", len(calls) == 1, f"{len(calls)}")
 files = sorted(os.listdir(tmp))
 check("the back-off is on disk (survives a restart)", any(json.load(open(os.path.join(tmp, f))).get("not_before") for f in files if f.startswith("orbit_")), str(files))
+
+print("\n== 7b. a SLOW source (FAKE 3 s answer) does not block the GUI ==")
+tmp3 = tempfile.mkdtemp()
+active_cache["dir"] = tmp3
+slow_calls = []
+
+
+def slow_source(url, **k):
+    if not _is_source(url):
+        return real_get(url, **k)
+    slow_calls.append(url)
+    time.sleep(3)
+    return FakeResp(503)
+
+
+requests.get = slow_source
+plugin._satellites_fetched_at = None
+node.setItemVisibilityChecked(False); qgs.processEvents(); wait_task()
+t0 = time.monotonic()
+node.setItemVisibilityChecked(True); qgs.processEvents()
+dt = time.monotonic() - t0
+running = plugin._satellites_task is not None
+ticks = 0
+t1 = time.monotonic()
+while plugin._satellites_task is not None and time.monotonic() - t1 < 30:
+    qgs.processEvents(); ticks += 1; time.sleep(0.01)
+check("the toggle returned immediately and the task was running", dt < 1.0 and running, f"{dt:.2f}s, running={running}")
+check("the event loop kept turning during the 3 s request (GUI responsive)", ticks > 50, f"{ticks} iterations")
+check("the slow failure ended as unavailable with one request", sat_layer.featureCount() == 0 and len(slow_calls) == 1, f"{len(slow_calls)}")
 
 print("\n== 8. stale cache + source down (FAKE answer): stale rows, labelled ==")
 tmp2 = tempfile.mkdtemp()

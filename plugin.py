@@ -11,8 +11,10 @@ from qgis.core import (
     QgsLayerTreeLayer,
     QgsMapBoxGlStyleConverter,
     QgsPointClusterRenderer,
+    QgsApplication,
     QgsSingleSymbolRenderer,
     QgsProject,
+    QgsTask,
     QgsRectangle,
     QgsVectorTileLayer,
 )
@@ -238,6 +240,7 @@ class VeloronaPlugin:
         self._selecting_from_table = False
         self.satellites_layer = None
         self._satellites_fetched_at = None
+        self._satellites_task = None           # the running QgsTask that loads satellite data (None when idle)
         self._endpoint_index = {}
         self._usa_provider = None
         self.network_context_layer = None
@@ -350,6 +353,8 @@ class VeloronaPlugin:
         if self._project_read_connected:
             self._safe_disconnect(QgsProject.instance().readProject, self._check_stale_project_crs)
             self._project_read_connected = False
+        if self._satellites_task is not None:
+            self._satellites_task.cancel()      # the worker checks this between requests; its result is ignored once the layer is gone
         self._viewport_cache.clear()
         self._link_weather_cache.clear()
         self._remove_evidence_layers()
@@ -899,41 +904,49 @@ class VeloronaPlugin:
         return satellite_feed.OrbitCache(os.path.join(QgsApplication.qgisSettingsDirPath(), "velorona", "orbit_cache"))
 
     def _populate_satellites(self):
-        """Loads CelesTrak element sets through the validated feed (core/sources/satellite_feed.py) and propagates sub-points, once the Satellites
-        layer is actually visible. Positions are recomputed from cached elements at most every SATELLITE_REFRESH_SECONDS; the PROVIDER is asked at most
-        once per group per cache window (2 h), and not again after a failed request until its back-off (persisted on disk) has passed -- so
-        switching the layer off and on cannot re-hit a source that just refused.
-
-        The network call is still synchronous on this thread (bounded: 5 s connect / 20 s read per group, and no further group after a failure). A
-        cache hit does no network I/O. The status is always stated: fresh data is silent; stale, partial and unavailable are reported in the QGIS
-        message bar; nothing is ever invented to fill the layer."""
-        if self.satellites_layer is None:
+        """Starts loading CelesTrak element sets through the validated feed (core/sources/satellite_feed.py), once the Satellites layer is actually
+        visible. The network I/O and SGP4 run in a QgsTask WORKER thread (nothing QGIS-related is touched there); the layer, the message bar and the
+        warnings are updated in the GUI thread when the task finishes (_satellites_loaded). Only one load runs at a time. Positions are recomputed from
+        cached elements at most every SATELLITE_REFRESH_SECONDS; the PROVIDER is asked at most once per group per cache window (2 h), and not again
+        after a failed request until its back-off (persisted on disk) has passed -- so switching the layer off and on cannot re-hit a source that just
+        refused. The status is always stated: fresh data is silent; stale, partial and unavailable are reported in the message bar; nothing is ever
+        invented to fill the layer."""
+        if self.satellites_layer is None or self._satellites_task is not None:
             return
         now = time.monotonic()
         if self._satellites_fetched_at is not None and now - self._satellites_fetched_at < SATELLITE_REFRESH_SECONDS:
             return
         bar = self.iface.messageBar()
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         if bar is not None:
             bar.pushMessage("Velorona", "Loading satellite data...", Qgis.MessageLevel.Info, 0)
-        QApplication.processEvents()  # paint the busy cursor and the message before a possible blocking fetch
-        try:
+        cache = self._orbit_cache()                 # resolved here, in the GUI thread
+
+        def work(task):
             when = datetime.now(timezone.utc)
-            feed = satellite_feed.load_groups(satellite_feed.GEO_GROUPS, self._orbit_cache(), when)
-            built = satellite_feed.build_rows(feed["records"], when)
-        except Exception as exc:
-            if bar is not None:
-                bar.popWidget()
-                bar.pushMessage("Velorona", "Satellite data unavailable.", Qgis.MessageLevel.Warning, 8)
-            self._warn(f"Satellites (CelesTrak) unavailable right now: {exc}")
-            return
-        finally:
-            QApplication.restoreOverrideCursor()
+            feed = satellite_feed.load_groups(satellite_feed.GEO_GROUPS, cache, when, cancelled=task.isCanceled)
+            return {"feed": feed, "built": satellite_feed.build_rows(feed["records"], when), "started": now}
+
+        task = QgsTask.fromFunction("Velorona: satellite data", work, on_finished=self._satellites_loaded)
+        self._satellites_task = task
+        QgsApplication.taskManager().addTask(task)
+
+    def _satellites_loaded(self, exception, result=None):
+        """GUI thread: applies what the worker produced."""
+        self._satellites_task = None
+        bar = self.iface.messageBar()
         if bar is not None:
             bar.popWidget()
+        if self.satellites_layer is None:           # the plugin was unloaded while the task ran
+            return
+        if exception is not None or not result:
+            if bar is not None:
+                bar.pushMessage("Velorona", "Satellite data unavailable.", Qgis.MessageLevel.Warning, 8)
+            self._warn(f"Satellites (CelesTrak) unavailable right now: {exception or 'cancelled'}")
+            return
+        feed, built = result["feed"], result["built"]
         rows = built["rows"]
         layer_helpers.replace_point_features(self.satellites_layer, rows, space_public.SATELLITE_FIELDS)
-        self._satellites_fetched_at = now
+        self._satellites_fetched_at = result["started"]
         status = feed["status"]
         detail = "; ".join(feed["warnings"][:3])
         skipped = built["skipped"]["propagation_failed"]
