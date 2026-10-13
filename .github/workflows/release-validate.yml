@@ -12,6 +12,10 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+  # The workflow tests itself: a change to this file runs a dry validation of the current commit on the PR
+  # (no tag, so the tag check is skipped; everything else runs).
+  pull_request:
+    paths: [".github/workflows/release-validate.yml"]
 
 permissions:
   contents: read
