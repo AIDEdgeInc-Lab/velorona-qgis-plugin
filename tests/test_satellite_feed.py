@@ -302,3 +302,13 @@ def test_engine_reports_missing_elements(monkeypatch):
     engine = _engine(monkeypatch)
     with pytest.raises(ValueError, match="no orbital elements"):
         engine.analyze((None, _Feat({"name": "S", "id": "s"})), (None, _Feat({"name": "X", "id": "y"})))
+
+
+def test_cancelled_load_makes_no_request_and_serves_the_cache(tmp_path):
+    f = Fake({"geo": [synth(90001)], "intelsat": [synth(90002)]})
+    sf.load_groups(["geo", "intelsat"], cache(tmp_path), NOW, f)
+    f.calls.clear()
+    later = NOW + timedelta(seconds=sf.REFRESH_SECONDS + 5)
+    r = sf.load_groups(["geo", "intelsat"], cache(tmp_path), later, f, cancelled=lambda: True)
+    assert f.calls == [], "a cancelled load must not touch the network"
+    assert r["status"] == "stale" and len(r["records"]) == 2

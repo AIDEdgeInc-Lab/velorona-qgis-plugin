@@ -70,7 +70,7 @@ def _cache_only(group: str, cache: OrbitCache, now: datetime, ttl_s: int) -> dic
 
 
 def load_groups(groups: Sequence[str], cache: OrbitCache, now: datetime, fetch: Callable[[str], FetchResult] = http_fetch,
-                ttl_s: int = REFRESH_SECONDS) -> dict:
+                ttl_s: int = REFRESH_SECONDS, cancelled: Optional[Callable[[], bool]] = None) -> dict:
     """Loads every group through orbit_data.load_group.
 
     After the first group whose request FAILED (no response, or a non-200), no further request is made in this run: the provider's policy is to stop after
@@ -89,6 +89,8 @@ def load_groups(groups: Sequence[str], cache: OrbitCache, now: datetime, fetch: 
     halted = {"flag": host_blocked}
 
     def guarded(url: str) -> FetchResult:
+        if cancelled is not None and cancelled():
+            halted["flag"] = True                # a cancelled load makes no further request; groups fall back to their cache
         if halted["flag"]:
             return FetchResult(status=None, error="skipped")
         r = fetch(url)
@@ -99,6 +101,8 @@ def load_groups(groups: Sequence[str], cache: OrbitCache, now: datetime, fetch: 
     per_group: Dict[str, dict] = {}
     warnings: List[str] = []
     for g in groups:
+        if cancelled is not None and cancelled():
+            halted["flag"] = True
         if halted["flag"]:
             res = _cache_only(g, cache, now, ttl_s)
         else:
