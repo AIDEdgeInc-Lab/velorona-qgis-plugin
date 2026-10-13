@@ -96,7 +96,7 @@ jobs:
         run: |
           mkdir -p "$VELORONA_TEST_PROFILE/python/plugins"
           python3 -c "import zipfile,glob; zipfile.ZipFile(glob.glob('rc/velorona-*.zip')[0]).extractall('$VELORONA_TEST_PROFILE/python/plugins')"
-          ls "$VELORONA_TEST_PROFILE/python/plugins/velorona" | head
+          find "$VELORONA_TEST_PROFILE/python/plugins/velorona" -maxdepth 1 | head
       - name: Runtime dependencies next to the QGIS bindings
         run: |
           python3 -m venv --system-site-packages "$RUNNER_TEMP/venv"
