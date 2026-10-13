@@ -102,5 +102,7 @@ jobs:
           python3 -m venv --system-site-packages "$RUNNER_TEMP/venv"
           "$RUNNER_TEMP/venv/bin/pip" install -r src/requirements-dev.txt
       - name: Whole workflow from the installed copy
+        # run_qgis_suite.py tolerates ONLY an abort at shutdown after a complete N/N pass (QGIS 4.0.3 exitQgis teardown),
+        # with a visible warning; any failed or missing assertion still fails the job.
         run: |
-          "$RUNNER_TEMP/venv/bin/python" src/tests/clean_install_smoke.py
+          "$RUNNER_TEMP/venv/bin/python" src/tools/run_qgis_suite.py src/tests/clean_install_smoke.py

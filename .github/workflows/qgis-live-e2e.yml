@@ -34,4 +34,4 @@ jobs:
           "$RUNNER_TEMP/venv/bin/pip" install -r velorona/requirements-dev.txt
       - name: Full end-to-end (live services)
         run: |
-          "$RUNNER_TEMP/venv/bin/python" velorona/tests/qgis_e2e.py
+          "$RUNNER_TEMP/venv/bin/python" velorona/tools/run_qgis_suite.py velorona/tests/qgis_e2e.py

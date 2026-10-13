@@ -22,6 +22,14 @@ Three stages, each with its own workflow. Tests are adapted to what this project
 - **Manual by design:** uploading the verified zip to plugins.qgis.org (needs the maintainer's OSGeo account). After
   upload, `published-verify.yml` is the evidence that users get the right package.
 
+## Known runtime quirk: QGIS 4.0.3 aborts at shutdown
+
+`tests/clean_install_smoke.py` (and `qgis_e2e.py`) end with `qgs.exitQgis()`. On QGIS **4.0.3** (the declared minimum)
+the process aborts there (`std::bad_alloc`, exit 134) *after* printing `36/36 passed`; 4.2 exits cleanly. Reproduced
+2 of 2 on GitHub runners. `tools/run_qgis_suite.py` tolerates exactly this case (complete N/N pass + abort signal, no
+failure lines) with a `::warning::`, and nothing else. Cause is not yet established (hypothesis: widgets still alive at
+`exitQgis()`). Remove the tolerance once the harness or QGIS no longer aborts.
+
 ## Run the same checks locally
 
 ```sh
