@@ -1,0 +1,37 @@
+# Weekly, advisory: the full QGIS end-to-end suite, which calls live public services (elevation, weather, CelesTrak).
+# A failure here is classified by reading the log: a provider outage/rate limit is EXTERNAL, an assertion on our own
+# output is a DEFECT. It never blocks a merge. Weekly (not nightly) to respect provider rate limits (CelesTrak in particular).
+name: QGIS live-service E2E
+
+on:
+  schedule:
+    - cron: "43 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: QGIS ${{ matrix.qgis }} full E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        qgis: ["4.0", "4.2"]
+    container:
+      image: qgis/qgis:${{ matrix.qgis }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: velorona
+          persist-credentials: false
+      - run: |
+          python3 -m venv --system-site-packages "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -r velorona/requirements-dev.txt
+      - name: Full end-to-end (live services)
+        run: |
+          "$RUNNER_TEMP/venv/bin/python" velorona/tests/qgis_e2e.py
