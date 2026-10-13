@@ -65,8 +65,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          # shellcheck disable=SC2016  # the backticks are literal Markdown fences
           title="Published plugin verification failing"
+          # shellcheck disable=SC2016  # the backticks are literal Markdown fences
           body="$(printf 'The scheduled verification of the published Velorona plugin failed.\n\nRun: %s\n\n```\n%s\n```\n' "$RUN_URL" "$(tail -n 30 verify.log)")"
           n="$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')"
           if [ -n "$n" ]; then gh issue comment "$n" --body "$body"; else gh issue create --title "$title" --body "$body"; fi
