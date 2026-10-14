@@ -1,4 +1,5 @@
-# (run 3: final commit)
+# Final-commit verification: this branch is main plus the two probe workflows, so the code under test is main's. Also runnable by hand (workflow_dispatch) so
+# it can be repeated when the source is reachable; leave at least an hour between runs (the provider's one-request-per-hour guidance). A source timeout fails the job.
 # Real-source + real-QGIS verification on a GitHub-hosted runner (the build sandbox can reach neither). Runs ONLY when this file, the probe script or the
 # test files change on the probe branch, so it cannot re-request the source on every push. Source requests: 5 (one per GEO group), made once by the
 # probe; every later step reads that cache or is blocked from the source. Publishes and deploys nothing.
@@ -8,6 +9,7 @@
 #   4. full e2e     tests/qgis_e2e.py           existing end-to-end suite, with the orbital source blocked (so it cannot send a second set of requests)
 name: Live orbit probe + real QGIS runtime
 on:
+  workflow_dispatch:
   push:
     branches: [claude/qgis-live-probe]
     paths: [".github/workflows/live-orbit-probe.yml", "tools/live_orbit_probe.py", "tests/qgis_satellite_feed_e2e.py"]
