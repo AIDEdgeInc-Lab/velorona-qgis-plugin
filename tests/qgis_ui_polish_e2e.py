@@ -181,6 +181,33 @@ check("operator hint states operators and records", "2 operator" in hint and "6 
 check("first operator item has no count that could contradict the footer", tbl.licensee_combo.itemText(0) == "All operators")
 check("controls have accessible names", all(w.accessibleName() for w in (tbl.licensee_combo, tbl.search_edit, tbl.columns_button, tbl.dataset_combo)))
 
+print("== Records columns at a default-sized dock ==")
+long_links = [{"authorization_number": f"0111426{i:02d}-001", "licensee": "Rogers Communications Canada Inc.", "frequencies_mhz": "6000, 6100",
+               "in_service_date": "2020", "source": "ISED Spectrum Management long source name",
+               "site_a": {"latitude": 43.00955, "longitude": -81.15257}, "site_b": {"latitude": 43.03392, "longitude": -81.16067}} for i in range(8)]
+ll2 = L.build_link_layer("l2", long_links, specs, "#5BC0BE")
+L.mark_velorona_owned(ll2)
+wide = VeloronaRecordsTable()
+wide.resize(530, 600)           # about the viewport of the default dock on a 1500 px window
+wide.show()
+wide.set_layers({L.SOURCE_FIXED_LINKS: ll2})
+QApplication.processEvents()
+hh = wide.view.horizontalHeader()
+names2 = wide._column_names()
+ia, ib = names2.index("Site A"), names2.index("Site B")
+vw = wide.view.viewport().width()
+check("Site A and Site B (coordinates) lie fully inside the view", hh.sectionPosition(ib) + hh.sectionSize(ib) <= vw,
+      f"B ends at {hh.sectionPosition(ib) + hh.sectionSize(ib)} of {vw}")
+check("a coordinate column is wide enough for its longest value",
+      all(hh.sectionSize(i) >= wide.view.fontMetrics().horizontalAdvance("43.00955, -81.15257") for i in (ia, ib)))
+check("text columns keep at least the squeeze floor", all(hh.sectionSize(i) >= wide.COLUMN_SQUEEZE_FLOOR for i in range(2)))
+check("an elided cell still carries its full value as a tooltip",
+      wide.proxy.index(0, 1).data(Qt.ItemDataRole.ToolTipRole) == "Rogers Communications Canada Inc.")
+wide.view.setColumnWidth(0, 300)
+wide.resize(560, 600)
+QApplication.processEvents()
+check("a column the user sized by hand is not refitted on the next resize", hh.sectionSize(0) == 300, hh.sectionSize(0))
+
 passed = sum(1 for _, ok, _ in RESULTS if ok)
 print(f"\n===== {passed}/{len(RESULTS)} checks passed =====")
 sys.exit(0 if passed == len(RESULTS) else 1)

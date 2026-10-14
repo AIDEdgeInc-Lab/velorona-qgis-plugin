@@ -197,7 +197,7 @@ VIEWPORT_REFRESH_DEBOUNCE_MS = 400
 # The map stays the primary workspace: the investigation dock opens at roughly
 # a third of the window, never below a readable width, and never wide enough to
 # dominate the map. The user can still resize it by dragging the splitter.
-DOCK_WIDTH_FRACTION = 0.32
+DOCK_WIDTH_FRACTION = 0.37
 DOCK_MIN_WIDTH_PX = 340
 DOCK_MAX_WIDTH_PX = 760
 

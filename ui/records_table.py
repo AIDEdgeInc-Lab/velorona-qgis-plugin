@@ -309,6 +309,9 @@ class VeloronaRecordsTable(QWidget):
         self.view.verticalHeader().setVisible(False)
         self.view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.view.horizontalHeader().setStretchLastSection(True)
+        self._fitting = False
+        self._user_sized_columns = False
+        self.view.horizontalHeader().sectionResized.connect(self._on_section_resized)
         # Measure only a sample of rows when sizing columns; measuring all
         # 24k rows would make every dataset switch visibly slow.
         self.view.horizontalHeader().setResizeContentsPrecision(40)
@@ -359,6 +362,7 @@ class VeloronaRecordsTable(QWidget):
             return
         self._current_key = key
         self.model.load(self._layers.get(key), key)
+        self._user_sized_columns = False        # a different dataset has different columns: fit afresh
         self._fit_columns()
         self._apply_column_visibility()
         self._update_status()
@@ -367,23 +371,48 @@ class VeloronaRecordsTable(QWidget):
         # Service sites, Fixed Service links and Cellular sites all filter
         # together, see plugin.set_licensee_filter), not a per-tab control.
 
+    # Narrowest a text column may be squeezed to in a narrow dock; its full value stays in the cell tooltip.
+    COLUMN_SQUEEZE_FLOOR = 108
+
     def _fit_columns(self) -> None:
-        """Content-fit every column, then keep each between a readable minimum and a cap. resizeColumnsToContents()
-        alone measures a 40-row sample, so a coordinate pair or licensee that is longer further down was cut mid-number
-        ("46.12083, -70.669"); the floor is the header text plus the longest sampled value with padding."""
-        self.view.resizeColumnsToContents()
-        for column in range(self.model.columnCount()):
-            width = self.view.columnWidth(column)
-            self.view.setColumnWidth(column, max(96, min(width + 16, 260)))
-        # In a narrow dock the widest column (usually the licensee, which elides with "...") gives way first so the
-        # next column starts inside the view instead of past the right edge.
-        available = max(self.view.viewport().width(), 400)
-        for _ in range(40):
-            widths = [self.view.columnWidth(c) for c in range(self.model.columnCount())]
-            if sum(widths) <= available or max(widths) <= 150:
-                break
-            widest = widths.index(max(widths))
-            self.view.setColumnWidth(widest, max(150, widths[widest] - 20))
+        """Content-fit every column, then, if the dock is too narrow for all of them, squeeze the widest columns (usually the
+        licensee, which elides with "...") toward COLUMN_SQUEEZE_FLOOR so the next columns start inside the view. A column is
+        never squeezed below COLUMN_SQUEEZE_FLOOR (enough for an authorization number or a short operator name; headers elide first). resizeColumnsToContents() alone measures a 40-row sample, so a coordinate
+        pair that is longer further down was cut mid-number ("46.12083, -70.669"); each column keeps the sampled width + padding."""
+        self._fitting = True
+        try:
+            self.view.resizeColumnsToContents()
+            count = self.model.columnCount()
+            natural = []
+            for column in range(count):
+                natural.append(max(96, min(self.view.columnWidth(column) + 10, 260)))
+            keys = [key for _name, key in self.model._columns]
+            # Coordinates are never squeezed (a clipped coordinate is a wrong-looking number); text columns are.
+            fixed = {_GEOM_A, _GEOM_B, _GEOM_LAT, _GEOM_LON}
+            floors = [natural[c] if keys[c] in fixed else min(natural[c], self.COLUMN_SQUEEZE_FLOOR)
+                      for c in range(count)]
+            widths = list(natural)
+            available = max(self.view.viewport().width(), 380)
+            while sum(widths) > available:
+                squeezable = [c for c in range(count) if widths[c] > floors[c] and not self.view.isColumnHidden(c)]
+                if not squeezable:
+                    break
+                widest = max(squeezable, key=lambda c: widths[c])
+                widths[widest] = max(floors[widest], widths[widest] - 10)
+            for column, width in enumerate(widths):
+                self.view.setColumnWidth(column, width)
+        finally:
+            self._fitting = False
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # The dock is sized after this widget is built, and the user can drag it: refit until the user sizes a column by hand.
+        if not self._user_sized_columns and self.model.columnCount():
+            self._fit_columns()
+
+    def _on_section_resized(self, *_):
+        if not self._fitting:
+            self._user_sized_columns = True
 
     # -- column visibility ----------------------------------------------
 
