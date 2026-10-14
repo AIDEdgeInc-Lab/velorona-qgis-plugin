@@ -1,4 +1,4 @@
-# (run 2: teardown fixes)
+# (run 3: faulthandler)
 # Real QGIS 4.x runtime tests that need NO access to the orbital source (the source is blocked inside the container, so this workflow can never send it a
 # request). Runs ONLY when this file changes on the probe branch. Every step continues on error so one run reports everything.
 name: Real QGIS runtime (no source access)
@@ -29,7 +29,7 @@ jobs:
         run: |
           docker run --rm --add-host celestrak.org:127.0.0.1 -v "$GITHUB_WORKSPACE":/work/velorona -e QT_QPA_PLATFORM=offscreen -w /work/velorona qgis/qgis:4.0 bash -c "set -o pipefail
             python3 -m pip install --quiet --break-system-packages $DEPS
-            python3 tests/qgis_e2e.py 2>&1 | grep -E 'FAIL|SKIP|checks passed|FAILED|Error|Traceback' | head -60"
+            python3 -X faulthandler tests/qgis_e2e.py > /tmp/e2e.log 2>&1; echo exit=$?; grep -E 'FAIL|SKIP|checks passed|FAILED|Traceback' /tmp/e2e.log | head -20; echo ---- crash; grep -n -A 40 'Fatal Python error' /tmp/e2e.log | head -60"
       - name: qgis_ui_polish_e2e.py
         continue-on-error: true
         run: |
