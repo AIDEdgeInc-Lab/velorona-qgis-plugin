@@ -1,0 +1,5 @@
+# Everything the CI (and a contributor running `python3 -m pytest tests`) needs on top of the runtime requirements.
+# `requests` is imported by several tests but is not a plugin runtime requirement, so it was previously undeclared.
+-r requirements.txt
+pytest>=8
+requests>=2.31

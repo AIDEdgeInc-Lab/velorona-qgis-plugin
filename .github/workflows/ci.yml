@@ -1,0 +1,154 @@
+# Stage A - pull-request CI for the Velorona QGIS plugin (see AIDEdgeInc-Lab/.github standards/ENGINEERING-QUALITY-STANDARD.md).
+#
+# Required (blocking) lanes - no network, no QGIS needed, deterministic:
+#   unit      pytest on Python 3.12 / 3.13; only the two documented skips are tolerated (tools/check_skips.py)
+#   enums     Qt6 unscoped-enum / removed-idiom checker (the plugin targets QGIS 4 / Qt6 only)
+#   security  bandit, medium severity and above
+#   package   tools/package.sh + tools/verify_package.py on the exact zip that would be released
+#
+# Advisory lane (continue-on-error) until it has been green on main for 3 consecutive runs, then flip it to required:
+#   qgis-offline   the two QGIS suites that make NO network calls (USA synthetic pack, UI polish) in real QGIS 4.0 (the
+#                  declared minimum, metadata.txt) and 4.2 (current stable) inside the official qgis/qgis images.
+#
+# NOT here on purpose: tests/qgis_e2e.py calls live public services (elevation, weather, CelesTrak). A third-party outage
+# or rate limit is not a code defect and must not block merges; it runs weekly in qgis-live-e2e.yml.
+#
+# Branch protection should require ONE check: "ci-gate".
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  unit:
+    name: Unit tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install --upgrade pip && python -m pip install -r requirements-dev.txt
+      - name: pytest
+        run: python -m pytest tests -q -rs --junitxml=pytest.xml
+      - name: Only the documented skips are allowed
+        if: ${{ !cancelled() }}
+        run: python tools/check_skips.py pytest.xml
+
+  enums:
+    name: Qt6 enum check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: python tools/check_qt6_enums.py
+
+  security:
+    name: Security (bandit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install bandit
+      - run: bandit -q -r . -ll --exclude ./tests,./tools,./parity,./dist
+
+  package:
+    name: Build and verify release zip
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build, verify, checksum
+        run: |
+          version="$(sed -n 's/^version=//p' metadata.txt | tr -d '[:space:]')"
+          ./tools/package.sh
+          python3 tools/verify_package.py "dist/velorona-${version}.zip" "$version"
+          (cd dist && sha256sum "velorona-${version}.zip" | tee SHA256SUMS)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: velorona-plugin-zip
+          path: |
+            dist/velorona-*.zip
+            dist/SHA256SUMS
+          retention-days: 14
+
+  qgis-offline:
+    name: QGIS ${{ matrix.qgis }} runtime (offline suites)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true   # advisory: promote to required after 3 consecutive green runs on main
+    strategy:
+      fail-fast: false
+      matrix:
+        qgis: ["4.0", "4.2"]
+    container:
+      image: qgis/qgis:${{ matrix.qgis }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      # The suites import `velorona.*`, so the checkout directory must be named exactly `velorona`.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: velorona
+          persist-credentials: false
+      - name: Runtime versions
+        run: |
+          python3 -c "from qgis.core import Qgis; import sys; print('QGIS', Qgis.version(), 'python', sys.version.split()[0])"
+      - name: Install plugin requirements next to the QGIS bindings
+        run: |
+          python3 -m venv --system-site-packages "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -r velorona/requirements-dev.txt
+      - name: USA support, synthetic pack, no network
+        run: |
+          "$RUNNER_TEMP/venv/bin/python" velorona/tests/qgis_usa_e2e.py
+      - name: UI polish
+        run: |
+          "$RUNNER_TEMP/venv/bin/python" velorona/tests/qgis_ui_polish_e2e.py
+
+  ci-gate:
+    name: ci-gate
+    if: ${{ always() }}
+    needs: [unit, enums, security, package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: All required lanes must have succeeded
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | python3 -c "
+          import json, sys
+          needs = json.load(sys.stdin)
+          bad = {k: v['result'] for k, v in needs.items() if v['result'] != 'success'}
+          print({k: v['result'] for k, v in needs.items()})
+          sys.exit(1 if bad else 0)"
