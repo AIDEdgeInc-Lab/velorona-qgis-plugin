@@ -1,4 +1,4 @@
-# (run 1)
+# (run 2)
 # Real-source + real-QGIS verification on a GitHub-hosted runner (the build sandbox can reach neither). Runs ONLY when this file, the probe script or the
 # test files change on the probe branch, so it cannot re-request the source on every push. Source requests: 5 (one per GEO group), made once by the
 # probe; every later step reads that cache or is blocked from the source. Publishes and deploys nothing.
