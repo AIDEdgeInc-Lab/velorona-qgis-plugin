@@ -372,29 +372,41 @@ class VeloronaRecordsTable(QWidget):
         # together, see plugin.set_licensee_filter), not a per-tab control.
 
     # Narrowest a text column may be squeezed to in a narrow dock; its full value stays in the cell tooltip.
-    COLUMN_SQUEEZE_FLOOR = 108
+    COLUMN_SQUEEZE_FLOOR = 104
 
     def _fit_columns(self) -> None:
         """Content-fit every column, then, if the dock is too narrow for all of them, squeeze the widest columns (usually the
         licensee, which elides with "...") toward COLUMN_SQUEEZE_FLOOR so the next columns start inside the view. A column is
-        never squeezed below COLUMN_SQUEEZE_FLOOR (enough for an authorization number or a short operator name; headers elide first). resizeColumnsToContents() alone measures a 40-row sample, so a coordinate
-        pair that is longer further down was cut mid-number ("46.12083, -70.669"); each column keeps the sampled width + padding."""
+        never squeezed below COLUMN_SQUEEZE_FLOOR or below its own header text plus the sort arrow, so a header is never clipped.
+        resizeColumnsToContents() alone measures a 40-row sample, so a coordinate pair that is longer further down was cut
+        mid-number ("46.12083, -70.669"); each column keeps the sampled width + padding."""
         self._fitting = True
         try:
             self.view.resizeColumnsToContents()
             count = self.model.columnCount()
+            header = self.view.horizontalHeader()
             natural = []
-            for column in range(count):
-                natural.append(max(96, min(self.view.columnWidth(column) + 10, 260)))
             keys = [key for _name, key in self.model._columns]
             # Coordinates are never squeezed (a clipped coordinate is a wrong-looking number); text columns are.
             fixed = {_GEOM_A, _GEOM_B, _GEOM_LAT, _GEOM_LON}
-            floors = [natural[c] if keys[c] in fixed else min(natural[c], self.COLUMN_SQUEEZE_FLOOR)
+            for column in range(count):
+                pad = 6 if keys[column] in fixed else 10
+                natural.append(max(96, header.sectionSizeHint(column), min(self.view.sizeHintForColumn(column) + pad, 260)))
+            floors = [natural[c] if keys[c] in fixed else min(natural[c], max(self.COLUMN_SQUEEZE_FLOOR, header.sectionSizeHint(c)))
                       for c in range(count)]
             widths = list(natural)
-            available = max(self.view.viewport().width(), 380)
-            while sum(widths) > available:
-                squeezable = [c for c in range(count) if widths[c] > floors[c] and not self.view.isColumnHidden(c)]
+            available = max(self.view.viewport().width(), 200)
+            # Priority is left to right: the leading columns that can fit (at their floors) are fitted into the view; the
+            # rest keep their natural width and are reached by horizontal scroll. Squeezing an off-screen column helps no one.
+            visible = [c for c in range(count) if not self.view.isColumnHidden(c)]
+            lead, used = [], 0
+            for c in visible:
+                if lead and used + floors[c] > available:
+                    break
+                lead.append(c)
+                used += floors[c]
+            while sum(widths[c] for c in lead) > available:
+                squeezable = [c for c in lead if widths[c] > floors[c]]
                 if not squeezable:
                     break
                 widest = max(squeezable, key=lambda c: widths[c])

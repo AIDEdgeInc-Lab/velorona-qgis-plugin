@@ -208,6 +208,48 @@ wide.resize(560, 600)
 QApplication.processEvents()
 check("a column the user sized by hand is not refitted on the next resize", hh.sectionSize(0) == 300, hh.sectionSize(0))
 
+print("== Records layout across dock widths, headers, sorting, filtering, dataset change ==")
+_coord = wide.view.fontMetrics().horizontalAdvance("43.00955, -81.15257")
+for _w, _label in ((380, "1024 px window"), (500, "1280 px window"), (580, "1500 px window"), (740, "1920 px window")):
+    wide.resize(_w, 600)
+    wide.view.setColumnWidth(0, 50)            # whatever happened before, a dataset (re)fit must start clean
+    wide._user_sized_columns = False
+    wide._fit_columns()
+    QApplication.processEvents()
+    _h = wide.view.horizontalHeader()
+    _vw = wide.view.viewport().width()
+    _n = wide.model.columnCount()
+    check(f"{_label}: no header is narrower than its own text plus sort arrow",
+          all(_h.sectionSize(c) >= _h.sectionSizeHint(c) for c in range(_n)),
+          [(c, _h.sectionSize(c), _h.sectionSizeHint(c)) for c in range(_n) if _h.sectionSize(c) < _h.sectionSizeHint(c)])
+    check(f"{_label}: coordinate columns never collapse below their longest value",
+          all(_h.sectionSize(i) >= _coord for i in (ia, ib)), [_h.sectionSize(i) for i in (ia, ib)])
+    _shown = [c for c in range(_n) if _h.sectionPosition(c) + _h.sectionSize(c) <= _vw]
+    check(f"{_label}: the leading columns that fit are fully inside the view (rest scroll)", _shown == list(range(len(_shown))) and len(_shown) >= 2,
+          (_shown, _vw))
+    if _w >= 580:
+        check(f"{_label}: Authorization, Licensee, Site A and Site B are all fully visible", ib in _shown and ia in _shown, (_shown, _vw))
+    check(f"{_label}: text columns are not squeezed below the floor",
+          _h.sectionSize(0) >= wide.COLUMN_SQUEEZE_FLOOR and _h.sectionSize(1) >= wide.COLUMN_SQUEEZE_FLOOR)
+wide.view.sortByColumn(0, Qt.SortOrder.DescendingOrder)
+QApplication.processEvents()
+check("sorting by a header still sorts", wide.proxy.index(0, 0).data() == "011142607-001" and wide.view.horizontalHeader().sortIndicatorSection() == 0)
+wide.search_edit.setText("0111426 05")
+wide.search_edit.setText("011142605")
+QApplication.processEvents()
+check("filtering still filters with the header sorted", wide.proxy.rowCount() == 1, wide.proxy.rowCount())
+wide.search_edit.setText("")
+wide.view.setColumnWidth(0, 321)
+QApplication.processEvents()
+wide.resize(700, 600)
+QApplication.processEvents()
+check("a hand-sized column survives a resize", wide.view.columnWidth(0) == 321, wide.view.columnWidth(0))
+wide.set_layers({L.SOURCE_FIXED_LINKS: ll2, L.SOURCE_FIXED_SITES: ll2})
+wide.dataset_combo.setCurrentIndex(1)
+QApplication.processEvents()
+check("changing dataset clears the hand-sized flag and refits", wide._user_sized_columns is False and wide.view.columnWidth(0) != 321,
+      wide.view.columnWidth(0))
+
 passed = sum(1 for _, ok, _ in RESULTS if ok)
 print(f"\n===== {passed}/{len(RESULTS)} checks passed =====")
 sys.exit(0 if passed == len(RESULTS) else 1)

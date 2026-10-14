@@ -133,8 +133,8 @@ def widget_stylesheet(dark: bool = True) -> str:
     }}
     QHeaderView::section {{
         background: {BG}; color: {TEXT_FAINT};
-        padding: 6px 8px; border: none; border-bottom: 1px solid {ACCENT_LINE};
-        font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+        padding: 6px 16px 6px 6px; border: none; border-bottom: 1px solid {ACCENT_LINE};   /* right padding keeps the sort arrow clear of the text */
+        font-size: 10px; letter-spacing: 0.02em; text-transform: uppercase;
     }}
     QTextBrowser {{
         background: {BG}; color: {TEXT};
