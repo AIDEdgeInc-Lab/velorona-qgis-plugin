@@ -278,6 +278,11 @@ check("the retrieval time shown is the OLD one, not now", all(x["retrieved_at"] 
 check("one request only; the message bar says the data is older", len(calls) == 1 and any("older" in str(p).lower() or "stale" in str(p).lower() for p in pushes), f"{len(calls)} / {pushes}")
 
 requests.get = real_get
+# orderly teardown (a worker thread or a plugin timer alive at exitQgis() crashed the interpreter on exit): cancel tasks, unload the plugin, then exit
+QgsApplication.taskManager().cancelAll()
+wait_task(10)
+plugin.unload()
+qgs.processEvents()
 passed = sum(1 for _, ok, _ in RESULTS if ok)
 print(f"\n===== {passed}/{len(RESULTS)} checks passed =====")
 for name, ok, detail in RESULTS:
