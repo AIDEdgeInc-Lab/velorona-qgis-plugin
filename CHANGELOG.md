@@ -6,7 +6,7 @@ Compare any two releases: https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin
 ## Unreleased
 
 ### Changed
-- **Satellites layer data path.** Element sets are cached for 2 hours, a failed request is not repeated until its back-off passes (previously the source was asked every 10 minutes and again on each layer toggle after a failure), decayed element sets are no longer drawn or analysed, satellites with catalog ids above 99999 are now supported (from their OMM record) instead of being unsupported, and each satellite records when its element set was retrieved and whether it is fresh or stale. Not run in a QGIS runtime yet.
+- **Satellites layer data path.** Element sets are cached for 2 hours, a failed request is not repeated until its back-off passes (previously the source was asked every 10 minutes and again on each layer toggle after a failure), decayed element sets are no longer drawn or analysed, satellites with catalog ids above 99999 are now supported (from their OMM record) instead of being unsupported, and each satellite records when its element set was retrieved and whether it is fresh or stale. The new path was exercised in a real QGIS 4.0.3 runtime against the live CelesTrak response on 2026-10-14 (28/28 checks; details and limits in docs/ORBIT_DATA.md), and the load now runs in a background task so the map stays responsive.
 
 ## 1.1.7 — UI polish (compared with 1.1.6; 1.1.6 was never published separately, so 1.1.7 also carries the 1.1.6 guided USA data setup below)
 
