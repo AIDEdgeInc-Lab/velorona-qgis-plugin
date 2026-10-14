@@ -168,6 +168,8 @@ for _ in range(3):
 check("three more off/on toggles made no request", not net_calls and sat_layer.featureCount() == n, f"{len(net_calls)} requests")
 
 print("\n== 4. real analysis engine on a real satellite ==")
+# the layer was repopulated by the toggles above, so feature ids changed: take the CURRENT first feature
+f0 = next(sat_layer.getFeatures())
 gs = next(gs_layer.getFeatures())
 results = []
 plugin._show_result = lambda r: results.append(r)
