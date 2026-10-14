@@ -105,6 +105,11 @@ print("== NO DATA wording ==")
 html_nd, _ = OV.render_summary(brief(NO_DATA))
 check("NO DATA keeps the status and the reason", "NO DATA" in html_nd and "Live weather could not be retrieved." in html_nd)
 check("NO DATA does not repeat itself as an 'No answer' line", "No answer" not in html_nd)
+_b = brief(NO_DATA)
+_b.reason = "NO DATA (weather): frequency outside 1-100 GHz (ITU-R P.838-3 range)"
+_h = OV.render_summary(_b)[0]
+check("a reason that already starts 'NO DATA (...):' is not printed under the NO DATA badge twice",
+      _h.count("NO DATA") == 1 and "frequency outside 1-100 GHz" in _h, _h.count("NO DATA"))
 html_ok, _ = OV.render_summary(brief(CLEAR))
 check("other statuses keep their plain answer", "No answer: there is no weather data" in html_ok)
 check("heading is shown (falls back to location)", "<h3>H</h3>" in html_ok and "<h3>loc</h3>" in OV.render_summary(brief(CLEAR, heading=""))[0])

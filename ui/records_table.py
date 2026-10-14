@@ -375,6 +375,15 @@ class VeloronaRecordsTable(QWidget):
         for column in range(self.model.columnCount()):
             width = self.view.columnWidth(column)
             self.view.setColumnWidth(column, max(96, min(width + 16, 260)))
+        # In a narrow dock the widest column (usually the licensee, which elides with "...") gives way first so the
+        # next column starts inside the view instead of past the right edge.
+        available = max(self.view.viewport().width(), 400)
+        for _ in range(40):
+            widths = [self.view.columnWidth(c) for c in range(self.model.columnCount())]
+            if sum(widths) <= available or max(widths) <= 150:
+                break
+            widest = widths.index(max(widths))
+            self.view.setColumnWidth(widest, max(150, widths[widest] - 20))
 
     # -- column visibility ----------------------------------------------
 

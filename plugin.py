@@ -1137,7 +1137,7 @@ class VeloronaPlugin:
         if not fids:
             return
         context_layer = layer_helpers.build_context_link_layer(
-            "Network Context -- shared endpoints",
+            "Shared endpoints",
             [layer.getFeature(fid) for fid in fids],
             layer_color("fixed-links", self.map_is_dark()))
         evidence_group = self._ensure_velorona_groups()[1]["Evidence"]

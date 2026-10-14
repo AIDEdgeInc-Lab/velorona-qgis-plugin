@@ -15,6 +15,7 @@ referenced by name and supplied separately (ui/charts.py).
 from __future__ import annotations
 
 import html
+import re
 from typing import List, Tuple
 
 from ..core.presentation.terrain import CRITICAL_POINT_DEFINITION
@@ -81,9 +82,13 @@ def _changes_block(brief: Brief) -> str:
 
 def _header(brief: Brief) -> str:
     # The reason line already says why the status is NO DATA; the badge is the status itself.
+    reason = brief.reason or ""
+    if brief.status == NO_DATA:
+        # The badge already says NO DATA; the engine's reason text starts "NO DATA (weather): ...", which printed it twice.
+        reason = re.sub(r"^\s*NO DATA(?:\s*\([^)]*\))?\s*:\s*", "", reason)
     return (f"<div class='kicker'>{_e(brief.title)}</div>"
             f"<h3>{_e(brief.heading or brief.location)}</h3>"
-            f"<p>{status_badge(brief.status)} &nbsp;{_e(brief.reason)}</p>")
+            f"<p>{status_badge(brief.status)} &nbsp;{_e(reason)}</p>")
 
 
 def _answer_line(brief: Brief) -> str:
