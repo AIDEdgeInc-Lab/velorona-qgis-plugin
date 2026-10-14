@@ -9,6 +9,7 @@ from qgis.core import (
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
     QgsLayerTreeLayer,
+    QgsMessageLog,
     QgsMapBoxGlStyleConverter,
     QgsPointClusterRenderer,
     QgsApplication,
@@ -23,6 +24,7 @@ from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtWidgets import QAction, QApplication, QMessageBox, QWIDGETSIZE_MAX
 
 from .core import basemap_labels
+from .core import imagery
 from .core import layers as layer_helpers
 from .core import network_context
 from .core import overlays
@@ -85,6 +87,33 @@ WGS84 = QgsCoordinateReferenceSystem("EPSG:4326")
 # labels are unaffected -- those come from feature attributes and the
 # dock, not this basemap layer.
 BASEMAP_NAME = "Velorona Basemap (CARTO)"
+
+# Layers-panel names. The "public infrastructure records, not a coverage guarantee" disclosure used to be part of every
+# layer NAME, which the Layers panel truncated to "Fixed Service sites -- pub"; it now lives in each layer's abstract
+# (Layer Properties > Metadata, and the hover tooltip); the country is in the name as CAN / USA, the source (ISED, FCC ULS) in the abstract and in the Records / Evidence provenance text.
+INFRA_GROUP_NAME = "Infrastructure"
+SPACE_GROUP_NAME = "Satellite / Orbital Data"
+LEGACY_SPACE_GROUP_NAME = "Space"
+IMAGERY_GROUP_NAME = "USA Imagery (optional)"
+NAME_CA_SITES = "Fixed Service sites (CAN)"
+NAME_CA_LINKS = "Fixed Service links (CAN)"
+NAME_TOWERS = "Ontario Towers (GeoHub)"
+NAME_CELLULAR = "Cellular Sites (CAN)"
+NAME_US_SITES = "Fixed Service sites (USA)"
+NAME_US_LINKS = "Fixed Service links (USA)"
+NAME_GROUND = "Ground/Earth Stations (SatNOGS)"
+NAME_SATELLITES = "Satellites (CelesTrak)"
+# Names earlier versions gave these layers; a layer still carrying one is renamed on reload, a layer the user renamed is not.
+LEGACY_LAYER_NAMES = {
+    layer_helpers.SOURCE_FIXED_SITES: (NAME_CA_SITES, f"Fixed Service sites -- {PUBLIC_RECORDS_DISCLOSURE}"),
+    layer_helpers.SOURCE_FIXED_LINKS: (NAME_CA_LINKS, f"Fixed Service links -- {PUBLIC_RECORDS_DISCLOSURE}"),
+    layer_helpers.SOURCE_TOWERS: (NAME_TOWERS, f"Ontario Towers (GeoHub) -- {PUBLIC_RECORDS_DISCLOSURE}"),
+    layer_helpers.SOURCE_CELLULAR: (NAME_CELLULAR, f"Cellular Sites (ISED) -- {PUBLIC_RECORDS_DISCLOSURE}"),
+    layer_helpers.SOURCE_US_SITES: (NAME_US_SITES, f"USA Fixed Service sites (FCC ULS) -- {PUBLIC_RECORDS_DISCLOSURE}"),
+    layer_helpers.SOURCE_US_LINKS: (NAME_US_LINKS, f"USA Fixed Service links (FCC ULS) -- {PUBLIC_RECORDS_DISCLOSURE}"),
+    layer_helpers.SOURCE_GROUND_STATIONS: (NAME_GROUND, "Ground/Earth Stations"),
+    layer_helpers.SOURCE_SATELLITES: (NAME_SATELLITES, "Satellites"),
+}
 # Two CARTO styles over the *same* vector tiles, so switching presentation
 # costs no extra data and adds no dependency.
 #
@@ -171,7 +200,7 @@ VIEWPORT_REFRESH_DEBOUNCE_MS = 400
 # The map stays the primary workspace: the investigation dock opens at roughly
 # a third of the window, never below a readable width, and never wide enough to
 # dominate the map. The user can still resize it by dragging the splitter.
-DOCK_WIDTH_FRACTION = 0.32
+DOCK_WIDTH_FRACTION = 0.37
 DOCK_MIN_WIDTH_PX = 340
 DOCK_MAX_WIDTH_PX = 760
 
@@ -415,10 +444,44 @@ class VeloronaPlugin:
         Created up front so the hierarchy reads the same before and after an
         analysis, and so 'My Data' exists as a home for the user's own layers."""
         velorona = self._ensure_group("Velorona")
+        # 1.1.7 and earlier called the satellite group "Space". Rename it in place (keeping its layers, order and
+        # visibility) instead of creating a second, empty group beside it.
+        legacy_space = velorona.findGroup(LEGACY_SPACE_GROUP_NAME)
+        if legacy_space is not None and velorona.findGroup(SPACE_GROUP_NAME) is None:
+            legacy_space.setName(SPACE_GROUP_NAME)
         groups = {}
-        for index, name in enumerate(("Infrastructure", "Space", "My Data", "Evidence")):
+        for index, name in enumerate((INFRA_GROUP_NAME, SPACE_GROUP_NAME, "My Data", "Evidence")):
             groups[name] = self._ensure_group(name, velorona, index)
+        groups["Infrastructure"] = groups[INFRA_GROUP_NAME]
+        groups["Space"] = groups[SPACE_GROUP_NAME]       # stable internal keys for callers
         return velorona, groups
+
+    def _ensure_imagery_group(self):
+        """'USA Imagery (optional)': a root-level group directly under Velorona and above the basemap, so a switched-on
+        aerial/topo layer covers the basemap but never Velorona's own data."""
+        root = QgsProject.instance().layerTreeRoot()
+        existing = root.findGroup(IMAGERY_GROUP_NAME)
+        if existing is not None:
+            return existing
+        velorona = root.findGroup("Velorona")
+        index = (root.children().index(velorona) + 1) if velorona is not None and velorona in root.children() else 0
+        group = root.insertGroup(index, IMAGERY_GROUP_NAME)
+        group.setExpanded(False)
+        return group
+
+    def _ensure_imagery_layers(self):
+        group = self._ensure_imagery_group()
+        project = QgsProject.instance()
+        for key, name, service, abstract in imagery.IMAGERY_SOURCES:
+            if layer_helpers.find_owned_layer(project, key) is not None:
+                continue
+            layer = imagery.build_imagery_layer(name, service, abstract)
+            if not layer.isValid():
+                # Optional, off-by-default layers: never interrupt Load Public Data with a dialog for them (the 'wms'
+                # provider is absent from some headless QGIS builds); the reason goes to the QGIS log panel.
+                QgsMessageLog.logMessage(f"Optional layer '{name}' was not added: {layer.error().summary()}", "Velorona", Qgis.MessageLevel.Warning)
+                continue
+            layer_helpers.add_to_group(project, layer, group, visible=False, source_key=key)
 
     def _finalize_workspace(self, zoom_targets):
         """Runs after QGIS's own queued layer-tree handling, so the workspace
@@ -451,6 +514,9 @@ class VeloronaPlugin:
         project = QgsProject.instance()
         existing = layer_helpers.find_owned_layer(project, source_key)
         if existing is not None:
+            names = LEGACY_LAYER_NAMES.get(source_key)
+            if names and existing.name() in names[1:]:
+                existing.setName(names[0])
             if refresh is not None:
                 refresh(existing)
             node = project.layerTreeRoot().findLayer(existing.id())
@@ -493,6 +559,7 @@ class VeloronaPlugin:
         # only recolours the existing landcover/park rules; every filter, zoom
         # range and other layer in the 66-rule CARTO style is untouched.
         layer_helpers.retint_basemap_vegetation(renderer, dark)
+        layer_helpers.retint_basemap_roads(renderer, dark)   # light only: roads/buildings/waterways were ~1.1-1.3:1
         self._basemap_renderers[dark] = renderer
         return self._basemap_renderers[dark]
 
@@ -735,6 +802,7 @@ class VeloronaPlugin:
         velorona_group, groups = self._ensure_velorona_groups()
         infra_group = groups["Infrastructure"]
         space_group = groups["Space"]
+        self._ensure_imagery_layers()
         problems = []
         # Each of the six typed layers built below gets its own colour for the
         # CURRENT map appearance (core/colors.py) -- snapshotted once here so
@@ -757,7 +825,7 @@ class VeloronaPlugin:
             sites_layer = self._ensure_public_layer(
                 layer_helpers.SOURCE_FIXED_SITES, infra_group, visible=True, kind="site",
                 build=lambda: layer_helpers.build_point_layer(
-                    f"Fixed Service sites -- {PUBLIC_RECORDS_DISCLOSURE}", sites,
+                    NAME_CA_SITES, sites,
                     terrestrial_public.FIXED_SITE_FIELDS, layer_color("fixed-sites", dark),
                     abstract=f"ISED Fixed Service, static snapshot. {PUBLIC_RECORDS_DISCLOSURE.capitalize()}."),
                 refresh=lambda lyr: layer_helpers.replace_point_features(
@@ -765,7 +833,7 @@ class VeloronaPlugin:
             links_layer = self._ensure_public_layer(
                 layer_helpers.SOURCE_FIXED_LINKS, infra_group, visible=True, kind="link",
                 build=lambda: layer_helpers.build_link_layer(
-                    f"Fixed Service links -- {PUBLIC_RECORDS_DISCLOSURE}", links,
+                    NAME_CA_LINKS, links,
                     link_fields, layer_color("fixed-links", dark),
                     abstract=f"ISED Fixed Service, static snapshot. {PUBLIC_RECORDS_DISCLOSURE.capitalize()}."),
                 refresh=lambda lyr: layer_helpers.replace_link_features(
@@ -780,8 +848,9 @@ class VeloronaPlugin:
             context_layers.append(self._ensure_public_layer(
                 layer_helpers.SOURCE_GROUND_STATIONS, space_group, visible=False, kind="ground-station",
                 build=lambda: layer_helpers.build_point_layer(
-                    "Ground/Earth Stations", stations, space_public.GROUND_STATION_FIELDS,
-                    layer_color("ground-stations", dark), kind="ground-station"),
+                    NAME_GROUND, stations, space_public.GROUND_STATION_FIELDS,
+                    layer_color("ground-stations", dark), kind="ground-station",
+                    abstract=f"{space_public.SOURCE_SATNOGS}. Worldwide amateur/educational ground stations, not licensed telecom sites."),
                 refresh=lambda lyr: layer_helpers.replace_point_features(
                     lyr, stations, space_public.GROUND_STATION_FIELDS)))
         except Exception as exc:
@@ -794,21 +863,23 @@ class VeloronaPlugin:
         self.satellites_layer = self._ensure_public_layer(
             layer_helpers.SOURCE_SATELLITES, space_group, visible=False, kind="satellite",
             build=lambda: layer_helpers.build_point_layer(
-                "Satellites", [], space_public.SATELLITE_FIELDS,
-                layer_color("satellites", dark), kind="satellite"))
+                NAME_SATELLITES, [], space_public.SATELLITE_FIELDS,
+                layer_color("satellites", dark), kind="satellite",
+                abstract="Geostationary and commercial GEO operators' satellites (sub-satellite points). Orbital elements from "
+                         "CelesTrak, live query when the layer is switched on; positions propagated with SGP4. Off by default."))
 
         # Viewport-scoped: created empty, filled by _refresh_viewport_layers
         # once the user switches them on.
         self.towers_layer = self._ensure_public_layer(
             layer_helpers.SOURCE_TOWERS, infra_group, visible=False, kind="site",
             build=lambda: layer_helpers.build_point_layer(
-                f"Ontario Towers (GeoHub) -- {PUBLIC_RECORDS_DISCLOSURE}", [], terrestrial_public.TOWER_FIELDS,
+                NAME_TOWERS, [], terrestrial_public.TOWER_FIELDS,
                 layer_color("towers", dark),
                 abstract=f"Ontario GeoHub Tower dataset (MNRF), live query. {PUBLIC_RECORDS_DISCLOSURE.capitalize()}."))
         self.cellular_layer = self._ensure_public_layer(
             layer_helpers.SOURCE_CELLULAR, infra_group, visible=False, kind="site",
             build=lambda: layer_helpers.build_point_layer(
-                f"Cellular Sites (ISED) -- {PUBLIC_RECORDS_DISCLOSURE}", [], terrestrial_public.CELLULAR_FIELDS,
+                NAME_CELLULAR, [], terrestrial_public.CELLULAR_FIELDS,
                 layer_color("cellular", dark),
                 abstract=f"ISED Spectrum Licences Site Data, live query via Esri Canada mirror. {PUBLIC_RECORDS_DISCLOSURE.capitalize()}."))
 
@@ -1093,7 +1164,7 @@ class VeloronaPlugin:
         if not fids:
             return
         context_layer = layer_helpers.build_context_link_layer(
-            "Network Context -- shared endpoints",
+            "Shared endpoints",
             [layer.getFeature(fid) for fid in fids],
             layer_color("fixed-links", self.map_is_dark()))
         evidence_group = self._ensure_velorona_groups()[1]["Evidence"]
@@ -1352,14 +1423,14 @@ class VeloronaPlugin:
         sites_layer = self._ensure_public_layer(
             layer_helpers.SOURCE_US_SITES, infra_group, visible=True, kind="site",
             build=lambda: layer_helpers.build_point_layer(
-                f"USA Fixed Service sites (FCC ULS) -- {PUBLIC_RECORDS_DISCLOSURE}", loaded.sites, US_SITE_FIELDS,
+                NAME_US_SITES, loaded.sites, US_SITE_FIELDS,
                 layer_color("fixed-sites", dark), abstract=abstract),
             refresh=lambda lyr: (layer_helpers.replace_point_features(lyr, loaded.sites, US_SITE_FIELDS),
                                  layer_helpers.set_abstract(lyr, abstract)))
         links_layer = self._ensure_public_layer(
             layer_helpers.SOURCE_US_LINKS, infra_group, visible=True, kind="link",
             build=lambda: layer_helpers.build_link_layer(
-                f"USA Fixed Service links (FCC ULS) -- {PUBLIC_RECORDS_DISCLOSURE}", loaded.links, US_LINK_FIELDS,
+                NAME_US_LINKS, loaded.links, US_LINK_FIELDS,
                 layer_color("fixed-links", dark), abstract=abstract),
             refresh=lambda lyr: (layer_helpers.replace_link_features(lyr, loaded.links, US_LINK_FIELDS),
                                  layer_helpers.set_abstract(lyr, abstract)))

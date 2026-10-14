@@ -80,15 +80,16 @@ def tokens(dark: bool = True) -> dict:
         return {
             "bg": BG, "surface": SURFACE, "surface_raised": SURFACE_RAISED,
             "text": TEXT, "text_muted": TEXT_MUTED, "text_faint": TEXT_FAINT,
-            "accent": ACCENT, "accent_strong": ACCENT_STRONG, "accent_deep": ACCENT_DEEP,
-            "accent_soft": ACCENT_SOFT, "accent_line": ACCENT_LINE,
+            "accent": ACCENT, "accent_text": ACCENT, "accent_strong": ACCENT_STRONG, "accent_deep": ACCENT_DEEP,
+            "on_accent": TEXT, "accent_soft": ACCENT_SOFT, "accent_line": ACCENT_LINE,
             "border": BORDER, "border_strong": BORDER_STRONG,
         }
     return {
         "bg": LIGHT_BG, "surface": LIGHT_SURFACE, "surface_raised": LIGHT_SURFACE_RAISED,
         "text": LIGHT_TEXT, "text_muted": LIGHT_TEXT_MUTED, "text_faint": LIGHT_TEXT_FAINT,
-        "accent": ACCENT, "accent_strong": LIGHT_ACCENT_STRONG, "accent_deep": ACCENT_DEEP,
-        "accent_soft": ACCENT_SOFT, "accent_line": "rgba(34, 75, 117, 0.28)",
+        # ACCENT (#5F98D1) is 3.0:1 on white -- fine for a border, too faint for small uppercase text; text uses the deep blue.
+        "accent": ACCENT, "accent_text": LIGHT_ACCENT_STRONG, "accent_strong": LIGHT_ACCENT_STRONG, "accent_deep": ACCENT_DEEP,
+        "on_accent": "#FFFFFF", "accent_soft": ACCENT_SOFT, "accent_line": "rgba(34, 75, 117, 0.28)",
         "border": LIGHT_BORDER, "border_strong": LIGHT_BORDER_STRONG,
     }
 
@@ -127,13 +128,13 @@ def widget_stylesheet(dark: bool = True) -> str:
         background: {SURFACE}; alternate-background-color: {SURFACE_RAISED};
         color: {TEXT}; gridline-color: {BORDER};
         border: 1px solid {BORDER}; border-radius: 6px;
-        selection-background-color: {ACCENT_DEEP}; selection-color: {TEXT};
+        selection-background-color: {ACCENT_DEEP}; selection-color: {t['on_accent']};
         font-size: 11.5px;
     }}
     QHeaderView::section {{
         background: {BG}; color: {TEXT_FAINT};
-        padding: 6px 8px; border: none; border-bottom: 1px solid {ACCENT_LINE};
-        font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+        padding: 6px 16px 6px 6px; border: none; border-bottom: 1px solid {ACCENT_LINE};   /* right padding keeps the sort arrow clear of the text */
+        font-size: 10px; letter-spacing: 0.02em; text-transform: uppercase;
     }}
     QTextBrowser {{
         background: {BG}; color: {TEXT};
@@ -176,33 +177,35 @@ def report_stylesheet(dark: bool = True) -> str:
     t = tokens(dark)
     BG, TEXT, TEXT_MUTED, TEXT_FAINT = t["bg"], t["text"], t["text_muted"], t["text_faint"]
     ACCENT, ACCENT_STRONG, ACCENT_DEEP = t["accent"], t["accent_strong"], t["accent_deep"]
+    ACCENT_TEXT = t["accent_text"]
     ACCENT_SOFT, ACCENT_LINE, BORDER = t["accent_soft"], t["accent_line"], t["border"]
     return f"""
 <style>
 body {{ background: {BG}; color: {TEXT};
        font-family: 'Geist Sans', -apple-system, system-ui, sans-serif; font-size: 12px; }}
-.kicker {{ font-size: 9.5px; letter-spacing: 0.14em; color: {ACCENT}; margin-bottom: 2px;
+.kicker {{ font-size: 10px; letter-spacing: 0.14em; color: {ACCENT_TEXT}; margin-bottom: 2px;
           text-transform: uppercase; }}
 h3 {{ margin: 0 0 10px; font-size: 15px; color: {TEXT}; font-weight: 600; letter-spacing: -0.01em; }}
-.sec {{ font-size: 9.5px; letter-spacing: 0.12em; color: {TEXT_FAINT}; text-transform: uppercase;
+.sec {{ font-size: 10px; letter-spacing: 0.12em; color: {TEXT_FAINT}; text-transform: uppercase;
        margin: 15px 0 5px; border-top: 1px solid {BORDER}; padding-top: 7px; }}
-.sub {{ font-size: 9.5px; letter-spacing: 0.1em; color: {ACCENT}; text-transform: uppercase;
+.sub {{ font-size: 10px; letter-spacing: 0.1em; color: {ACCENT_TEXT}; text-transform: uppercase;
        margin: 9px 0 3px; }}
 .site {{ font-size: 12.5px; font-weight: 600; color: {ACCENT_STRONG}; margin: 12px 0 3px;
         border-left: 2px solid {ACCENT}; padding-left: 7px; }}
 .site .coord {{ font-weight: normal; color: {TEXT_FAINT}; font-size: 10.5px; }}
 table {{ border-collapse: collapse; width: 100%; margin-bottom: 2px; }}
 td {{ padding: 2px 8px 2px 0; vertical-align: top; }}
-td.fk {{ color: {TEXT_MUTED}; white-space: nowrap; width: 42%; }}
+/* The label column is a fixed width (width='132' on each td.fk) so values start at the same x in every section. */
+td.fk {{ color: {TEXT_MUTED}; }}
 td.nd {{ color: {TEXT_FAINT}; font-style: italic; }}
 table.grid {{ margin-top: 4px; font-size: 10.5px; }}
 table.grid th {{ text-align: left; color: {TEXT_FAINT}; font-weight: normal; font-size: 9.5px;
                 letter-spacing: 0.06em; text-transform: uppercase;
                 border-bottom: 1px solid {ACCENT_LINE}; padding: 3px 6px 3px 0; }}
 table.grid td {{ border-bottom: 1px solid {BORDER}; padding: 3px 6px 3px 0; color: {TEXT_MUTED}; }}
-.note {{ color: {TEXT_FAINT}; font-size: 10.5px; }}
+.note {{ color: {TEXT_MUTED}; font-size: 10.5px; }}
 .pill {{ font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: 11px; }}
-.caveat {{ color: {TEXT_FAINT}; font-size: 10.5px; margin: 6px 0; line-height: 1.45; }}
+.caveat {{ color: {TEXT_MUTED}; font-size: 11px; margin: 6px 0; line-height: 1.45; }}
 .src {{ color: {TEXT_MUTED}; font-size: 10.5px; margin: 2px 0 8px; }}
 .assumption {{ font-size: 10.5px; background: {ACCENT_SOFT}; color: {TEXT_MUTED};
               border-left: 2px solid {ACCENT_DEEP}; padding: 5px 8px;

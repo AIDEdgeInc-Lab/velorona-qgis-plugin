@@ -224,6 +224,74 @@ def retint_basemap_vegetation(renderer, dark: bool) -> int:
     return touched
 
 
+# Light-basemap road legibility (field readability pass). CARTO Voyager draws minor, service and
+# residential roads as a white fill with a white case on land #fbf8f3 (about 1.07:1), so the street
+# network a technician navigates by is effectively invisible, and the pale-yellow/pale-orange arterials
+# are only ~1.2:1. Only the colours of the existing road rules are replaced (filters, zoom ranges and
+# the zoom-interpolated widths stay as CARTO defined them): a darker case gives every road an edge on
+# the cream land, and arterials get progressively more saturated fills so the hierarchy
+# (minor < secondary < primary < trunk/motorway) still reads. Dark Matter's roads were accepted as they
+# are and are left untouched.
+LIGHT_ROAD_CASE = {"service": "#A39D8F", "minor": "#A39D8F", "sec": "#BFA24F", "pri": "#CE9A2A",
+                   "trunk": "#C4801A", "mot": "#C4801A"}
+LIGHT_ROAD_FILL = {"service": "#FFFFFF", "minor": "#FFFFFF", "sec": "#FFF0A8", "pri": "#FFDC7A",
+                   "trunk": "#FFC24A", "mot": "#FFC24A"}
+LIGHT_ROAD_PATH = "#9C9588"
+LIGHT_RAIL = "#8F8F8F"
+LIGHT_BUILDING_FILL = "#D8CFC0"   # was #e4dcd0 (1.2:1 on land)
+LIGHT_WATERWAY = "#8FBFCB"        # was #cce7ea (1.3:1 on land)
+
+
+def _constant_color(layer, color: str) -> None:
+    c = QColor(color)
+    layer.setColor(c)                       # a line layer's stroke / a fill layer's fill
+    if hasattr(layer, "setStrokeColor"):
+        layer.setStrokeColor(c)
+    if hasattr(layer, "setDataDefinedProperty"):
+        layer.setDataDefinedProperty(QgsSymbolLayer.Property.StrokeColor, QgsProperty.fromValue(c))
+        layer.setDataDefinedProperty(QgsSymbolLayer.Property.FillColor, QgsProperty.fromValue(c))
+
+
+def _light_road_color(name: str):
+    """The replacement colour for one CARTO Voyager style rule, or None to leave it alone."""
+    if name.startswith("tunnel_"):
+        return None            # tunnels stay faint on purpose
+    if name.startswith(("road_", "bridge_")):
+        if name.endswith("_path"):
+            return LIGHT_ROAD_PATH
+        parts = name.split("_")
+        if len(parts) < 3 or parts[1] not in LIGHT_ROAD_CASE:
+            return None
+        if "_case" in name:
+            return LIGHT_ROAD_CASE[parts[1]]
+        if "_fill" in name:
+            return LIGHT_ROAD_FILL[parts[1]]
+        return None
+    return {"rail": LIGHT_RAIL, "building": LIGHT_BUILDING_FILL, "waterway": LIGHT_WATERWAY}.get(name)
+
+
+def retint_basemap_roads(renderer, dark: bool) -> int:
+    """Raises road/rail/building/waterway contrast on the light basemap (see the constants above). A no-op
+    for the dark basemap. Same write-back rules as retint_basemap_vegetation: styles() hands out copies and
+    the converter's zoom-interpolated colours are data-defined, so both are replaced.
+    Returns how many style rules were retinted."""
+    if dark:
+        return 0
+    styles = renderer.styles()
+    touched = 0
+    for style in styles:
+        color = _light_road_color(style.styleName())
+        symbol = style.symbol()
+        if color is None or symbol is None:
+            continue
+        for i in range(symbol.symbolLayerCount()):
+            _constant_color(symbol.symbolLayer(i), color)
+        style.setSymbol(symbol.clone())
+        touched += 1
+    renderer.setStyles(styles)
+    return touched
+
+
 # Clustering parameters ported from the Velorona Web Map's clusterGroup()
 # (aei-link-clearance/web/app.js): same 50px grouping radius and the same
 # 32/40/48px size tiers by represented-record count, so the two products

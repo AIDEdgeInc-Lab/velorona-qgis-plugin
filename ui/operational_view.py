@@ -15,6 +15,7 @@ referenced by name and supplied separately (ui/charts.py).
 from __future__ import annotations
 
 import html
+import re
 from typing import List, Tuple
 
 from ..core.presentation.terrain import CRITICAL_POINT_DEFINITION
@@ -45,7 +46,7 @@ def _facts_table(facts) -> str:
             extra += f"<div class='note'>{_e(f.comparison)}</div>"
         if f.meaning:
             extra += f"<div class='note'>{_e(f.meaning)}</div>"
-        rows.append(f"<tr><td class='fk'>{_e(f.label)}</td><td><b>{_e(f.value)}</b>{extra}</td></tr>")
+        rows.append(f"<tr><td class='fk' width='132'>{_e(f.label)}</td><td><b>{_e(f.value)}</b>{extra}</td></tr>")
     return f"<table cellpadding='3'>{''.join(rows)}</table>" if rows else ""
 
 
@@ -62,7 +63,7 @@ def _group_changes(changes):
         label = (c.baseline or "").strip()
         period = f"{_e(c.previous_time)} \u2192 {_e(c.current_time)}"
         groups.setdefault(label, []).append(
-            f"<tr><td class='fk'>{_e(c.label)}</td><td><b>{_e(fmt(c.current, c.decimals))} {_e(c.unit)}</b> "
+            f"<tr><td class='fk' width='132'>{_e(c.label)}</td><td><b>{_e(fmt(c.current, c.decimals))} {_e(c.unit)}</b> "
             f"&nbsp;{_e(c.delta_text)} <span class='note'>({period})</span></td></tr>")
     return [(label, "".join(rows)) for label, rows in groups.items()]
 
@@ -81,9 +82,13 @@ def _changes_block(brief: Brief) -> str:
 
 def _header(brief: Brief) -> str:
     # The reason line already says why the status is NO DATA; the badge is the status itself.
+    reason = brief.reason or ""
+    if brief.status == NO_DATA:
+        # The badge already says NO DATA; the engine's reason text starts "NO DATA (weather): ...", which printed it twice.
+        reason = re.sub(r"^\s*NO DATA(?:\s*\([^)]*\))?\s*:\s*", "", reason)
     return (f"<div class='kicker'>{_e(brief.title)}</div>"
             f"<h3>{_e(brief.heading or brief.location)}</h3>"
-            f"<p>{status_badge(brief.status)} &nbsp;{_e(brief.reason)}</p>")
+            f"<p>{status_badge(brief.status)} &nbsp;{_e(reason)}</p>")
 
 
 def _answer_line(brief: Brief) -> str:

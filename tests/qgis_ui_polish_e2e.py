@@ -105,6 +105,11 @@ print("== NO DATA wording ==")
 html_nd, _ = OV.render_summary(brief(NO_DATA))
 check("NO DATA keeps the status and the reason", "NO DATA" in html_nd and "Live weather could not be retrieved." in html_nd)
 check("NO DATA does not repeat itself as an 'No answer' line", "No answer" not in html_nd)
+_b = brief(NO_DATA)
+_b.reason = "NO DATA (weather): frequency outside 1-100 GHz (ITU-R P.838-3 range)"
+_h = OV.render_summary(_b)[0]
+check("a reason that already starts 'NO DATA (...):' is not printed under the NO DATA badge twice",
+      _h.count("NO DATA") == 1 and "frequency outside 1-100 GHz" in _h, _h.count("NO DATA"))
 html_ok, _ = OV.render_summary(brief(CLEAR))
 check("other statuses keep their plain answer", "No answer: there is no weather data" in html_ok)
 check("heading is shown (falls back to location)", "<h3>H</h3>" in html_ok and "<h3>loc</h3>" in OV.render_summary(brief(CLEAR, heading=""))[0])
@@ -175,6 +180,79 @@ hint = tbl.operator_hint.text()
 check("operator hint states operators and records", "2 operator" in hint and "6 records" in hint, hint)
 check("first operator item has no count that could contradict the footer", tbl.licensee_combo.itemText(0) == "All operators")
 check("controls have accessible names", all(w.accessibleName() for w in (tbl.licensee_combo, tbl.search_edit, tbl.columns_button, tbl.dataset_combo)))
+
+print("== Records columns at a default-sized dock ==")
+long_links = [{"authorization_number": f"0111426{i:02d}-001", "licensee": "Rogers Communications Canada Inc.", "frequencies_mhz": "6000, 6100",
+               "in_service_date": "2020", "source": "ISED Spectrum Management long source name",
+               "site_a": {"latitude": 43.00955, "longitude": -81.15257}, "site_b": {"latitude": 43.03392, "longitude": -81.16067}} for i in range(8)]
+ll2 = L.build_link_layer("l2", long_links, specs, "#5BC0BE")
+L.mark_velorona_owned(ll2)
+wide = VeloronaRecordsTable()
+wide.resize(530, 600)           # about the viewport of the default dock on a 1500 px window
+wide.show()
+wide.set_layers({L.SOURCE_FIXED_LINKS: ll2})
+QApplication.processEvents()
+hh = wide.view.horizontalHeader()
+names2 = wide._column_names()
+ia, ib = names2.index("Site A"), names2.index("Site B")
+vw = wide.view.viewport().width()
+check("Site A and Site B (coordinates) lie fully inside the view", hh.sectionPosition(ib) + hh.sectionSize(ib) <= vw,
+      f"B ends at {hh.sectionPosition(ib) + hh.sectionSize(ib)} of {vw}")
+check("a coordinate column is wide enough for its longest value",
+      all(hh.sectionSize(i) >= wide.view.fontMetrics().horizontalAdvance("43.00955, -81.15257") for i in (ia, ib)))
+check("text columns keep at least the squeeze floor", all(hh.sectionSize(i) >= wide.COLUMN_SQUEEZE_FLOOR for i in range(2)))
+check("an elided cell still carries its full value as a tooltip",
+      wide.proxy.index(0, 1).data(Qt.ItemDataRole.ToolTipRole) == "Rogers Communications Canada Inc.")
+wide.view.setColumnWidth(0, 300)
+wide.resize(560, 600)
+QApplication.processEvents()
+check("a column the user sized by hand is not refitted on the next resize", hh.sectionSize(0) == 300, hh.sectionSize(0))
+
+print("== Records layout across dock widths, headers, sorting, filtering, dataset change ==")
+_coord = wide.view.fontMetrics().horizontalAdvance("43.00955, -81.15257")
+for _w, _label in ((380, "1024 px window"), (500, "1280 px window"), (580, "1500 px window"), (740, "1920 px window")):
+    wide.resize(_w, 600)
+    wide.view.setColumnWidth(0, 50)            # whatever happened before, a dataset (re)fit must start clean
+    wide._user_sized_columns = False
+    wide._fit_columns()
+    QApplication.processEvents()
+    _h = wide.view.horizontalHeader()
+    _vw = wide.view.viewport().width()
+    _n = wide.model.columnCount()
+    check(f"{_label}: no header is narrower than its own text plus sort arrow",
+          all(_h.sectionSize(c) >= _h.sectionSizeHint(c) for c in range(_n)),
+          [(c, _h.sectionSize(c), _h.sectionSizeHint(c)) for c in range(_n) if _h.sectionSize(c) < _h.sectionSizeHint(c)])
+    check(f"{_label}: coordinate columns never collapse below their longest value",
+          all(_h.sectionSize(i) >= _coord for i in (ia, ib)), [_h.sectionSize(i) for i in (ia, ib)])
+    _shown = [c for c in range(_n) if _h.sectionPosition(c) + _h.sectionSize(c) <= _vw]
+    check(f"{_label}: the leading columns that fit are fully inside the view (rest scroll)", _shown == list(range(len(_shown))) and len(_shown) >= 2,
+          (_shown, _vw))
+    if _w >= 580:
+        check(f"{_label}: Authorization, Licensee, Site A and Site B are all fully visible", ib in _shown and ia in _shown, (_shown, _vw))
+    check(f"{_label}: text columns are not squeezed below the floor",
+          _h.sectionSize(0) >= wide.COLUMN_SQUEEZE_FLOOR and _h.sectionSize(1) >= wide.COLUMN_SQUEEZE_FLOOR)
+wide.resize(740, 600)
+wide.view.setColumnWidth(0, 50); wide._user_sized_columns = False; wide._fit_columns(); QApplication.processEvents()
+check("with spare width the licensee is not squeezed to fit a fifth column", wide.view.columnWidth(1) > wide.COLUMN_SQUEEZE_FLOOR + 40,
+      wide.view.columnWidth(1))
+wide.view.sortByColumn(0, Qt.SortOrder.DescendingOrder)
+QApplication.processEvents()
+check("sorting by a header still sorts", wide.proxy.index(0, 0).data() == "011142607-001" and wide.view.horizontalHeader().sortIndicatorSection() == 0)
+wide.search_edit.setText("0111426 05")
+wide.search_edit.setText("011142605")
+QApplication.processEvents()
+check("filtering still filters with the header sorted", wide.proxy.rowCount() == 1, wide.proxy.rowCount())
+wide.search_edit.setText("")
+wide.view.setColumnWidth(0, 321)
+QApplication.processEvents()
+wide.resize(700, 600)
+QApplication.processEvents()
+check("a hand-sized column survives a resize", wide.view.columnWidth(0) == 321, wide.view.columnWidth(0))
+wide.set_layers({L.SOURCE_FIXED_LINKS: ll2, L.SOURCE_FIXED_SITES: ll2})
+wide.dataset_combo.setCurrentIndex(1)
+QApplication.processEvents()
+check("changing dataset clears the hand-sized flag and refits", wide._user_sized_columns is False and wide.view.columnWidth(0) != 321,
+      wide.view.columnWidth(0))
 
 passed = sum(1 for _, ok, _ in RESULTS if ok)
 print(f"\n===== {passed}/{len(RESULTS)} checks passed =====")
