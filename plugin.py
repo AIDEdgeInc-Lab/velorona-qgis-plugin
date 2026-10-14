@@ -355,6 +355,7 @@ class VeloronaPlugin:
             self._project_read_connected = False
         if self._satellites_task is not None:
             self._satellites_task.cancel()      # the worker checks this between requests; its result is ignored once the layer is gone
+            self._satellites_task.waitForFinished(3000)   # do not leave a worker thread running into a torn-down plugin (bounded wait)
         self._viewport_cache.clear()
         self._link_weather_cache.clear()
         self._remove_evidence_layers()

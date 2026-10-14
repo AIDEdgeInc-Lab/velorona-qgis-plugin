@@ -2297,5 +2297,7 @@ for name, ok, detail in RESULTS:
     if not ok:
         print(f"  FAILED: {name} -- {detail}")
 
+QgsApplication.taskManager().cancelAll()   # no worker thread may outlive the application object (a task started by section 28 crashed the exit)
+qgs.processEvents()
 qgs.exitQgis()
 sys.exit(0 if passed == len(RESULTS) else 1)
