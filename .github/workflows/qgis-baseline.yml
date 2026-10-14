@@ -1,0 +1,22 @@
+# BASELINE: the existing real-QGIS e2e suite on the plugin's main branch (no Velorona changes from the orbit-data work), in the same QGIS 4.0 image, with the
+# orbital source blocked. Used to tell a failure caused by a change from one that was already there. Runs only when this file changes on its own branch.
+name: Real QGIS baseline (main)
+on:
+  push:
+    branches: [claude/qgis-baseline]
+    paths: [".github/workflows/qgis-baseline.yml"]
+permissions:
+  contents: read
+jobs:
+  qgis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: qgis_e2e.py on main
+        run: |
+          docker run --rm --add-host celestrak.org:127.0.0.1 -v "$GITHUB_WORKSPACE":/work/velorona -e QT_QPA_PLATFORM=offscreen -w /work/velorona qgis/qgis:4.0 bash -c "
+            python3 -m pip install --quiet --break-system-packages requests skyfield sgp4 'aei-link-clearance>=0.2.0,<0.3' 'aei-microwave-link-exposure>=0.2.0,<0.3' aei-geo-features
+            python3 tests/qgis_e2e.py > /tmp/e2e.log 2>&1; echo exit=\$?
+            grep -E 'FAIL|SKIP|checks passed|FAILED|Traceback' /tmp/e2e.log | head -40
+            python3 -c \"print('---- group lines'); import re; [print(l) for l in open('/tmp/e2e.log') if 'group' in l.lower() and ('Velorona' in l or 'Infrastructure' in l)][:5]\""
