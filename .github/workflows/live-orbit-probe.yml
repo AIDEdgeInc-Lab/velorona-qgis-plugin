@@ -40,7 +40,7 @@ jobs:
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE":/work/velorona -v /tmp/orbitcache:/orbitcache -e ORBIT_CACHE_DIR=/orbitcache -e QT_QPA_PLATFORM=offscreen -w /work/velorona qgis/qgis:4.0 bash -c 'set -o pipefail
             python3 -m pip install --quiet --break-system-packages requests skyfield sgp4 "aei-link-clearance>=0.2.0,<0.3" "aei-microwave-link-exposure>=0.2.0,<0.3" aei-geo-features
-            python3 tests/qgis_satellite_feed_e2e.py 2>&1 | tail -60'
+            python3 tools/run_qgis_suite.py tests/qgis_satellite_feed_e2e.py 2>&1 | tail -60'   # the repo's own classifier: tolerates ONLY a complete N/N pass followed by the documented QGIS 4.0.3 exit abort (docs/QUALITY.md), with a ::warning::
       - name: 4. full existing e2e suite (orbital source blocked)
         continue-on-error: true
         run: |
