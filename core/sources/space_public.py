@@ -65,7 +65,7 @@ GROUND_STATION_FIELDS = [
     ("frequencies_mhz", QVariant.String), ("altitude_m", QVariant.Double),
     ("qthlocator", QVariant.String), ("observations", QVariant.Int),
     ("success_rate", QVariant.Double), ("min_horizon_deg", QVariant.Double),
-    ("coverage", QVariant.String),
+    ("coverage", QVariant.String), ("retrieved_at", QVariant.String),
 ]
 
 
@@ -145,12 +145,18 @@ def build_satellite_records(elements: Dict[str, Tuple[str, str, str]], when: dat
     return records
 
 
-def load_ground_station_snapshot(path: str = GROUND_STATIONS_SNAPSHOT_PATH) -> List[dict]:
+def load_ground_station_snapshot(path: str = GROUND_STATIONS_SNAPSHOT_PATH, stats: dict = None) -> List[dict]:
+    """The bundled SatNOGS station snapshot as layer records. A station the source reports at exactly latitude 0, longitude 0 has no recorded
+    location (an unset value, not a place in the Gulf of Guinea), so it is NOT drawn; `stats`, when given, receives the counts so the layer can say so."""
     with open(path, "r", encoding="utf-8") as f:
         raw = json.load(f)
 
     stations = []
+    unlocated = 0
     for s in raw["stations"]:
+        if s.get("lat") == 0 and s.get("lng") == 0:
+            unlocated += 1
+            continue
         freq_ranges = []
         for antenna in s.get("antenna") or []:
             if antenna.get("frequency_hz") is None:
@@ -176,5 +182,8 @@ def load_ground_station_snapshot(path: str = GROUND_STATIONS_SNAPSHOT_PATH) -> L
             "success_rate": success_rate if isinstance(success_rate, (int, float)) else None,
             "min_horizon_deg": s.get("min_horizon_deg"),
             "coverage": raw.get("coverage_note"),
+            "retrieved_at": raw.get("retrieved_at"),
         })
+    if stats is not None:
+        stats.update({"total": len(raw["stations"]), "unlocated": unlocated, "retrieved_at": raw.get("retrieved_at")})
     return stations

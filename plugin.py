@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
+import math
 import time
 
 from qgis.core import (
@@ -196,6 +197,7 @@ POINT_ZOOM_HALF_WIDTH_M = 500.0
 # layers are backed by live ArcGIS queries (measured at ~10s for the ISED
 # cellular service), so each burst is coalesced into one fetch.
 VIEWPORT_REFRESH_DEBOUNCE_MS = 400
+VIEWPORT_LAYER_LABELS = {layer_helpers.SOURCE_TOWERS: "Ontario GeoHub towers", layer_helpers.SOURCE_CELLULAR: "ISED cellular sites"}
 
 # The map stays the primary workspace: the investigation dock opens at roughly
 # a third of the window, never below a readable width, and never wide enough to
@@ -269,6 +271,8 @@ class VeloronaPlugin:
         self._selecting_from_table = False
         self.satellites_layer = None
         self._satellites_fetched_at = None
+        self._dataset_notes = {}               # source key -> provenance/status line shown in Records (replayed when the dock is created)
+        self._viewport_status = {}             # source key -> what the live viewport layers are showing (see _set_viewport_status)
         self._satellites_task = None           # the running QgsTask that loads satellite data (None when idle)
         self._endpoint_index = {}
         self._usa_provider = None
@@ -761,8 +765,9 @@ class VeloronaPlugin:
         line or multi-feature selection already has real area and only needs
         the same margin _zoom_to_layers gives a freshly loaded layer."""
         extent = layer.boundingBoxOfSelected()
-        if extent is None or extent.isNull():
-            return
+        if extent is None or extent.isNull() or not all(math.isfinite(v) for v in (
+                extent.xMinimum(), extent.yMinimum(), extent.xMaximum(), extent.yMaximum())):
+            return              # a selected feature with no usable geometry: leave the user's view where it is
         canvas = self.iface.mapCanvas()
         canvas_crs = canvas.mapSettings().destinationCrs()
         if canvas_crs != WGS84:
@@ -773,7 +778,12 @@ class VeloronaPlugin:
                 min(extent.yMaximum(), WEB_MERCATOR_MAX_LAT),
             )
             transform = QgsCoordinateTransform(WGS84, canvas_crs, QgsProject.instance())
-            extent = transform.transformBoundingBox(extent)
+            try:
+                extent = transform.transformBoundingBox(extent)
+            except Exception:
+                return          # the coordinates cannot be projected into the map CRS: do not move the view
+            if extent.isNull() or not all(math.isfinite(v) for v in (extent.xMinimum(), extent.yMinimum(), extent.xMaximum(), extent.yMaximum())):
+                return
         if extent.width() == 0 and extent.height() == 0:
             extent = QgsRectangle(
                 extent.xMinimum() - POINT_ZOOM_HALF_WIDTH_M,
@@ -839,20 +849,30 @@ class VeloronaPlugin:
                 refresh=lambda lyr: layer_helpers.replace_link_features(
                     lyr, links, link_fields))
             home_layers += [sites_layer, links_layer]
+            if sites:
+                for key in (layer_helpers.SOURCE_FIXED_SITES, layer_helpers.SOURCE_FIXED_LINKS):
+                    self._set_note(key, "ISED Fixed Service register, bundled " + str(sites[0].get("coverage") or "").replace("National (Canada-wide) -- ", ""))
         except Exception as exc:
             problems.append(f"Fixed Service (ISED): {exc}")
 
         # Context: present, off by default -- toggled on by the user, not removed.
         try:
-            stations = space_public.load_ground_station_snapshot()
+            gs_stats = {}
+            stations = space_public.load_ground_station_snapshot(stats=gs_stats)
             context_layers.append(self._ensure_public_layer(
                 layer_helpers.SOURCE_GROUND_STATIONS, space_group, visible=False, kind="ground-station",
                 build=lambda: layer_helpers.build_point_layer(
                     NAME_GROUND, stations, space_public.GROUND_STATION_FIELDS,
                     layer_color("ground-stations", dark), kind="ground-station",
-                    abstract=f"{space_public.SOURCE_SATNOGS}. Worldwide amateur/educational ground stations, not licensed telecom sites."),
+                    abstract=f"{space_public.SOURCE_SATNOGS} (retrieved {gs_stats.get('retrieved_at')}; not a live feed). Worldwide amateur/educational ground "
+                             f"stations, not licensed telecom sites. {gs_stats.get('unlocated', 0):,} of {gs_stats.get('total', 0):,} stations have no recorded location "
+                             "(the source reports them at 0,0) and are not drawn."),
                 refresh=lambda lyr: layer_helpers.replace_point_features(
                     lyr, stations, space_public.GROUND_STATION_FIELDS)))
+            self._set_note(
+                    layer_helpers.SOURCE_GROUND_STATIONS,
+                    f"SatNOGS stations: static snapshot retrieved {gs_stats.get('retrieved_at')}, not a live feed; {gs_stats.get('unlocated', 0):,} of "
+                    f"{gs_stats.get('total', 0):,} have no recorded location and are not shown.")
         except Exception as exc:
             problems.append(f"Ground/Earth Stations (SatNOGS): {exc}")
 
@@ -1002,6 +1022,30 @@ class VeloronaPlugin:
         self._satellites_task = task
         QgsApplication.taskManager().addTask(task)
 
+    @staticmethod
+    def _satellite_status_text(feed, shown, skipped) -> str:
+        """The Satellites layer's data status in one line: live / cached (with the retrieval time) / partial / unavailable. Positions are
+        CALCULATED (SGP4) from the provider's element sets for the time of the load; the element sets are the provider's data."""
+        status = feed["status"]
+        times = sorted(g["retrieved_at_utc"] for g in feed["per_group"].values() if g.get("retrieved_at_utc"))
+        when = f", element sets retrieved {times[0][:19].replace('T', ' ')} UTC" if times else ""
+        if status == "unavailable" or not shown:
+            return "CelesTrak satellites: no valid element sets are available; the layer is empty and nothing is substituted."
+        word = {"fresh": "from the provider within the last 2 hours", "stale": "STALE: cached element sets older than the 2-hour window",
+                "partial": "PARTIAL: some provider groups unavailable"}.get(status, status)
+        text = f"CelesTrak satellites: {shown:,} positions calculated with SGP4 ({word}{when})"
+        if skipped:
+            text += f"; {skipped} element set(s) could not be propagated and are not shown"
+        return text
+
+    def _set_note(self, source_key: str, text: str) -> None:
+        self._dataset_notes[source_key] = text
+        if self.dock is not None:
+            self.dock.records.set_dataset_note(source_key, text)
+
+    def _set_satellite_note(self, text: str) -> None:
+        self._set_note(layer_helpers.SOURCE_SATELLITES, text)
+
     def _satellites_loaded(self, exception, result=None):
         """GUI thread: applies what the worker produced."""
         self._satellites_task = None
@@ -1014,6 +1058,7 @@ class VeloronaPlugin:
             if bar is not None:
                 bar.pushMessage("Velorona", "Satellite data unavailable.", Qgis.MessageLevel.Warning, 8)
             self._warn(f"Satellites (CelesTrak) unavailable right now: {exception or 'cancelled'}")
+            self._set_satellite_note("CelesTrak satellites: unavailable right now; nothing is substituted.")
             return
         feed, built = result["feed"], result["built"]
         rows = built["rows"]
@@ -1022,6 +1067,7 @@ class VeloronaPlugin:
         status = feed["status"]
         detail = "; ".join(feed["warnings"][:3])
         skipped = built["skipped"]["propagation_failed"]
+        self._set_satellite_note(self._satellite_status_text(feed, len(rows), skipped))
         if status == "fresh" and rows:
             pass
         elif status == "unavailable" or not rows:
@@ -1039,6 +1085,49 @@ class VeloronaPlugin:
         if self.dock is not None:
             self.dock.records.refresh_current()
 
+    def _set_viewport_status(self, layer, source_key, label, state, count=0, truncated=False, skipped=0, detail="", retrieved_at=None, refresh_records=True):
+        """What a live viewport layer is showing, stated: live (just retrieved), cached (a retrieval from the last 5 minutes, with its time),
+        empty (the service answered with no records for this view) or unavailable (the request failed; the layer is emptied, nothing stands in).
+        Shown in the Records status line; an unavailable service is also announced once on the message bar."""
+        previous = self._viewport_status.get(source_key, {})
+        if count == 0 and state in ("live", "cached"):
+            state = "empty"
+        if state == "unavailable":
+            layer_helpers.replace_point_features(layer, [], [])
+            self._last_viewport_bbox.pop(layer.id(), None)
+            retrieved_at = None
+        self._viewport_status[source_key] = {"state": state, "retrieved_at": retrieved_at, "count": count, "truncated": truncated,
+                                             "skipped": skipped, "label": label, "detail": detail}
+        if state == "unavailable" and previous.get("state") != "unavailable":
+            bar = self.iface.messageBar()
+            if bar is not None:
+                bar.pushMessage("Velorona", f"{label} is unavailable right now. The layer is empty for this view; nothing is substituted.",
+                                Qgis.MessageLevel.Warning, 8)
+        if truncated and not previous.get("truncated"):
+            bar = self.iface.messageBar()
+            if bar is not None:
+                bar.pushMessage("Velorona", f"{label}: the service returned its 1,000-record limit for this view. Zoom in to see every record.",
+                                Qgis.MessageLevel.Info, 8)
+        self._set_note(source_key, self._viewport_status_text(self._viewport_status[source_key]))
+        if self.dock is not None and refresh_records:
+            self.dock.records.refresh_current()
+
+    @staticmethod
+    def _viewport_status_text(status) -> str:
+        state, label = status["state"], status["label"]
+        at = status.get("retrieved_at")
+        stamp = at.strftime("%H:%M:%S") if at else ""
+        if state == "unavailable":
+            return f"{label} is unavailable right now; no records are shown for this view."
+        if state == "empty":
+            return f"{label} returned no records for this view (retrieved {stamp})."
+        text = f"{label}: {status['count']:,} records, {'live, retrieved' if state == 'live' else 'cached, retrieved'} {stamp}"
+        if status.get("truncated"):
+            text += "; the service's 1,000-record limit was reached, zoom in for every record"
+        if status.get("skipped"):
+            text += f"; {status['skipped']} record(s) with invalid coordinates not shown"
+        return text
+
     def _refresh_viewport_layers(self):
         if self.towers_layer is None or self.cellular_layer is None:
             return
@@ -1053,11 +1142,11 @@ class VeloronaPlugin:
         busy = False
         refreshed = False
         try:
-            for layer, fetch, fields, source in (
+            for layer, fetch, fields, source, source_key in (
                 (self.towers_layer, terrestrial_public.fetch_geohub_towers,
-                 terrestrial_public.TOWER_FIELDS, terrestrial_public.TOWER_SOURCE_KEY),
+                 terrestrial_public.TOWER_FIELDS, terrestrial_public.TOWER_SOURCE_KEY, layer_helpers.SOURCE_TOWERS),
                 (self.cellular_layer, terrestrial_public.fetch_ised_cellular,
-                 terrestrial_public.CELLULAR_FIELDS, terrestrial_public.CELLULAR_SOURCE_KEY),
+                 terrestrial_public.CELLULAR_FIELDS, terrestrial_public.CELLULAR_SOURCE_KEY, layer_helpers.SOURCE_CELLULAR),
             ):
                 # Both layers are off by default. Querying a live service for a
                 # layer nobody can see cost ~10s of blocked GUI time per map
@@ -1069,9 +1158,14 @@ class VeloronaPlugin:
                 if self._last_viewport_bbox.get(layer.id()) == bbox:
                     continue
 
+                label = VIEWPORT_LAYER_LABELS[source_key]
                 cached = self._viewport_cache.get(source, bbox)
                 if cached is FAILED:
-                    continue  # recent failure -- don't hammer a service that is down
+                    # A recent failure: show NOTHING for this view (the layer must not keep the previous view's records and pass them off as
+                    # this view's) and say so, rather than skipping silently.
+                    self._set_viewport_status(layer, source_key, label, "unavailable")
+                    continue
+                truncated = False
                 if cached is MISS:
                     if not busy:
                         # The ISED query alone measures ~8s. Paint the busy
@@ -1080,17 +1174,23 @@ class VeloronaPlugin:
                         QApplication.processEvents()
                         busy = True
                     try:
-                        sites, _ = fetch(bbox)
-                    except Exception:
-                        # live public service -- degrade, don't crash the map interaction
+                        sites, truncated = fetch(bbox)
+                    except Exception as exc:
+                        # live public service -- degrade, don't crash the map interaction; but never leave the old view's records on screen
                         self._viewport_cache.put_failure(source, bbox)
+                        self._set_viewport_status(layer, source_key, label, "unavailable", detail=str(exc)[:160])
                         continue
-                    self._viewport_cache.put(source, bbox, sites)
+                    retrieved_at = datetime.now()
+                    self._viewport_cache.put(source, bbox, (sites, truncated, retrieved_at))
+                    state = "live"
                 else:
-                    sites = cached
+                    sites, truncated, retrieved_at = cached
+                    state = "cached"
 
-                layer_helpers.replace_point_features(layer, sites, fields)
+                skipped = layer_helpers.replace_point_features(layer, sites, fields)
                 self._last_viewport_bbox[layer.id()] = bbox
+                self._set_viewport_status(layer, source_key, label, state, count=len(sites) - skipped, truncated=truncated, skipped=skipped,
+                                          retrieved_at=retrieved_at, refresh_records=False)
                 refreshed = True
         finally:
             if busy:
@@ -1115,6 +1215,8 @@ class VeloronaPlugin:
         if count == 0:
             if self.dock is not None:
                 self.dock.show_empty_state()
+                if not self._selecting_from_table:
+                    self.dock.records.clear_selection()      # no highlighted row may outlive the map selection it mirrored
             return
         # Brings the selection into view regardless of where it came from --
         # a map click already has the feature in view, but a dock row click
@@ -1130,6 +1232,7 @@ class VeloronaPlugin:
         if not selected:        # a selection id with no feature behind it (e.g. the layer was repopulated since): nothing to investigate
             if self.dock is not None:
                 self.dock.show_empty_state()
+                self.dock.records.clear_selection()
             return
         feature = selected[0]
         entry = feature_to_entry(feature, kind)
@@ -1488,6 +1591,8 @@ class VeloronaPlugin:
             self.dock.elevation_profile_requested = self._open_elevation_profile
             self.dock.map_appearance_changed = self.set_map_appearance
             self.dock.set_map_appearance(self._map_appearance)
+            for key, text in self._dataset_notes.items():       # statuses recorded before the dock existed
+                self.dock.records.set_dataset_note(key, text)
             self.dock.records.featureChosen.connect(self._on_record_chosen)
             self.dock.records.featuresChosen.connect(self._on_records_chosen)
             self.dock.records.licenseeChanged.connect(self.set_licensee_filter)

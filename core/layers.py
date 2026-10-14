@@ -515,6 +515,56 @@ def layer_lifecycle(layer) -> str:
 PUBLIC_RECORDS_DISCLOSURE = "public infrastructure records, not a coverage guarantee"
 
 
+VELORONA_SKIPPED_PROPERTY = "velorona_invalid_coordinates_skipped"
+
+
+def valid_wgs84(latitude, longitude) -> bool:
+    """True only for finite numbers inside the WGS84 range. A record that fails this is never drawn: a wrong or missing coordinate must not
+    become a point on the map (it would look like a real location and Records/selection would navigate to it)."""
+    try:
+        lat, lon = float(latitude), float(longitude)
+    except (TypeError, ValueError):
+        return False
+    return lat == lat and lon == lon and abs(lat) <= 90.0 and abs(lon) <= 180.0 and abs(lat) != float("inf") and abs(lon) != float("inf")
+
+
+def _point_feature(layer, record, field_specs):
+    """A feature for one point record, or None when its coordinates are missing or invalid."""
+    if not valid_wgs84(record.get("latitude"), record.get("longitude")):
+        return None
+    feature = QgsFeature(layer.fields())
+    feature.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(float(record["longitude"]), float(record["latitude"]))))
+    feature.setAttributes([record.get(field_name) for field_name, _ in field_specs])
+    return feature
+
+
+def _link_feature(layer, link, field_specs):
+    """A feature for one link record, or None when either endpoint is missing or has invalid coordinates."""
+    site_a, site_b = link.get("site_a") or {}, link.get("site_b") or {}
+    if not (valid_wgs84(site_a.get("latitude"), site_a.get("longitude")) and valid_wgs84(site_b.get("latitude"), site_b.get("longitude"))):
+        return None
+    feature = QgsFeature(layer.fields())
+    feature.setGeometry(QgsGeometry.fromPolylineXY([
+        QgsPointXY(float(site_a["longitude"]), float(site_a["latitude"])),
+        QgsPointXY(float(site_b["longitude"]), float(site_b["latitude"])),
+    ]))
+    feature.setAttributes([link.get(field_name) for field_name, _ in field_specs])
+    return feature
+
+
+def _fill(layer, records, field_specs, make):
+    features, skipped = [], 0
+    for record in records:
+        feature = make(layer, record, field_specs)
+        if feature is None:
+            skipped += 1
+        else:
+            features.append(feature)
+    layer.dataProvider().addFeatures(features)
+    layer.setCustomProperty(VELORONA_SKIPPED_PROPERTY, skipped)
+    return skipped
+
+
 def _build_fields(field_specs: Sequence[Tuple[str, QMetaType.Type]]) -> List[QgsField]:
     return [QgsField(name, qtype) for name, qtype in field_specs]
 
@@ -636,13 +686,7 @@ def build_point_layer(
     provider.addAttributes(_build_fields(field_specs))
     layer.updateFields()
 
-    features = []
-    for record in records:
-        feature = QgsFeature(layer.fields())
-        feature.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(record["longitude"], record["latitude"])))
-        feature.setAttributes([record.get(field_name) for field_name, _ in field_specs])
-        features.append(feature)
-    provider.addFeatures(features)
+    _fill(layer, records, field_specs, _point_feature)
     layer.updateExtents()
 
     layer.setRenderer(_clustered_renderer(color_hex) if cluster else QgsSingleSymbolRenderer(_point_symbol(color_hex)))
@@ -667,18 +711,7 @@ def build_link_layer(
     provider.addAttributes(_build_fields(field_specs))
     layer.updateFields()
 
-    features = []
-    for link in links:
-        site_a, site_b = link["site_a"], link["site_b"]
-        geom = QgsGeometry.fromPolylineXY([
-            QgsPointXY(site_a["longitude"], site_a["latitude"]),
-            QgsPointXY(site_b["longitude"], site_b["latitude"]),
-        ])
-        feature = QgsFeature(layer.fields())
-        feature.setGeometry(geom)
-        feature.setAttributes([link.get(field_name) for field_name, _ in field_specs])
-        features.append(feature)
-    provider.addFeatures(features)
+    _fill(layer, links, field_specs, _link_feature)
     layer.updateExtents()
 
     color = QColor(color_hex)
@@ -699,17 +732,11 @@ def replace_point_features(layer: QgsVectorLayer, records: Iterable[dict], field
     """Clears and repopulates a memory point layer in place -- used for the
     viewport-scoped live layers (towers, cellular) on canvas extentsChanged,
     same refresh-in-place pattern as app.js's refreshLiveLayers()."""
-    provider = layer.dataProvider()
-    provider.truncate()
-    features = []
-    for record in records:
-        feature = QgsFeature(layer.fields())
-        feature.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(record["longitude"], record["latitude"])))
-        feature.setAttributes([record.get(field_name) for field_name, _ in field_specs])
-        features.append(feature)
-    provider.addFeatures(features)
+    layer.dataProvider().truncate()
+    skipped = _fill(layer, records, field_specs, _point_feature)
     layer.updateExtents()
     layer.triggerRepaint()
+    return skipped
 
 
 def build_context_link_layer(name: str, features, color_hex: str) -> QgsVectorLayer:
@@ -742,21 +769,11 @@ def replace_link_features(layer: QgsVectorLayer, links: Iterable[dict],
     """Clears and repopulates a memory line layer in place, so a re-run of
     Load Public Data refreshes the existing layer instead of adding a second
     one (and keeps whatever visibility/styling the user set)."""
-    provider = layer.dataProvider()
-    provider.truncate()
-    features = []
-    for link in links:
-        site_a, site_b = link["site_a"], link["site_b"]
-        feature = QgsFeature(layer.fields())
-        feature.setGeometry(QgsGeometry.fromPolylineXY([
-            QgsPointXY(site_a["longitude"], site_a["latitude"]),
-            QgsPointXY(site_b["longitude"], site_b["latitude"]),
-        ]))
-        feature.setAttributes([link.get(field_name) for field_name, _ in field_specs])
-        features.append(feature)
-    provider.addFeatures(features)
+    layer.dataProvider().truncate()
+    skipped = _fill(layer, links, field_specs, _link_feature)
     layer.updateExtents()
     layer.triggerRepaint()
+    return skipped
 
 
 def add_to_group(project, layer: QgsVectorLayer, group, visible: bool,

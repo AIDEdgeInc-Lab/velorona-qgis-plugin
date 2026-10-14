@@ -42,7 +42,9 @@ def context_for(result) -> Optional[AskContext]:
     if kind == "microwave-exposure":
         return AskContext(weather=exposure_brief(result))
     if kind == "link-investigation":
-        return AskContext(weather=exposure_brief(result.exposure, result.param_origins, result.weather_error))
+        from .model import link_title
+        record_title = link_title((getattr(result.entry, "data", None) or {}).get("authorization_number"))
+        return AskContext(weather=exposure_brief(result.exposure, result.param_origins, result.weather_error, record_title))
     return None
 
 
