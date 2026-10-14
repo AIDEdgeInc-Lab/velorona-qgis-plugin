@@ -306,7 +306,7 @@ def _field_row(label: str, value, note: str = None) -> str:
     if value is None or value == "":
         return ""
     note_html = f" <span class='note'>{_esc(note)}</span>" if note else ""
-    return f"<tr><td class='fk'>{_esc(label)}</td><td>{_esc(value)}{note_html}</td></tr>"
+    return f"<tr><td class='fk' width='132'>{_esc(label)}</td><td>{_esc(value)}{note_html}</td></tr>"
 
 
 def _field_row_checked(d: dict, key: str, label: str, formatter=None) -> str:
@@ -319,7 +319,7 @@ def _field_row_checked(d: dict, key: str, label: str, formatter=None) -> str:
         return ""
     value = d.get(key)
     if value is None or value == "":
-        return f"<tr><td class='fk'>{_esc(label)}</td><td class='nd'>{NOT_DETERMINED}</td></tr>"
+        return f"<tr><td class='fk' width='132'>{_esc(label)}</td><td class='nd'>{NOT_DETERMINED}</td></tr>"
     return _field_row(label, formatter(value) if formatter else value)
 
 
@@ -477,7 +477,7 @@ def _render_ground_station_feature(entry) -> str:
     if "success_rate" in d:
         sr = d.get("success_rate")
         success_rate_row = _field_row("Success rate (SatNOGS)", f"{sr}%") if isinstance(sr, (int, float)) else \
-            f"<tr><td class='fk'>Success rate (SatNOGS)</td><td class='nd'>{NOT_DETERMINED}</td></tr>"
+            f"<tr><td class='fk' width='132'>Success rate (SatNOGS)</td><td class='nd'>{NOT_DETERMINED}</td></tr>"
     technical = (
         _field_row_checked(d, "frequencies_mhz", "Antenna frequencies") + _field_row("Antenna count", d.get("antenna_count"))
         + _field_row_checked(d, "observations", "Observations (SatNOGS)")

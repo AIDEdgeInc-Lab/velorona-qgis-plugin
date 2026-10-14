@@ -184,9 +184,13 @@ qgs.processEvents()  # let the layer-tree bridge push visible layers onto the ca
 check("hidden layers excluded from render", len(canvas.mapSettings().layers()) == 3,
       f"renderer sees {len(canvas.mapSettings().layers())} of {len(by_name)} layers")
 
-disclosed = [n for n in by_name if "not a coverage guarantee" in n]
-check("public-records disclosure still on the raw-record layer names", len(disclosed) == 4,
+# Field-readability pass: the disclosure moved OUT of the layer names (the Layers panel truncated them to "Fixed Service
+# sites -- pub") and into each layer's abstract plus the Records status line.
+disclosed = [n for n, lyr in by_name.items() if "public infrastructure records" in lyr.metadata().abstract().lower()]
+check("public-records disclosure is in the abstract of the four raw-record layers", len(disclosed) == 4,
       f"{len(disclosed)} layers carry it")
+check("layer names are short enough for the Layers panel (<= 34 characters)",
+      all(len(n) <= 34 for n in by_name), str({n: len(n) for n in by_name if len(n) > 34}))
 check("layer abstract/metadata disclosure intact",
       all("public infrastructure records" in by_name[n].metadata().abstract().lower()
           for n in disclosed if by_name[n].metadata().abstract()),
@@ -305,7 +309,7 @@ except Exception as exc:
 
 try:
     gs_layer = next(lyr for name, lyr in by_name.items() if "Ground/Earth Stations" in name)
-    sat_layer = next(lyr for name, lyr in by_name.items() if name == "Satellites")
+    sat_layer = next(lyr for name, lyr in by_name.items() if name.startswith("Satellites"))
     if sat_layer.featureCount() == 0 or gs_layer.featureCount() == 0:
         # CelesTrak is a live public service and rate-limits; an empty layer is
         # the plugin's intended degrade path, not a defect. Report it as skipped
@@ -768,11 +772,42 @@ check("basemap stays at the bottom of the stack",
       root_children and root_children[-1] == BASEMAP_NAME, str(root_children))
 velorona_group = next((c for c in project.layerTreeRoot().children() if c.name() == "Velorona"), None)
 group_order = [c.name() for c in velorona_group.children()] if velorona_group else []
-check("Infrastructure comes before Space",
-      group_order.index("Infrastructure") < group_order.index("Space") if
-      {"Infrastructure", "Space"} <= set(group_order) else False, str(group_order))
-check("Velorona groups are Infrastructure, Space, My Data, Evidence in order",
-      group_order == ["Infrastructure", "Space", "My Data", "Evidence"], str(group_order))
+check("Infrastructure comes before Satellite / Orbital Data",
+      group_order.index("Infrastructure") < group_order.index("Satellite / Orbital Data") if
+      {"Infrastructure", "Satellite / Orbital Data"} <= set(group_order) else False, str(group_order))
+check("Velorona groups are Infrastructure, Satellite / Orbital Data, My Data, Evidence in order",
+      group_order == ["Infrastructure", "Satellite / Orbital Data", "My Data", "Evidence"], str(group_order))
+check("optional USA imagery sits between the Velorona group and the basemap, all off by default",
+      root_children[-3:] == ["Velorona", "USA Imagery (optional)", BASEMAP_NAME], str(root_children))
+
+# Projects saved by 1.1.7 hold the old names. A reload renames a layer/group that still carries the old Velorona name and
+# leaves one the user renamed alone; it never creates a second "Space" group beside the new one.
+_legacy_sites = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_FIXED_SITES)
+_legacy_links = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_FIXED_LINKS)
+_new_sites_name, _new_links_name = _legacy_sites.name(), _legacy_links.name()
+_legacy_sites.setName(plugin_module.LEGACY_LAYER_NAMES[layer_helpers.SOURCE_FIXED_SITES][1])
+_legacy_links.setName("My own name for the links")
+velorona_group.findGroup("Satellite / Orbital Data").setName("Space")
+_v, _g = plugin._ensure_velorona_groups()
+plugin._ensure_public_layer(layer_helpers.SOURCE_FIXED_SITES, _g["Infrastructure"], True, "site", build=lambda: None)
+plugin._ensure_public_layer(layer_helpers.SOURCE_FIXED_LINKS, _g["Infrastructure"], True, "link", build=lambda: None)
+check("a project saved with the old 'Space' group gets it renamed, not duplicated",
+      [c.name() for c in velorona_group.children()] == ["Infrastructure", "Satellite / Orbital Data", "My Data", "Evidence"],
+      str([c.name() for c in velorona_group.children()]))
+check("a layer still carrying its old Velorona name is renamed on reload", _legacy_sites.name() == _new_sites_name, _legacy_sites.name())
+check("a layer the user renamed keeps their name", _legacy_links.name() == "My own name for the links", _legacy_links.name())
+_legacy_links.setName(_new_links_name)
+_img_group = project.layerTreeRoot().findGroup("USA Imagery (optional)")
+from qgis.core import QgsProviderRegistry as _PR  # noqa: E402
+if "wms" in _PR.instance().providerList():
+    check("both USGS layers exist, are valid and are not visible",
+          _img_group is not None and len(_img_group.findLayers()) == 2
+          and all(n.layer().isValid() and not n.isVisible() for n in _img_group.findLayers()),
+          str([(n.name(), n.isVisible()) for n in _img_group.findLayers()] if _img_group else None))
+else:
+    SKIPPED.append("USGS imagery layers (this headless QGIS build has no 'wms' raster provider; verified in the GUI app instead)")
+    check("without the wms provider the imagery group is simply empty and no dialog is raised",
+          _img_group is not None and len(_img_group.findLayers()) == 0 and not any("optional layer" in w for w in warnings))
 
 check("exactly one Velorona dock exists",
       sum(1 for d in iface.docks if d.objectName() == "VeloronaDock") == 1,
@@ -937,8 +972,8 @@ check("towns only appear when zoomed in", by_name["town"].minZoomLevel() >= 10)
 check("city tiers are rank-limited so labels cannot flood",
       '"rank" <=' in by_name["city-wide"].filterExpression()
       and '"rank" <=' in by_name["city"].filterExpression())
-check("only place and water names are labelled, not roads or POIs",
-      {st.layerName() for st in styles} == {basemap_labels.PLACE_LAYER, basemap_labels.WATER_LAYER})
+check("only place, water and street names are labelled (no POIs)",
+      {st.layerName() for st in styles} == {basemap_labels.PLACE_LAYER, basemap_labels.WATER_LAYER, basemap_labels.STREET_LAYER})
 check("duplicate labels across tile seams are removed",
       all(st.labelSettings().thinningSettings().allowDuplicateRemoval() for st in styles))
 
@@ -1698,6 +1733,41 @@ check("vegetation retint does not touch water/boundary/waterway/transportation",
 check("vegetation retint adds no new HTTP dependency",
       "requests.get" not in open(os.path.join(PLUGIN_DIR, "core", "layers.py")).read())
 
+print("\n== 22b. light basemap road legibility (field readability pass) ==")
+def _rel_lum(rgb):
+    def ch(v):
+        v /= 255.0
+        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+    return 0.2126 * ch(rgb[0]) + 0.7152 * ch(rgb[1]) + 0.0722 * ch(rgb[2])
+def _contrast(a, b):
+    la, lb = _rel_lum(a), _rel_lum(b)
+    hi, lo = max(la, lb), min(la, lb)
+    return (hi + 0.05) / (lo + 0.05)
+_LAND = (0xfb, 0xf8, 0xf3)
+_dark_r = _Conv(); _dark_r.convert(_rq.get(plugin_module.BASEMAP_STYLE_URL_DARK, timeout=25).text)
+check("roads retint is a no-op on the dark basemap", _L.retint_basemap_roads(_dark_r.renderer(), True) == 0)
+_roads_before = {st.styleName(): st.symbol().symbolLayer(0).color().name() for st in _renderer.styles()}
+_nroads = _L.retint_basemap_roads(_renderer, False)
+check("light roads retint reaches the road, rail, building and waterway rules", _nroads >= 30, f"{_nroads} rules")
+_roads = {st.styleName(): st for st in _renderer.styles()}
+def _col(name):
+    sl = _roads[name].symbol().symbolLayer(0)
+    c = sl.color()
+    return (c.red(), c.green(), c.blue())
+_min_case = _col("road_minor_case")
+check("minor-road casing is at least 2:1 against the land (was 1.07:1 white-on-cream)",
+      _contrast(_min_case, _LAND) >= 2.0, f"{_contrast(_min_case, _LAND):.2f}:1")
+for _nm in ("road_sec_case_noramp", "road_pri_case_noramp", "road_mot_case_noramp"):
+    check(f"{_nm} casing is at least 2:1 against the land", _contrast(_col(_nm), _LAND) >= 2.0, f"{_contrast(_col(_nm), _LAND):.2f}:1")
+check("road hierarchy: motorway fill is more saturated than the minor-road fill",
+      _col("road_mot_fill_noramp") != _col("road_minor_fill") and _col("road_mot_fill_noramp")[2] < _col("road_minor_fill")[2])
+check("tunnels are left as CARTO drew them", _roads["tunnel_minor_fill"].symbol().symbolLayer(0).color().name() == _roads_before["tunnel_minor_fill"])
+_zd = _roads["road_minor_case"].symbol().symbolLayer(0).dataDefinedProperties()
+from qgis.core import QgsExpressionContext as _EC  # noqa: E402
+_zv = _zd.value(_SL.Property.StrokeColor, _EC(), None)
+check("the converter's data-defined road colour now evaluates to the constant",
+      _zv is not None and getattr(_zv, "name", lambda: str(_zv))() == "#%02x%02x%02x" % _min_case, str(_zv))
+
 print("\n== 23. label restraint, calibrated to the Velorona Web Map ==")
 # The Web Map renders OSM raster under a CSS invert/contrast filter; pushing a
 # real tile through that same chain numerically puts its brightest label text at
@@ -1766,9 +1836,11 @@ check("the label halo is still enabled (names cross water and roads)", _buf.enab
 check("duplicate removal survives this pass",
       all(st.labelSettings().thinningSettings().allowDuplicateRemoval()
           for st in basemap_labels.place_labeling(True).styles()))
-check("geographic coverage is unchanged (same six tiers, same source layers)",
+check("geographic coverage is the six original tiers plus the two street tiers",
       {t[0] for t in basemap_labels.TIERS} == {"country", "province", "water",
-                                               "city-wide", "city", "town"})
+                                               "city-wide", "city", "town", "street-major", "street"})
+check("no label tier stops at the tile maximum (names must survive over-zoom)",
+      all(t[5] != 14 for t in basemap_labels.TIERS), str([(t[0], t[5]) for t in basemap_labels.TIERS]))
 
 print("\n== 24. Operator filter visible from dock creation, before any data ==")
 # A fresh dock, never having gone through load_public_data() -- this is what

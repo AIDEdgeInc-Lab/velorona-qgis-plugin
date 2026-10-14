@@ -359,13 +359,22 @@ class VeloronaRecordsTable(QWidget):
             return
         self._current_key = key
         self.model.load(self._layers.get(key), key)
-        self.view.resizeColumnsToContents()
+        self._fit_columns()
         self._apply_column_visibility()
         self._update_status()
         # The Operator combo itself stays visible and enabled regardless of
         # which dataset tab is showing: it is a map-wide filter (Fixed
         # Service sites, Fixed Service links and Cellular sites all filter
         # together, see plugin.set_licensee_filter), not a per-tab control.
+
+    def _fit_columns(self) -> None:
+        """Content-fit every column, then keep each between a readable minimum and a cap. resizeColumnsToContents()
+        alone measures a 40-row sample, so a coordinate pair or licensee that is longer further down was cut mid-number
+        ("46.12083, -70.669"); the floor is the header text plus the longest sampled value with padding."""
+        self.view.resizeColumnsToContents()
+        for column in range(self.model.columnCount()):
+            width = self.view.columnWidth(column)
+            self.view.setColumnWidth(column, max(96, min(width + 16, 260)))
 
     # -- column visibility ----------------------------------------------
 
@@ -437,7 +446,7 @@ class VeloronaRecordsTable(QWidget):
         self.licensee_combo.blockSignals(False)
         self.licensee_combo.setEnabled(bool(counts))
         self.operator_hint.setText(
-            f"{len(counts):,} operator(s), {total:,} records in currently-loaded data.")
+            f"{len(counts):,} operator(s); {total:,} records across the loaded Velorona layers (the table below shows one layer at a time).")
         self.operator_hint.setVisible(bool(counts))
 
     def _on_licensee_changed(self, _index):
@@ -485,10 +494,13 @@ class VeloronaRecordsTable(QWidget):
                     f"Clear the Operator filter to see everything.")
             else:
                 self.status_label.setText("No records in this dataset yet.")
-        elif shown == total:
-            self.status_label.setText(f"{total:,} records")
         else:
-            self.status_label.setText(f"{shown:,} of {total:,} records")
+            count = f"{total:,} records" if shown == total else f"{shown:,} of {total:,} records"
+            # The layer NAMES no longer carry this disclosure (the Layers panel truncated it); it stays on screen here.
+            if self._current_key in layer_helpers.OPERATOR_SOURCE_KEYS + (layer_helpers.SOURCE_TOWERS, layer_helpers.SOURCE_US_LINKS,
+                                                                           layer_helpers.SOURCE_US_SITES):
+                count += f" \u00b7 {layer_helpers.PUBLIC_RECORDS_DISCLOSURE}"
+            self.status_label.setText(count)
 
     # -- selection ------------------------------------------------------
 

@@ -45,7 +45,7 @@ def _facts_table(facts) -> str:
             extra += f"<div class='note'>{_e(f.comparison)}</div>"
         if f.meaning:
             extra += f"<div class='note'>{_e(f.meaning)}</div>"
-        rows.append(f"<tr><td class='fk'>{_e(f.label)}</td><td><b>{_e(f.value)}</b>{extra}</td></tr>")
+        rows.append(f"<tr><td class='fk' width='132'>{_e(f.label)}</td><td><b>{_e(f.value)}</b>{extra}</td></tr>")
     return f"<table cellpadding='3'>{''.join(rows)}</table>" if rows else ""
 
 
@@ -62,7 +62,7 @@ def _group_changes(changes):
         label = (c.baseline or "").strip()
         period = f"{_e(c.previous_time)} \u2192 {_e(c.current_time)}"
         groups.setdefault(label, []).append(
-            f"<tr><td class='fk'>{_e(c.label)}</td><td><b>{_e(fmt(c.current, c.decimals))} {_e(c.unit)}</b> "
+            f"<tr><td class='fk' width='132'>{_e(c.label)}</td><td><b>{_e(fmt(c.current, c.decimals))} {_e(c.unit)}</b> "
             f"&nbsp;{_e(c.delta_text)} <span class='note'>({period})</span></td></tr>")
     return [(label, "".join(rows)) for label, rows in groups.items()]
 

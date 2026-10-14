@@ -44,6 +44,9 @@ DUPLICATE_DISTANCE_MM = 55.0
 # follows the scale that tier serves. 40 remains the fallback.
 MAX_LABELS_PER_TIER = 40
 
+# Street names repeat per tile too, but two different streets called 'Main St' are normally further than this apart.
+STREET_DUPLICATE_DISTANCE_MM = 20.0
+
 # The tiles carry names in many scripts; resolving fonts for those is slow and
 # they are unreadable to most users of this plugin anyway. Prefer the Latin
 # transliteration, then English, then whatever the record has.
@@ -51,6 +54,7 @@ NAME_EXPRESSION = 'coalesce("name:latin", "name_en", "name")'
 
 PLACE_LAYER = "place"
 WATER_LAYER = "water_name"
+STREET_LAYER = "transportation_name"
 
 # Label ink for each basemap presentation: light text over the dark basemap,
 # dark text over the light one, each with the opposite-tone halo.
@@ -65,9 +69,12 @@ WATER_LAYER = "water_name"
 # muted toward the Web Map's character while staying comfortably legible on a
 # desktop canvas, which is viewed further back than a 256 px web tile. Every
 # light-theme value is held at or above 4.5:1 so nothing becomes hard to read.
-DARK_INK = {"place": "#B4C2D0", "place_muted": "#8A9AAA", "water": "#6F8FA8", "halo": "#05090C"}
-LIGHT_INK = {"place": "#46535E", "place_muted": "#647380", "water": "#527287", "halo": "#FFFFFF"}
+DARK_INK = {"place": "#B4C2D0", "place_muted": "#8A9AAA", "water": "#6F8FA8", "street": "#AEBBC8", "halo": "#05090C"}
+LIGHT_INK = {"place": "#46535E", "place_muted": "#647380", "water": "#527287", "street": "#3A4650", "halo": "#FFFFFF"}
 
+# A max zoom of -1 means 'no upper limit'. It must be -1, not the tile maximum (14): the tiles are over-zoomed
+# past 14, and a style capped at 14 stops matching there, so names vanished exactly when a technician zoomed in
+# to find a street or a site (field readability pass, measured at 1:7,700).
 # name, source layer, ink key, point size, zoom range, filter, rank ceiling,
 # max labels. Sizes step down from the previous 9.0-10.5 pt: at this render's
 # 96 dpi, 10 pt drew a 13.3 px glyph against the ~7 px city glyph measured in
@@ -78,8 +85,15 @@ TIERS = [
     ("province", PLACE_LAYER, "place_muted", 8.0, 0, 5, "\"class\" = 'state'", None, 8),
     ("water", WATER_LAYER, "water", 8.5, 3, 12, "", None, 12),
     ("city-wide", PLACE_LAYER, "place", 9.0, 0, 5, "\"class\" = 'city'", 8, 10),
-    ("city", PLACE_LAYER, "place", 9.0, 6, 14, "\"class\" = 'city'", 20, 24),
-    ("town", PLACE_LAYER, "place_muted", 8.0, 10, 14, "\"class\" IN ('town', 'village')", None, 20),
+    ("city", PLACE_LAYER, "place", 9.0, 6, -1, "\"class\" = 'city'", 20, 24),
+    ("town", PLACE_LAYER, "place_muted", 8.0, 10, -1, "\"class\" IN ('town', 'village')", None, 20),
+    # Street names, for finding a site on the ground (field readability pass). Same source tiles, no extra
+    # request. Major roads from regional zoom, every named street once the view is neighbourhood-sized; each
+    # tier is capped so a dense downtown frame stays cheap (measured in tests/qgis_e2e.py).
+    ("street-major", STREET_LAYER, "street", 8.0, 9, -1,
+     "\"class\" IN ('motorway', 'trunk', 'primary', 'secondary')", None, 24),
+    ("street", STREET_LAYER, "street", 8.0, 13, -1,
+     "\"class\" IN ('tertiary', 'minor', 'service')", None, 36),
 ]
 
 
@@ -107,8 +121,13 @@ def _style(tier, ink) -> QgsVectorTileBasicLabelingStyle:
     settings = QgsPalLayerSettings()
     settings.fieldName = NAME_EXPRESSION
     settings.isExpression = True
+    is_street = source_layer == STREET_LAYER
     settings.placement = (Qgis.LabelPlacement.Horizontal if source_layer == WATER_LAYER
+                          else Qgis.LabelPlacement.Curved if is_street
                           else Qgis.LabelPlacement.OverPoint)
+    if is_street:
+        settings.repeatDistance = 120.0                     # a long street is named every ~120 mm, not once
+        settings.repeatDistanceUnit = Qgis.RenderUnit.Millimeters
     settings.setFormat(_text_format(size, ink[ink_key], ink["halo"]))
     # Label priority is deliberately left at its default. Setting it low was
     # measured to suppress every label on a vector tile layer (473 drawn text
@@ -120,7 +139,7 @@ def _style(tier, ink) -> QgsVectorTileBasicLabelingStyle:
     # collapses those repeats.
     thinning = settings.thinningSettings()
     thinning.setAllowDuplicateRemoval(True)
-    thinning.setMinimumDistanceToDuplicate(DUPLICATE_DISTANCE_MM)
+    thinning.setMinimumDistanceToDuplicate(STREET_DUPLICATE_DISTANCE_MM if is_street else DUPLICATE_DISTANCE_MM)
     thinning.setMinimumDistanceToDuplicateUnit(Qgis.RenderUnit.Millimeters)
     thinning.setLimitNumberLabelsEnabled(True)
     thinning.setMaximumNumberLabels(max_labels or MAX_LABELS_PER_TIER)
@@ -129,7 +148,7 @@ def _style(tier, ink) -> QgsVectorTileBasicLabelingStyle:
     style = QgsVectorTileBasicLabelingStyle()
     style.setStyleName(name)
     style.setLayerName(source_layer)
-    style.setGeometryType(Qgis.GeometryType.Line if source_layer == WATER_LAYER
+    style.setGeometryType(Qgis.GeometryType.Line if source_layer in (WATER_LAYER, STREET_LAYER)
                           else Qgis.GeometryType.Point)
     style.setMinZoomLevel(zmin)
     style.setMaxZoomLevel(zmax)
