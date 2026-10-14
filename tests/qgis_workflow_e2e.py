@@ -314,6 +314,19 @@ check("(7) after search + sort the selected record is still the highlighted row 
       (links.selectedFeatureIds(), len(sel)))
 rec.search_edit.setText("")
 
+print("== 6b. a selected satellite gets a regional view, not a 1 km box ==")
+sats = lay(L.SOURCE_SATELLITES)
+sat_rec = {"id": "sat-test", "latitude": 0.5, "longitude": -75.0, "name": "TEST-ONLY", "norad_cat_id": "1", "altitude_km": 35786.0}
+# test-only record, never shipped: it is only here to exercise the navigation rule on the satellite layer
+L.replace_point_features(sats, [sat_rec], space_public.SATELLITE_FIELDS)
+canvas.setExtent(QgsRectangle(-1e5, 4e6, 1e5, 4.2e6))
+sats.selectByIds([next(sats.getFeatures()).id()])
+for _ in range(10):
+    qgs.processEvents()
+check("the satellite view is wider than 1,000 km", canvas.extent().width() > 1.0e6, canvas.extent().width())
+sats.removeSelection()
+L.replace_point_features(sats, [], space_public.SATELLITE_FIELDS)
+
 print("== 7. invalid or missing coordinates never navigate ==")
 mem = L.build_point_layer("bad", [{"id": "b", "latitude": 12.0, "longitude": 30.0, "name": "n"}], [("id", QMetaType.Type.QString), ("name", QMetaType.Type.QString)], "#ffffff")
 bad_f = QgsFeature(mem.fields())

@@ -192,6 +192,7 @@ WEB_MERCATOR_MAX_LAT = 85.05112878
 # metres) reads the halo clearly at a glance while keeping nearby sites/
 # links in view, rather than filling the screen with basemap alone.
 POINT_ZOOM_HALF_WIDTH_M = 500.0
+SATELLITE_ZOOM_HALF_WIDTH_M = 1500000.0      # ~3,000 km wide: the sub-satellite point with its surroundings
 
 # A single pan or zoom emits extentsChanged several times. The viewport
 # layers are backed by live ArcGIS queries (measured at ~10s for the ISED
@@ -785,11 +786,14 @@ class VeloronaPlugin:
             if extent.isNull() or not all(math.isfinite(v) for v in (extent.xMinimum(), extent.yMinimum(), extent.xMaximum(), extent.yMaximum())):
                 return
         if extent.width() == 0 and extent.height() == 0:
+            # A satellite is a sub-satellite point under an object ~36,000 km up: a 1 km box around it shows nothing but empty ocean, so it gets a
+            # regional view instead; every other point (a site, a station) keeps the 1 km box.
+            half = SATELLITE_ZOOM_HALF_WIDTH_M if layer_helpers.layer_kind(layer) == "satellite" else POINT_ZOOM_HALF_WIDTH_M
             extent = QgsRectangle(
-                extent.xMinimum() - POINT_ZOOM_HALF_WIDTH_M,
-                extent.yMinimum() - POINT_ZOOM_HALF_WIDTH_M,
-                extent.xMaximum() + POINT_ZOOM_HALF_WIDTH_M,
-                extent.yMaximum() + POINT_ZOOM_HALF_WIDTH_M,
+                extent.xMinimum() - half,
+                extent.yMinimum() - half,
+                extent.xMaximum() + half,
+                extent.yMaximum() + half,
             )
         else:
             extent.scale(1.2)

@@ -3,6 +3,34 @@
 Canonical human-readable version history. (The plugin manager shows the shorter `changelog=` text in `metadata.txt`; this file is the detailed record.)
 Compare any two releases: https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/compare/v1.1.4...v1.1.5
 
+## 1.1.9 — unreleased (release candidate; compared with 1.1.8)
+
+Why it matters: the map is readable in the light theme in the field, the layer list says what each layer is and where its data comes from, and every live or bundled data source now states its status (live, cached with a time, empty, unavailable, or a dated snapshot) instead of failing silently.
+
+### Changed
+- **Light map readability.** Roads, rail, buildings and waterways are retinted for the light basemap only (minor roads were white on cream, about 1.07:1); street-name labels appear in both themes at neighbourhood scale; city and town names no longer vanish when zoomed past tile zoom 14.
+- **Layers panel.** Names are short and carry the country (`Fixed Service sites (CAN)`, `... (USA)`, `Satellites (CelesTrak)`); the group `Space` is now `Satellite / Orbital Data` (a project saved with the old group or old names is renamed in place, a layer you renamed keeps your name); the public-records disclosure moved from the layer names to each layer's metadata and the Records status line.
+- **Optional USA imagery** (off by default, own group): USGS aerial imagery and USGS topographic map, United States only, zoom 0-16. These are aerial photography and a map, not the orbital data; the Satellites layer shows satellite positions, not imagery.
+- **Records.** The sort arrow no longer clips the header; columns are fitted by priority (coordinates are never squeezed) at 1024-1920 px windows and refit on resize unless you sized a column; a selected row is readable on the light theme; the dock opens at 37 percent of the window; full values stay in cell tooltips.
+- **Evidence view.** Labels line up in one column; a NO DATA panel for a link names the link (it was blank); NO DATA is shown once.
+
+### Data integrity (what is shown is real, or says why not)
+- **Ontario towers and ISED cellular sites (live services).** Each layer's status is stated in the Records status line and, for an outage, once on the message bar: live (just retrieved), cached (retrieved within the last 5 minutes, with that time), empty (the service answered with no records for this view) or unavailable (the request failed). After a failed request the layer is emptied rather than keeping the previous view's records; the service's 1,000-record limit is reported instead of ignored.
+- **Satellites.** The status line says fresh, stale (with the retrieval time), partial or unavailable; positions are described as calculated (SGP4) from the provider's element sets.
+- **Invalid coordinates.** A record whose coordinates are missing, not finite or outside the valid range is not drawn, on any layer, and is counted; a selected feature without usable geometry no longer moves the map.
+- **SatNOGS ground stations.** 206 of 4,461 stations in the bundled snapshot are reported by the source at latitude 0, longitude 0 (an unset location). They were drawn in the Gulf of Guinea; they are no longer drawn, and the layer says how many and why.
+- **Snapshots are dated.** Canada Fixed Service records state the ISED file date and bundle date; ground stations state the snapshot retrieval date.
+- **Selection.** Clearing a map selection also clears the highlighted Records row (a stale highlight remained).
+- **Selecting a satellite** now shows a regional view (about 3,000 km wide) around its sub-satellite point instead of a 1 km box over empty ocean.
+
+### Internal
+- New cross-component workflow test (`tests/qgis_workflow_e2e.py`: Records row to map to details, map to Records, filters, sort, dataset change, provider outages with test doubles, no fabricated records), a Records layout/header test set, a satellite render test and a dev-only live probe workflow.
+
+### Verified, and known limits
+- Real sources reached from this machine on 2026-10-14: ISED snapshot checked against the raw ISED file (300 of 300 sampled links identical in endpoints and frequencies), SatNOGS snapshot checked against the live API (397 of 400 sampled stations identical, 3 moved since), live ISED cellular (453 sites in one view), live Open-Meteo and ECCC weather for a real link, the USA pack from map.velorona.ai (7,232 links and 3,606 sites in one view). Ontario towers: the service answered (278 in a wide Ontario view, none in downtown Toronto).
+- CelesTrak could not be reached from this machine (timeout, also for the home page); the failure behaviour was verified live (empty layer, stated status, no records). CelesTrak also timed out from a GitHub-hosted runner at 21:13 UTC the same day, so real element sets for this RC were NOT obtained; the earlier real-source verification of the same feed code (599 records, 2026-10-14 14:12 UTC) is documented in docs/ORBIT_DATA.md.
+- Not verified: Windows and Linux; a real user's desktop session (the checks ran in the real QGIS application with an offscreen display).
+
 ## 1.1.8 — 2026-10-14 (compared with 1.1.7)
 
 Why it matters: the Satellites layer no longer asks the orbital source every ten minutes, no longer repeats a request that just failed, can show satellites with catalog numbers above 99999, and says how old its element sets are. Nothing about terrain clearance, weather exposure, statuses, exports or Canada/USA data changes.
