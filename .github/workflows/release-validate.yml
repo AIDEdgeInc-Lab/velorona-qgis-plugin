@@ -1,0 +1,108 @@
+# Stage B - validate the exact release candidate. Runs on a version tag or by hand. It publishes NOTHING:
+# uploading to plugins.qgis.org needs an OSGeo account and stays a manual, human step (docs/QUALITY.md).
+#
+#   1. tag, metadata.txt version and CHANGELOG.md must agree.
+#   2. the full Stage A CI passes on this commit.
+#   3. the release zip is built once, verified, checksummed (SHA256SUMS is what Stage C compares against).
+#   4. that same zip is installed into a FRESH profile in real QGIS 4.0 and 4.2 and the whole
+#      Explore -> Select -> Analyze -> Evidence -> Export workflow runs from the installed copy (tests/clean_install_smoke.py).
+name: Release validation
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+  # The workflow tests itself: a change to this file runs a dry validation of the current commit on the PR
+  # (no tag, so the tag check is skipped; everything else runs).
+  pull_request:
+    paths: [".github/workflows/release-validate.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  consistency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: v
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          version="$(sed -n 's/^version=//p' metadata.txt | tr -d '[:space:]')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "$REF_TYPE" = "tag" ] && [ "$REF_NAME" != "v$version" ]; then
+            echo "::error::tag $REF_NAME does not match metadata.txt version $version"; exit 1
+          fi
+          grep -qE "^## +\[?${version//./\\.}\]?" CHANGELOG.md || { echo "::error::CHANGELOG.md has no entry for $version"; exit 1; }
+          echo "release candidate: $version"
+
+  ci:
+    needs: consistency
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: [consistency, ci]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build, verify, checksum
+        env:
+          VERSION: ${{ needs.consistency.outputs.version }}
+        run: |
+          ./tools/package.sh
+          python3 tools/verify_package.py "dist/velorona-${VERSION}.zip" "$VERSION"
+          (cd dist && sha256sum "velorona-${VERSION}.zip" | tee SHA256SUMS)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-candidate
+          path: |
+            dist/velorona-*.zip
+            dist/SHA256SUMS
+
+  clean-install:
+    name: Clean install in QGIS ${{ matrix.qgis }}
+    needs: [consistency, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        qgis: ["4.0", "4.2"]
+    container:
+      image: qgis/qgis:${{ matrix.qgis }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+      VELORONA_TEST_PROFILE: /tmp/velorona_release_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: src
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-candidate
+          path: rc
+      - name: Install the release zip into a fresh profile (development tree is not on sys.path)
+        run: |
+          mkdir -p "$VELORONA_TEST_PROFILE/python/plugins"
+          python3 -c "import zipfile,glob; zipfile.ZipFile(glob.glob('rc/velorona-*.zip')[0]).extractall('$VELORONA_TEST_PROFILE/python/plugins')"
+          find "$VELORONA_TEST_PROFILE/python/plugins/velorona" -maxdepth 1 | head
+      - name: Runtime dependencies next to the QGIS bindings
+        run: |
+          python3 -m venv --system-site-packages "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -r src/requirements-dev.txt
+      - name: Whole workflow from the installed copy
+        # run_qgis_suite.py tolerates ONLY an abort at shutdown after a complete N/N pass (QGIS 4.0.3 exitQgis teardown),
+        # with a visible warning; any failed or missing assertion still fails the job.
+        run: |
+          "$RUNNER_TEMP/venv/bin/python" src/tools/run_qgis_suite.py src/tests/clean_install_smoke.py
