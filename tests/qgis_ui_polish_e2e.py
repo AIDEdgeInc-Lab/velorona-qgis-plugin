@@ -231,6 +231,10 @@ for _w, _label in ((380, "1024 px window"), (500, "1280 px window"), (580, "1500
         check(f"{_label}: Authorization, Licensee, Site A and Site B are all fully visible", ib in _shown and ia in _shown, (_shown, _vw))
     check(f"{_label}: text columns are not squeezed below the floor",
           _h.sectionSize(0) >= wide.COLUMN_SQUEEZE_FLOOR and _h.sectionSize(1) >= wide.COLUMN_SQUEEZE_FLOOR)
+wide.resize(740, 600)
+wide.view.setColumnWidth(0, 50); wide._user_sized_columns = False; wide._fit_columns(); QApplication.processEvents()
+check("with spare width the licensee is not squeezed to fit a fifth column", wide.view.columnWidth(1) > wide.COLUMN_SQUEEZE_FLOOR + 40,
+      wide.view.columnWidth(1))
 wide.view.sortByColumn(0, Qt.SortOrder.DescendingOrder)
 QApplication.processEvents()
 check("sorting by a header still sorts", wide.proxy.index(0, 0).data() == "011142607-001" and wide.view.horizontalHeader().sortIndicatorSection() == 0)

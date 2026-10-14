@@ -373,6 +373,9 @@ class VeloronaRecordsTable(QWidget):
 
     # Narrowest a text column may be squeezed to in a narrow dock; its full value stays in the cell tooltip.
     COLUMN_SQUEEZE_FLOOR = 104
+    # Only the first columns (for links: Authorization, Licensee, Site A, Site B) are fitted into the view; spare width goes to
+    # them instead of squeezing the licensee to make room for a fifth, lower-priority column.
+    PRIORITY_COLUMNS = 4
 
     def _fit_columns(self) -> None:
         """Content-fit every column, then, if the dock is too narrow for all of them, squeeze the widest columns (usually the
@@ -400,7 +403,7 @@ class VeloronaRecordsTable(QWidget):
             # rest keep their natural width and are reached by horizontal scroll. Squeezing an off-screen column helps no one.
             visible = [c for c in range(count) if not self.view.isColumnHidden(c)]
             lead, used = [], 0
-            for c in visible:
+            for c in visible[:self.PRIORITY_COLUMNS]:
                 if lead and used + floors[c] > available:
                     break
                 lead.append(c)
