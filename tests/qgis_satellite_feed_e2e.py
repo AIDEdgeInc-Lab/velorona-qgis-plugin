@@ -199,9 +199,9 @@ bad = {"OBJECT_NAME": "SYNTH-DECAY", "OBJECT_ID": "2026-001A", "EPOCH": ep, "MEA
 f_bad = sat_layer.getFeature(f0.id())
 sat_layer.dataProvider().changeAttributeValues({f0.id(): {sat_layer.fields().indexOf("omm_json"): json.dumps(bad)}})
 sat_layer.updateFields(); qgs.processEvents()
-before = len(results)
-sat_layer.removeSelection(); sat_layer.selectByIds([f0.id()])
+sat_layer.removeSelection(); sat_layer.selectByIds([f0.id()])     # selecting also shows the plugin's own selection result; count after that
 warnings.clear()
+before = len(results)
 plugin.run_satellite()
 check("the engine refuses it with an explanation and returns no result", len(results) == before and any("cannot be propagated" in w or "below the Earth" in w for w in warnings), str(warnings))
 
