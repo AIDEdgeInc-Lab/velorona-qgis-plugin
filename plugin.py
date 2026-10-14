@@ -1054,7 +1054,12 @@ class VeloronaPlugin:
                 self.dock.records.show_features(layer, layer.selectedFeatureIds())
             return
 
-        feature = layer.selectedFeatures()[0]
+        selected = layer.selectedFeatures()
+        if not selected:        # a selection id with no feature behind it (e.g. the layer was repopulated since): nothing to investigate
+            if self.dock is not None:
+                self.dock.show_empty_state()
+            return
+        feature = selected[0]
         entry = feature_to_entry(feature, kind)
         if kind == "link":
             result = self._investigate_link(entry)
