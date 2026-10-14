@@ -29,7 +29,7 @@ CELESTRAK_GROUPS = ["geo", "intelsat", "ses", "eutelsat", "telesat"]
 # the GUI thread (see plugin._populate_satellites), so every second of it is a
 # second the map is frozen.
 CELESTRAK_TIMEOUT = (5.0, 20.0)
-SOURCE_CELESTRAK = "CelesTrak GP element sets (geo/intelsat/ses/eutelsat/telesat groups, deduplicated by NORAD catalog number), Public Domain"
+SOURCE_CELESTRAK = "CelesTrak GP element sets (geo/intelsat/ses/eutelsat/telesat groups, deduplicated by NORAD catalog number); terms: https://celestrak.org/usage-policy.php"
 
 GROUND_STATIONS_SNAPSHOT_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -47,12 +47,16 @@ SATELLITE_FIELDS = [
     ("norad_cat_id", QVariant.String), ("orbit_category", QVariant.String),
     ("period_minutes", QVariant.Double), ("altitude_km", QVariant.Double),
     ("tle_epoch", QVariant.String), ("coverage", QVariant.String),
+    # provenance of the element set behind the position (satellite_feed): when it was retrieved, and fresh | stale
+    ("retrieved_at", QVariant.String), ("data_status", QVariant.String),
     # TLE lines themselves -- carried as plain attributes (not just an
     # internal/computation-time value) so the satellite-earth-space engine
     # can re-propagate at analysis time directly from the selected
     # feature, without needing a separate in-memory cache tied to session
     # state.
     ("tle_line1", QVariant.String), ("tle_line2", QVariant.String),
+    # the validated OMM record (JSON). Rows with a catalog id above 99999 have no valid TLE, so the analysis engine propagates from this instead.
+    ("omm_json", QVariant.String),
 ]
 
 GROUND_STATION_FIELDS = [
@@ -81,7 +85,10 @@ def _fetch_celestrak_group_tle(group: str) -> str:
 
 
 def fetch_celestrak_satellites() -> Dict[str, Tuple[str, str, str]]:
-    """Returns {norad_cat_id: (name, line1, line2)}, deduplicated across
+    """DEPRECATED -- the plugin no longer calls this (it goes through core/sources/satellite_feed.py: cache, back-off, validation, provenance). Kept only
+    for the legacy e2e section 27. It has no cache, no back-off after a failure, and cuts the catalog id from TLE columns 3-7.
+
+    Returns {norad_cat_id: (name, line1, line2)}, deduplicated across
     all 5 groups, same as space.js's loadCelestrakElements().
 
     Degrades per group rather than raising -- one group being unavailable

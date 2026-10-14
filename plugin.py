@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 import time
 
 from qgis.core import (
@@ -10,8 +11,10 @@ from qgis.core import (
     QgsLayerTreeLayer,
     QgsMapBoxGlStyleConverter,
     QgsPointClusterRenderer,
+    QgsApplication,
     QgsSingleSymbolRenderer,
     QgsProject,
+    QgsTask,
     QgsRectangle,
     QgsVectorTileLayer,
 )
@@ -32,7 +35,7 @@ from .core.engines import microwave_exposure, satellite_earth_space, terrestrial
 from .core import dependencies, inspector
 from .core.inspector import feature_to_entry
 from .core.layers import LIFECYCLE_EVIDENCE, PUBLIC_RECORDS_DISCLOSURE
-from .core.sources import space_public, terrestrial_public
+from .core.sources import satellite_feed, space_public, terrestrial_public
 from .core.validation import NoDataError
 from .core.viewport_cache import FAILED, MISS, ViewportCache
 from .ui import records_table
@@ -237,6 +240,7 @@ class VeloronaPlugin:
         self._selecting_from_table = False
         self.satellites_layer = None
         self._satellites_fetched_at = None
+        self._satellites_task = None           # the running QgsTask that loads satellite data (None when idle)
         self._endpoint_index = {}
         self._usa_provider = None
         self.network_context_layer = None
@@ -349,6 +353,9 @@ class VeloronaPlugin:
         if self._project_read_connected:
             self._safe_disconnect(QgsProject.instance().readProject, self._check_stale_project_crs)
             self._project_read_connected = False
+        if self._satellites_task is not None:
+            self._satellites_task.cancel()      # the worker checks this between requests; its result is ignored once the layer is gone
+            self._satellites_task.waitForFinished(3000)   # do not leave a worker thread running into a torn-down plugin (bounded wait)
         self._viewport_cache.clear()
         self._link_weather_cache.clear()
         self._remove_evidence_layers()
@@ -892,57 +899,72 @@ class VeloronaPlugin:
         if node.layerId() in (self.towers_layer.id(), self.cellular_layer.id()):
             self._schedule_viewport_refresh()
 
-    def _populate_satellites(self):
-        """Fetches CelesTrak element sets and propagates sub-points, once the
-        Satellites layer is actually visible. Sub-points are time-dependent, so
-        a refresh is re-run if the layer is switched off and on again after the
-        positions have gone stale.
+    def _orbit_cache(self) -> satellite_feed.OrbitCache:
+        """The plugin's own folder under the QGIS profile -- not a shared, predictable temp path."""
+        from qgis.core import QgsApplication
+        return satellite_feed.OrbitCache(os.path.join(QgsApplication.qgisSettingsDirPath(), "velorona", "orbit_cache"))
 
-        The fetch is bounded (worst case ~5s connect timeout, see
-        core/sources/space_public.py) but is still a blocking call on this
-        thread, so a status message explains the short pause instead of the
-        map just appearing to freeze -- QGIS's own message bar, not a modal:
-        this is a background-feeling wait, not a decision the user needs to
-        act on. It is replaced with a plain explanation on failure rather
-        than silently vanishing, and always cleared before this returns."""
-        if self.satellites_layer is None:
+    def _populate_satellites(self):
+        """Starts loading CelesTrak element sets through the validated feed (core/sources/satellite_feed.py), once the Satellites layer is actually
+        visible. The network I/O and SGP4 run in a QgsTask WORKER thread (nothing QGIS-related is touched there); the layer, the message bar and the
+        warnings are updated in the GUI thread when the task finishes (_satellites_loaded). Only one load runs at a time. Positions are recomputed from
+        cached elements at most every SATELLITE_REFRESH_SECONDS; the PROVIDER is asked at most once per group per cache window (2 h), and not again
+        after a failed request until its back-off (persisted on disk) has passed -- so switching the layer off and on cannot re-hit a source that just
+        refused. The status is always stated: fresh data is silent; stale, partial and unavailable are reported in the message bar; nothing is ever
+        invented to fill the layer."""
+        if self.satellites_layer is None or self._satellites_task is not None:
             return
         now = time.monotonic()
         if self._satellites_fetched_at is not None and now - self._satellites_fetched_at < SATELLITE_REFRESH_SECONDS:
             return
         bar = self.iface.messageBar()
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         if bar is not None:
-            bar.pushMessage("Velorona", "Connecting to satellite data -- this may take a few seconds...",
-                            Qgis.MessageLevel.Info, 0)
-        QApplication.processEvents()  # paint the busy cursor and the message before the blocking fetch
-        try:
-            records = space_public.build_satellite_records(space_public.fetch_celestrak_satellites())
-        except Exception as exc:
-            if bar is not None:
-                bar.popWidget()
-                bar.pushMessage("Velorona", "Satellite data unavailable -- CelesTrak could not be reached.",
-                                Qgis.MessageLevel.Warning, 8)
-            self._warn(f"Satellites (CelesTrak) unavailable right now: {exc}")
-            return
-        finally:
-            QApplication.restoreOverrideCursor()
+            bar.pushMessage("Velorona", "Loading satellite data...", Qgis.MessageLevel.Info, 0)
+        cache = self._orbit_cache()                 # resolved here, in the GUI thread
+
+        def work(task):
+            when = datetime.now(timezone.utc)
+            feed = satellite_feed.load_groups(satellite_feed.GEO_GROUPS, cache, when, cancelled=task.isCanceled)
+            return {"feed": feed, "built": satellite_feed.build_rows(feed["records"], when), "started": now}
+
+        task = QgsTask.fromFunction("Velorona: satellite data", work, on_finished=self._satellites_loaded)
+        self._satellites_task = task
+        QgsApplication.taskManager().addTask(task)
+
+    def _satellites_loaded(self, exception, result=None):
+        """GUI thread: applies what the worker produced."""
+        self._satellites_task = None
+        bar = self.iface.messageBar()
         if bar is not None:
             bar.popWidget()
-        layer_helpers.replace_point_features(self.satellites_layer, records, space_public.SATELLITE_FIELDS)
-        self._satellites_fetched_at = now
-        if not records:
-            # fetch_celestrak_satellites degrades per group rather than raising
-            # -- an unreachable host (the actual failure observed while this
-            # was built) ends up here, not in the except branch above, so the
-            # plain explanation belongs here too, not only on a raised
-            # exception.
+        if self.satellites_layer is None:           # the plugin was unloaded while the task ran
+            return
+        if exception is not None or not result:
             if bar is not None:
-                bar.pushMessage("Velorona", "Satellite data unavailable -- CelesTrak could not be reached.",
-                                Qgis.MessageLevel.Warning, 8)
-            self._warn("CelesTrak returned no element sets just now (the service rate-limits "
-                       "repeated requests). The Satellites layer is empty; switch it off and on "
-                       "again later to retry.")
+                bar.pushMessage("Velorona", "Satellite data unavailable.", Qgis.MessageLevel.Warning, 8)
+            self._warn(f"Satellites (CelesTrak) unavailable right now: {exception or 'cancelled'}")
+            return
+        feed, built = result["feed"], result["built"]
+        rows = built["rows"]
+        layer_helpers.replace_point_features(self.satellites_layer, rows, space_public.SATELLITE_FIELDS)
+        self._satellites_fetched_at = result["started"]
+        status = feed["status"]
+        detail = "; ".join(feed["warnings"][:3])
+        skipped = built["skipped"]["propagation_failed"]
+        if status == "fresh" and rows:
+            pass
+        elif status == "unavailable" or not rows:
+            if bar is not None:
+                bar.pushMessage("Velorona", "Satellite data unavailable -- no valid CelesTrak element sets. The layer is empty.", Qgis.MessageLevel.Warning, 8)
+            self._warn("No usable CelesTrak element sets: " + (detail or "none returned") + ". The Satellites layer is empty; nothing is substituted. "
+                       "The source is not asked again until its back-off has passed.")
+        else:
+            label = {"stale": "older than the 2-hour refresh window (shown, flagged 'stale')", "partial": "only some groups available"}.get(status, status)
+            if bar is not None:
+                bar.pushMessage("Velorona", f"Satellite data is {label}.", Qgis.MessageLevel.Warning, 8)
+            self._warn(f"Satellites: {label}. {detail}")
+        if skipped:
+            self._warn(f"{skipped} element set(s) were not shown (SGP4 could not propagate them to this time).")
         if self.dock is not None:
             self.dock.records.refresh_current()
 
@@ -1033,7 +1055,12 @@ class VeloronaPlugin:
                 self.dock.records.show_features(layer, layer.selectedFeatureIds())
             return
 
-        feature = layer.selectedFeatures()[0]
+        selected = layer.selectedFeatures()
+        if not selected:        # a selection id with no feature behind it (e.g. the layer was repopulated since): nothing to investigate
+            if self.dock is not None:
+                self.dock.show_empty_state()
+            return
+        feature = selected[0]
         entry = feature_to_entry(feature, kind)
         if kind == "link":
             result = self._investigate_link(entry)

@@ -13,9 +13,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from skyfield.api import EarthSatellite, wgs84, load
+from skyfield.api import wgs84, load
 
 from ..features import feature_attr, feature_id_name
+from ..sources import satellite_feed
 
 MIN_ELEVATION_MASK_DEG = 10  # same convention as space.js: standard-practice 5-10 deg range, conservative end
 
@@ -49,13 +50,15 @@ def analyze(ground_station_entry, satellite_entry) -> SatelliteLookAngleResult:
 
     line1 = feature_attr(sat_feat, "tle_line1")
     line2 = feature_attr(sat_feat, "tle_line2")
-    if not line1 or not line2:
-        raise ValueError("Selected satellite feature has no TLE data -- re-run 'Load Public Data' to refresh it.")
+    omm_json = feature_attr(sat_feat, "omm_json")
+    if not (line1 and line2) and not omm_json:
+        raise ValueError("Selected satellite feature has no orbital elements -- re-run 'Load Public Data' to refresh it.")
     _, satellite_name = feature_id_name(sat_feat, "Selected satellite")
     tle_epoch = feature_attr(sat_feat, "tle_epoch", "unknown")
 
-    sat = EarthSatellite(line1, line2, satellite_name, _TS)
     when = datetime.now(timezone.utc)
+    sat = satellite_feed.earth_satellite(line1, line2, omm_json, satellite_name, _TS)
+    satellite_feed.ensure_propagates(sat, when)   # a decayed element set raises instead of yielding a number
     t = _TS.from_datetime(when)
     topocentric = (sat - observer).at(t)
     alt, az, distance = topocentric.altaz()

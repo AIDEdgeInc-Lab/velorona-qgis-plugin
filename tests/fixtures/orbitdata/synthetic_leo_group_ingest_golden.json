@@ -1,0 +1,367 @@
+{
+ "_note": "SYNTHETIC fixture; output of web/orbitdata.js ingest(). See parity/build_ingest_golden.mjs.",
+ "now_utc": "2026-10-02T00:00:00Z",
+ "json": {
+  "counts": {
+   "retrieved": 71,
+   "valid": 68,
+   "incomplete": 1,
+   "invalid": 2,
+   "duplicates": 1,
+   "unique_valid": 67,
+   "beyond_legacy_tle": 67
+  },
+  "epoch_age_days": {
+   "min": 1,
+   "median": 1,
+   "p95": 1,
+   "max": 31
+  },
+  "records": {
+   "100001": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-00"
+   },
+   "100002": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-01"
+   },
+   "100003": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-02"
+   },
+   "100004": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-03"
+   },
+   "100005": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-04"
+   },
+   "100006": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-05"
+   },
+   "100007": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-06"
+   },
+   "100008": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-07"
+   },
+   "100009": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-10"
+   },
+   "100010": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-11"
+   },
+   "100011": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-12"
+   },
+   "100012": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-13"
+   },
+   "100013": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-14"
+   },
+   "100014": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-15"
+   },
+   "100015": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-16"
+   },
+   "100016": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-17"
+   },
+   "100017": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-20"
+   },
+   "100018": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-21"
+   },
+   "100019": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-22"
+   },
+   "100020": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-23"
+   },
+   "100021": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-24"
+   },
+   "100022": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-25"
+   },
+   "100023": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-26"
+   },
+   "100024": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-27"
+   },
+   "100025": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-30"
+   },
+   "100026": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-31"
+   },
+   "100027": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-32"
+   },
+   "100028": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-33"
+   },
+   "100029": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-34"
+   },
+   "100030": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-35"
+   },
+   "100031": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-36"
+   },
+   "100032": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-37"
+   },
+   "100033": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-40"
+   },
+   "100034": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-41"
+   },
+   "100035": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-42"
+   },
+   "100036": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-43"
+   },
+   "100037": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-44"
+   },
+   "100038": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-45"
+   },
+   "100039": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-46"
+   },
+   "100040": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-47"
+   },
+   "100041": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-50"
+   },
+   "100042": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-51"
+   },
+   "100043": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-52"
+   },
+   "100044": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-53"
+   },
+   "100045": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-54"
+   },
+   "100046": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-55"
+   },
+   "100047": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-56"
+   },
+   "100048": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-A-57"
+   },
+   "100049": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-00"
+   },
+   "100050": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-01"
+   },
+   "100051": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-02"
+   },
+   "100052": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-03"
+   },
+   "100053": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-04"
+   },
+   "100054": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-05"
+   },
+   "100055": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-10"
+   },
+   "100056": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-11"
+   },
+   "100057": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-12"
+   },
+   "100058": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-13"
+   },
+   "100059": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-14"
+   },
+   "100060": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-15"
+   },
+   "100061": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-20"
+   },
+   "100062": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-21"
+   },
+   "100063": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-22"
+   },
+   "100064": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-23"
+   },
+   "100065": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-24"
+   },
+   "100066": {
+    "epoch_utc": "2026-10-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-B-25"
+   },
+   "100067": {
+    "epoch_utc": "2026-09-01T00:00:00.000Z",
+    "legacy_tle_compatible": false,
+    "name": "SYNTH-STALE-1"
+   }
+  }
+ },
+ "csv_counts": {
+  "retrieved": 71,
+  "valid": 68,
+  "incomplete": 1,
+  "invalid": 2,
+  "duplicates": 1,
+  "unique_valid": 67,
+  "beyond_legacy_tle": 67
+ }
+}
