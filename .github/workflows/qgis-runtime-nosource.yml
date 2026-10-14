@@ -1,3 +1,4 @@
+# (run 2: teardown fixes)
 # Real QGIS 4.x runtime tests that need NO access to the orbital source (the source is blocked inside the container, so this workflow can never send it a
 # request). Runs ONLY when this file changes on the probe branch. Every step continues on error so one run reports everything.
 name: Real QGIS runtime (no source access)
