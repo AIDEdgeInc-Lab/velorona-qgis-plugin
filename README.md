@@ -139,6 +139,6 @@ See [CHANGELOG.md](CHANGELOG.md) (what changed in 1.1.5 compared with 1.1.4) and
 
 ## Status
 
-Version 1.1.6. Packaged and clean-profile install tested for QGIS 4.x.
+Version 1.1.8. Packaged and clean-profile install tested for QGIS 4.x.
 Distributed via GitHub Release; not yet submitted to the QGIS Plugin
 Repository.

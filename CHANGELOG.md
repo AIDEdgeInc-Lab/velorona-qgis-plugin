@@ -3,10 +3,21 @@
 Canonical human-readable version history. (The plugin manager shows the shorter `changelog=` text in `metadata.txt`; this file is the detailed record.)
 Compare any two releases: https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/compare/v1.1.4...v1.1.5
 
-## Unreleased
+## 1.1.8 — 2026-10-14 (compared with 1.1.7)
+
+Why it matters: the Satellites layer no longer asks the orbital source every ten minutes, no longer repeats a request that just failed, can show satellites with catalog numbers above 99999, and says how old its element sets are. Nothing about terrain clearance, weather exposure, statuses, exports or Canada/USA data changes.
 
 ### Changed
 - **Satellites layer data path.** Element sets are cached for 2 hours, a failed request is not repeated until its back-off passes (previously the source was asked every 10 minutes and again on each layer toggle after a failure), decayed element sets are no longer drawn or analysed, satellites with catalog ids above 99999 are now supported (from their OMM record) instead of being unsupported, and each satellite records when its element set was retrieved and whether it is fresh or stale. The new path was exercised in a real QGIS 4.0.3 runtime against the live CelesTrak response on 2026-10-14 (28/28 checks; details and limits in docs/ORBIT_DATA.md), and the load now runs in a background task so the map stays responsive.
+- **Satellite analysis.** The satellite-to-station analysis rejects an element set that cannot be propagated (SGP4 error) with an explanation instead of returning a number; an OMM-only satellite is analysed from its OMM record (agrees with the TLE path within 0.05 degrees in the real-QGIS test).
+- **Source text.** The CelesTrak source line now links the provider's usage policy instead of calling the data "Public Domain" (no source for that claim).
+
+### Internal
+- Narrower error handling where an unreadable provider response body is classified by its HTTP status (Bandit B608/B110); `metadata.txt` escapes a literal percent sign (plugins.qgis.org rejected 1.1.7 for it); the tests read the expected version from `metadata.txt`; CI gates (unit, Qt6 enums, security, package, real-QGIS offline suites on 4.0 and 4.2) and a release-validation workflow.
+
+### Verified, and known limits
+- Real CelesTrak data through this feed (five GEO groups, 599 unique records, 3 only representable as OMM) and a real QGIS 4.0.3 runtime test of the Satellites layer (28/28 checks), on this code, 2026-10-14; details in docs/ORBIT_DATA.md. The source is intermittently unreachable (seen from several networks); when it is, the layer stays empty, says so, and backs off, and nothing is substituted.
+- Not changed and not part of this release: two QGIS 4.0 layer-group-order checks in the live end-to-end suite fail the same way on 1.1.7; a provider connection error can be shown to the user as raw text (existing behaviour).
 
 ## 1.1.7 — UI polish (compared with 1.1.6; 1.1.6 was never published separately, so 1.1.7 also carries the 1.1.6 guided USA data setup below)
 
