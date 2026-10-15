@@ -102,11 +102,12 @@ def _trend_sentence(label: str, change) -> str:
             f"({fmt(change.current)} vs {fmt(change.previous)} mm/h).")
 
 
-def exposure_brief(mw, param_origins: Optional[dict] = None, weather_error: Optional[str] = None) -> Brief:
-    """`mw` is a MicrowaveAnalysisResult (duck-typed), or None with `weather_error`."""
+def exposure_brief(mw, param_origins: Optional[dict] = None, weather_error: Optional[str] = None, record_title: str = "") -> Brief:
+    """`mw` is a MicrowaveAnalysisResult (duck-typed), or None with `weather_error`. `record_title` (on-screen only) names the selected link when there is
+    no analysis to take a title from, so a NO DATA panel still says WHICH record it is about."""
     if mw is None or mw.exposure is None:
         reason = weather_error or "Live weather services were unavailable."
-        return Brief(kind="weather", title="Weather exposure", location="", status=NO_DATA,
+        return Brief(kind="weather", title="Weather exposure", location="", heading=record_title, status=NO_DATA,
                      reason=reason, answer="No answer: there is no weather data for this link.",
                      caveats=["Nothing was substituted for the missing weather."])
 

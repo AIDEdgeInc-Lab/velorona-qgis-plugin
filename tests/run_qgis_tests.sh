@@ -52,6 +52,10 @@ echo
 echo "== QGIS USA support end-to-end test (synthetic pack, no network) =="
 "$QGISPY" "$HERE/qgis_usa_e2e.py"
 
+echo
+echo "== QGIS cross-component workflow test (selection, navigation, provider outages; offline doubles) =="
+"$QGISPY" "$HERE/qgis_workflow_e2e.py"
+
 if [ "$1" = "--bench" ]; then
     echo
     echo "== performance benchmark =="

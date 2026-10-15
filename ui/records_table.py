@@ -277,6 +277,7 @@ class VeloronaRecordsTable(QWidget):
         # Column visibility is a display preference only: it is kept for this session, per dataset, and
         # never touches the model rows, the layer, selection, sorting, search or any export.
         self._hidden_columns = {}
+        self._dataset_notes = {}
         self.columns_button = QToolButton(self)
         self.columns_button.setText("Columns \u25be")
         self.columns_button.setToolTip("Show or hide table columns (display only; search and exports use every column)")
@@ -517,6 +518,19 @@ class VeloronaRecordsTable(QWidget):
         self._active_operator = licensee or ""
         self._update_status()
 
+    def clear_selection(self) -> None:
+        """Drop the highlighted row(s) without echoing a change back to the map (the map selection was just cleared)."""
+        self._syncing = True
+        try:
+            self.view.selectionModel().clearSelection()
+        finally:
+            self._syncing = False
+
+    def set_dataset_note(self, source_key: str, text: str) -> None:
+        """A provenance/status line for a live dataset (live / cached with its time / empty / unavailable), shown in the status line."""
+        self._dataset_notes[source_key] = text
+        self._update_status()
+
     def refresh_current(self) -> None:
         """Rebuild the visible dataset from its layer (used after the viewport
         layers fetch new features)."""
@@ -546,14 +560,15 @@ class VeloronaRecordsTable(QWidget):
                     f"No records match operator “{operator}” in this dataset. "
                     f"Clear the Operator filter to see everything.")
             else:
-                self.status_label.setText("No records in this dataset yet.")
+                self.status_label.setText(self._dataset_notes.get(self._current_key) or "No records in this dataset yet.")
         else:
             count = f"{total:,} records" if shown == total else f"{shown:,} of {total:,} records"
             # The layer NAMES no longer carry this disclosure (the Layers panel truncated it); it stays on screen here.
             if self._current_key in layer_helpers.OPERATOR_SOURCE_KEYS + (layer_helpers.SOURCE_TOWERS, layer_helpers.SOURCE_US_LINKS,
                                                                            layer_helpers.SOURCE_US_SITES):
                 count += f" \u00b7 {layer_helpers.PUBLIC_RECORDS_DISCLOSURE}"
-            self.status_label.setText(count)
+            note = self._dataset_notes.get(self._current_key)
+            self.status_label.setText(f"{count}\n{note}" if note else count)
 
     # -- selection ------------------------------------------------------
 

@@ -155,6 +155,9 @@ def load_fixed_service_snapshot(path: str = FIXED_SERVICE_SNAPSHOT_PATH) -> Tupl
     with open(path, "r", encoding="utf-8") as f:
         raw = json.load(f)
 
+    # Bundled real records, not a live feed: say which file they come from and when it was bundled, on every record.
+    coverage = ("National (Canada-wide) -- snapshot, not a live query "
+                f"(ISED file dated {raw.get('source_file_updated') or 'unknown'}; bundled {raw.get('generated_date') or 'unknown'})")
     sites_by_id: Dict[str, dict] = {}
     for s in raw["sites"]:
         sites_by_id[s["id"]] = {
@@ -168,7 +171,7 @@ def load_fixed_service_snapshot(path: str = FIXED_SERVICE_SNAPSHOT_PATH) -> Tupl
             "frequencies_mhz": ", ".join(str(v) for v in s.get("frequencies_mhz", [])) or None,
             "licensee": " / ".join(s.get("licensees", [])) or None,
             "province": s.get("province"),
-            "coverage": "National (Canada-wide) -- snapshot, not a live query",
+            "coverage": coverage,
         }
 
     height_source = None
@@ -189,7 +192,7 @@ def load_fixed_service_snapshot(path: str = FIXED_SERVICE_SNAPSHOT_PATH) -> Tupl
             "in_service_date": link.get("in_service_date"),
             "frequencies_mhz": ", ".join(str(v) for v in link.get("frequencies_mhz", [])),
             "site_a": site_a, "site_b": site_b,
-            "coverage": "National (Canada-wide) -- snapshot, not a live query",
+            "coverage": coverage,
             "site_a_height_m": link.get("site_a_height_m"), "site_b_height_m": link.get("site_b_height_m"),
             "height_source": height_source if (link.get("site_a_height_m") is not None or link.get("site_b_height_m") is not None) else None,
         })

@@ -134,6 +134,9 @@ jobs:
       - name: UI polish
         run: |
           "$RUNNER_TEMP/venv/bin/python" velorona/tests/qgis_ui_polish_e2e.py
+      - name: Cross-component workflow (selection, navigation, provider outages), offline doubles
+        run: |
+          "$RUNNER_TEMP/venv/bin/python" velorona/tests/qgis_workflow_e2e.py
 
   ci-gate:
     name: ci-gate

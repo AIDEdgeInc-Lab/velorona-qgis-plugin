@@ -490,7 +490,7 @@ def _render_ground_station_feature(entry) -> str:
         + _field_row("Longitude", f"{entry.longitude:.4f}°" if entry.longitude is not None else None)
     )
     provenance = (
-        _field_row("Source", d.get("source")) + _field_row("Snapshot retrieved", "not a live feed")
+        _field_row("Source", d.get("source")) + _field_row("Snapshot retrieved", f"{d.get('retrieved_at') or 'date not recorded'} (static snapshot, not a live feed)")
         + _field_row("Coverage", d.get("coverage"))
     )
     return (

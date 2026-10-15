@@ -25,7 +25,7 @@ ZIP="$DIST/${NAME}-${VERSION}.zip"
 rm -rf "$STAGE" "$ZIP"
 mkdir -p "$STAGE/$NAME"
 
-# Runtime content only. tests/, tools/, parity/ (the Map/QGIS parity harness and fixtures), the internal SESSION_HANDOFF.md and the
+# Runtime content only. tests/, examples/ (a made-up two-site sample CSV: sample data does not ship), tools/, parity/ (the Map/QGIS parity harness and fixtures), the internal SESSION_HANDOFF.md and the
 # GitHub community files (.github/, CONTRIBUTING.md) are development-only; caches and
 # build output never ship.
 tar -C "$PLUGIN" -cf - \
@@ -37,6 +37,7 @@ tar -C "$PLUGIN" -cf - \
     --exclude='.DS_Store' \
     --exclude='dist' \
     --exclude='tests' \
+    --exclude='examples' \
     --exclude='tools' \
     --exclude='parity' \
     --exclude='SESSION_HANDOFF.md' \

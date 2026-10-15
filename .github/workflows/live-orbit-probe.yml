@@ -1,0 +1,40 @@
+# RC validation only (dev workflow, ships nothing): real CelesTrak records through the plugin's own feed code, then the Satellites layer rendered from that cache in a REAL
+# QGIS 4.0 runtime (positions, selection <-> Records <-> details, Light/Dark screenshots uploaded as an artifact). One request per GEO group (5), once; every later step reads the
+# cache. Runs on a push that changes this file (branch rc/1.1.9 only) and by hand; leave an hour between runs (the provider's one-request-per-hour guidance).
+name: Live orbit probe and satellite render (RC)
+on:
+  workflow_dispatch:
+  push:
+    branches: [rc/1.1.9]
+    paths: [".github/workflows/live-orbit-probe.yml", "tests/qgis_satellite_render.py"]
+permissions:
+  contents: read
+jobs:
+  qgis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prepare
+        run: |
+          mkdir -p /tmp/orbitcache /tmp/render && chmod 777 /tmp/orbitcache /tmp/render
+          docker pull qgis/qgis:4.0
+          docker run --rm qgis/qgis:4.0 python3 -c "from qgis.core import Qgis; import sys; print('QGIS', Qgis.version(), 'python', sys.version.split()[0])"
+      - name: 1. probe (real source, one request per GEO group)
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE":/work/velorona -v /tmp/orbitcache:/orbitcache -e ORBIT_CACHE_DIR=/orbitcache -w /work/velorona qgis/qgis:4.0 bash -c 'set -o pipefail
+            python3 -m pip install --quiet --break-system-packages requests skyfield sgp4 "aei-link-clearance>=0.2.0,<0.3" "aei-microwave-link-exposure>=0.2.0,<0.3" aei-geo-features
+            python3 tools/live_orbit_probe.py'
+      - name: 2. render the Satellites layer from the real cache in real QGIS
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE":/work/velorona -v /tmp/orbitcache:/orbitcache -v /tmp/render:/render -e ORBIT_CACHE_DIR=/orbitcache -e RENDER_OUT=/render -e QT_QPA_PLATFORM=offscreen -w /work/velorona qgis/qgis:4.0 bash -c 'set -o pipefail
+            python3 -m pip install --quiet --break-system-packages requests skyfield sgp4 "aei-link-clearance>=0.2.0,<0.3" "aei-microwave-link-exposure>=0.2.0,<0.3" aei-geo-features
+            python3 tools/run_qgis_suite.py tests/qgis_satellite_render.py 2>&1 | tail -40'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: satellite-render
+          path: /tmp/render
+          if-no-files-found: warn
