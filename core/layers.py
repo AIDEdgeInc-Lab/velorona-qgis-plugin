@@ -732,6 +732,7 @@ def replace_point_features(layer: QgsVectorLayer, records: Iterable[dict], field
     """Clears and repopulates a memory point layer in place -- used for the
     viewport-scoped live layers (towers, cellular) on canvas extentsChanged,
     same refresh-in-place pattern as app.js's refreshLiveLayers()."""
+    layer.removeSelection()      # features are rebuilt with reused ids: a kept selection would point at a DIFFERENT record while the details panel still shows the old one
     layer.dataProvider().truncate()
     skipped = _fill(layer, records, field_specs, _point_feature)
     layer.updateExtents()
@@ -769,6 +770,7 @@ def replace_link_features(layer: QgsVectorLayer, links: Iterable[dict],
     """Clears and repopulates a memory line layer in place, so a re-run of
     Load Public Data refreshes the existing layer instead of adding a second
     one (and keeps whatever visibility/styling the user set)."""
+    layer.removeSelection()      # features are rebuilt with reused ids: a kept selection would point at a DIFFERENT record while the details panel still shows the old one
     layer.dataProvider().truncate()
     skipped = _fill(layer, links, field_specs, _link_feature)
     layer.updateExtents()
