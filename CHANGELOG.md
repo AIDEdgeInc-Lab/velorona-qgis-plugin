@@ -3,7 +3,7 @@
 Canonical human-readable version history. (The plugin manager shows the shorter `changelog=` text in `metadata.txt`; this file is the detailed record.)
 Compare any two releases: https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/compare/v1.1.4...v1.1.5
 
-## 1.1.9 — unreleased (release candidate; compared with 1.1.8)
+## 1.1.9 — 2026-10-15 (compared with 1.1.8)
 
 Why it matters: the map is readable in the light theme in the field, the layer list says what each layer is and where its data comes from, and every live or bundled data source now states its status (live, cached with a time, empty, unavailable, or a dated snapshot) instead of failing silently.
 
@@ -28,7 +28,9 @@ Why it matters: the map is readable in the light theme in the field, the layer l
 
 ### Verified, and known limits
 - Real sources reached from this machine on 2026-10-14: ISED snapshot checked against the raw ISED file (300 of 300 sampled links identical in endpoints and frequencies), SatNOGS snapshot checked against the live API (397 of 400 sampled stations identical, 3 moved since), live ISED cellular (453 sites in one view), live Open-Meteo and ECCC weather for a real link, the USA pack from map.velorona.ai (7,232 links and 3,606 sites in one view). Ontario towers: the service answered (278 in a wide Ontario view, none in downtown Toronto).
-- CelesTrak could not be reached from this machine (timeout, also for the home page); the failure behaviour was verified live (empty layer, stated status, no records). CelesTrak also timed out from a GitHub-hosted runner at 21:13 UTC the same day, so real element sets for this RC were NOT obtained; the earlier real-source verification of the same feed code (599 records, 2026-10-14 14:12 UTC) is documented in docs/ORBIT_DATA.md.
+- **Live CelesTrak, on the code in this release.** Workflow run 38661544311 (GitHub-hosted runner, real QGIS 4.0, 2026-10-15 00:43 UTC, commit e85c28e): HTTP 200 for all five GEO groups, 599 unique real records retrieved and parsed, 599 positions computed with SGP4 (TLE and OMM paths agree to 0.005 km), all coordinates valid and finite, and the render and selection checks (Records row to map to details) passed 10/10, including physical-invariant checks on all 564 geosynchronous-period records (inclined BeiDou, QZSS and IRNSS satellites included). CelesTrak is intermittently unreachable: the same source timed out at 21:13 UTC and returned HTTP 500 at 22:12 UTC on 2026-10-14, and was unreachable from the maintainer's machine; in those cases the layer stayed empty, said so, and made no further requests (verified live).
+- **Package provenance.** The first validated package (SHA-256 630863132e2d71fb1b310a0188e66445de8b6975f159b37f0a0b6ebcdf235cfe) was built from commit 05f9a3a. The live probe above ran on e85c28e, a test-only child of 05f9a3a (it changes only a development test that the package excludes). This release was rebuilt after a documentation-only change (this changelog); all packaged code is byte-identical to that first package.
+- Known and planned for 1.1.10: after a live layer refresh a previous selection can remain while the details panel still shows the earlier record (a stale, not a wrong, record).
 - Not verified: Windows and Linux; a real user's desktop session (the checks ran in the real QGIS application with an offscreen display).
 
 ## 1.1.8 — 2026-10-14 (compared with 1.1.7)
