@@ -31,7 +31,7 @@ from .core import network_context
 from .core import overlays
 from .core.colors import COLORS, layer_color
 from .core.countries import usa as usa_pack
-from .core.countries.base import PackError
+from .core.countries.base import PackError, ViewTooLargeError
 from .core.countries.canada import CanadaProvider
 from .core.countries.usa_fields import US_LINK_FIELDS, US_SITE_FIELDS
 from .core.engines import microwave_exposure, satellite_earth_space, terrestrial
@@ -260,6 +260,8 @@ class VeloronaPlugin:
         self._extents_connected = False
         self._project_read_connected = False
         self._viewport_timer = None
+        self._usa_loaded_window = None         # (west, south, east, north) of the 1-degree tiles the USA layers currently hold
+        self._usa_auto_loading = False
         self._last_viewport_bbox = {}
         self._basemap_renderers = {}
         self._map_appearance = DEFAULT_MAP_APPEARANCE
@@ -1038,13 +1040,22 @@ class VeloronaPlugin:
         if self._viewport_timer is None:
             self._viewport_timer = QTimer(self.iface.mainWindow())
             self._viewport_timer.setSingleShot(True)
-            self._viewport_timer.timeout.connect(self._refresh_viewport_layers)
+            self._viewport_timer.timeout.connect(self._on_viewport_settled)
         self._viewport_timer.start(VIEWPORT_REFRESH_DEBOUNCE_MS)
+
+    def _on_viewport_settled(self):
+        self._refresh_viewport_layers()
+        self._refresh_usa_view()
 
     def _on_layer_visibility_changed(self, node):
         """A layer switched on holds no data yet, since nothing was fetched
         while it was hidden."""
         if not isinstance(node, QgsLayerTreeLayer) or not node.isVisible():
+            return
+        if node.layerId() in {lyr.id() for lyr in (layer_helpers.find_owned_layer(QgsProject.instance(), k)
+                                                   for k in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS)) if lyr is not None}:
+            self._usa_loaded_window = None        # switched back on: the view may have moved while it was off
+            self._schedule_viewport_refresh()
             return
         if self.satellites_layer is not None and node.layerId() == self.satellites_layer.id():
             self._populate_satellites()
@@ -1649,6 +1660,26 @@ class VeloronaPlugin:
         if not loaded.links:
             self._warn("No US links in this view in the data pack. Pan or zoom to the United States and try again.")
             return
+        self._apply_usa_records(loaded, dark)
+        self._usa_loaded_window = self._tile_window(self._current_extent_bbox_wgs84())
+        self._populate_records()
+        if self.dock is not None:
+            self.dock.records.select_dataset(layer_helpers.SOURCE_US_LINKS)    # the user just asked for USA links: Records shows them, not Canada's
+        self.iface.messageBar().pushInfo(
+            "Velorona",
+            f"Loaded {len(loaded.links):,} US links and {len(loaded.sites):,} sites from {loaded.tiles_requested} tile(s) "
+            f"({loaded.duplicate_links_dropped:,} tile-edge duplicates removed). {loaded.attribution.attribution_text} "
+            f"Source file dated {loaded.attribution.source_file_updated}. "
+            "Once loaded, the USA layers follow the map as you pan and zoom (a view that is too large to draw keeps what is loaded).")
+
+    @staticmethod
+    def _tile_window(bbox):
+        """The whole 1-degree tiles a view touches: what the pack actually returns for it."""
+        return (math.floor(bbox[0]), math.floor(bbox[1]), math.ceil(bbox[2]), math.ceil(bbox[3]))
+
+    def _apply_usa_records(self, loaded, dark: bool) -> None:
+        """Puts the loaded US records into the two USA layers (created on first use, refreshed in place afterwards). The clusters are the same
+        clustered renderer as Canada's sites (layer_helpers.build_point_layer), restyled with the same appearance-aware cluster symbol."""
         self._ensure_basemap()
         infra_group = self._ensure_velorona_groups()[1]["Infrastructure"]
         abstract = f"{loaded.attribution.one_line()} {PUBLIC_RECORDS_DISCLOSURE.capitalize()}."
@@ -1671,12 +1702,57 @@ class VeloronaPlugin:
         self._apply_selection_symbols(dark)
         self._restyle_links(dark)
         self._restyle_clusters(dark)
-        self._populate_records()
-        self.iface.messageBar().pushInfo(
-            "Velorona",
-            f"Loaded {len(loaded.links):,} US links and {len(loaded.sites):,} sites from {loaded.tiles_requested} tile(s) "
-            f"({loaded.duplicate_links_dropped:,} tile-edge duplicates removed). {loaded.attribution.attribution_text} "
-            f"Source file dated {loaded.attribution.source_file_updated}.")
+
+    def _refresh_usa_view(self) -> None:
+        """Keeps the USA layers in step with the map, as Velorona Map does (it fetches the 1-degree tiles of the view as you pan and zoom).
+
+        Only after the user has loaded USA data once (the layers exist), only while a USA layer is switched on and only when a pack source is
+        already configured: nothing here asks a question, opens a dialog or touches the network for a user who never set USA up. A view the pack
+        refuses as too large leaves what is loaded in place and says so in the Records note; other pack problems are reported there too, not as a
+        message-bar pop-up on every pan."""
+        project = QgsProject.instance()
+        sites = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_US_SITES)
+        links = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_US_LINKS)
+        if sites is None or links is None or self._usa_auto_loading or not self._configured_usa_source():
+            return
+        root = project.layerTreeRoot()
+        if not any(node is not None and node.isVisible() for node in (root.findLayer(sites.id()), root.findLayer(links.id()))):
+            return
+        bbox = self._current_extent_bbox_wgs84()
+        window = self._usa_loaded_window
+        if window is not None and window[0] <= bbox[0] and window[1] <= bbox[1] and window[2] >= bbox[2] and window[3] >= bbox[3]:
+            return                                   # the tiles already loaded cover this view
+        self._usa_auto_loading = True
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            try:
+                loaded = self._usa_pack_provider().load_bbox(bbox)
+            except ViewTooLargeError:
+                note = ("USA records: this view is too large to draw, so the USA layers keep what was loaded for the last view that fitted. "
+                        "Zoom in to load the USA links and sites for the area you are looking at.")
+                for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
+                    self._set_note(key, note)
+                return
+            except PackError as exc:
+                note = f"USA records could not be refreshed for this view: {exc}"
+                for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
+                    self._set_note(key, note)
+                return
+        finally:
+            QApplication.restoreOverrideCursor()
+            self._usa_auto_loading = False
+        if not loaded.links:
+            for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
+                self._set_note(key, "USA records: the data pack has no links in this view.")
+            return
+        self._apply_usa_records(loaded, self.map_is_dark())
+        self._usa_loaded_window = self._tile_window(bbox)
+        for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
+            self._dataset_notes.pop(key, None)
+            if self.dock is not None:
+                self.dock.records.set_dataset_note(key, "")
+        if self.dock is not None and self.dock.records.current_source_key() in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
+            self.dock.records.refresh_current()
 
     def run_microwave(self):
         entries = self._selected_by_kind("site")
