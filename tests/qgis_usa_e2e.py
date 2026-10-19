@@ -449,6 +449,52 @@ try:
     print("\n== unload leaves nothing behind ==")
     plugin.unload()
     check("unload completes", True)
+
+    print("\n== opt-in by the USA setting: the first US view creates the USA layers, with no button ==")
+    QgsProject.instance().clear()
+    plugin3 = VeloronaPlugin(iface)
+    plugin3._ensure_basemap = lambda: None
+    plugin3._warn = lambda m: SHOWN.append(m)
+    plugin3._error = lambda m: SHOWN.append(m)
+    plugin3.initGui()
+    reads = []
+    _orig = _usa.UsaPackProvider.load_bbox
+    _usa.UsaPackProvider.load_bbox = lambda self, bbox: (reads.append(bbox), _orig(self, bbox))[1]
+    _reset_messages()
+    set_source("")
+    set_view(-106.0, 40.0, -105.0, 40.9)
+    plugin3._refresh_usa_view()
+    check("no USA setting: nothing read, nothing created", not reads and find(layer_helpers.SOURCE_US_SITES) is None)
+    set_source(pack_dir)
+    plugin3._usa_provider = None
+    set_view(-80.0, 43.0, -79.0, 44.0)
+    plugin3._refresh_usa_view()
+    check("a Canadian view with USA set up: the pack is consulted, nothing is created, no message", len(reads) == 1
+          and find(layer_helpers.SOURCE_US_SITES) is None and not messages(), str(messages()))
+    plugin3._refresh_usa_view()
+    check("... and the empty answer is remembered (no second read for the same view)", len(reads) == 1)
+    set_view(-106.0, 40.0, -105.0, 40.9)
+    plugin3._refresh_usa_view()
+    sites3, links3 = find(layer_helpers.SOURCE_US_SITES), find(layer_helpers.SOURCE_US_LINKS)
+    check("panning to a US view creates the USA layers by itself", sites3 is not None and links3 is not None and links3.featureCount() == 2)
+    check("... as clustered sites like Canada's", isinstance(sites3.renderer(), QgsPointClusterRenderer))
+    check("... and the Records picker lists the USA datasets without switching away from the user's dataset",
+          plugin3.dock.records.dataset_combo.findData(layer_helpers.SOURCE_US_LINKS) >= 0)
+    set_view(10.0, 10.0, 11.0, 11.0)
+    plugin3._refresh_usa_view()
+    check("panning on to another tile follows the map", sorted(f["call_signs"] for f in sites3.getFeatures()) == ["WCCC003", "WCCC003"])
+    plugin3._usa_loaded_window = None
+    set_source(os.path.join(pack_dir, "does-not-exist"))
+    plugin3._usa_provider = None
+    n = len(reads)
+    _reset_messages()
+    set_view(-106.0, 40.0, -105.0, 40.9)
+    plugin3._refresh_usa_view()
+    plugin3._refresh_usa_view()
+    check("a broken pack is a quiet note, not a pop-up, and is not retried on every pan", not [m for m in messages() if "does not exist" in m]
+          and "could not be refreshed" in plugin3._dataset_notes.get(layer_helpers.SOURCE_US_SITES, "") and plugin3._usa_retry_after > 0)
+    _usa.UsaPackProvider.load_bbox = _orig
+    plugin3.unload()
 finally:
     pass
 

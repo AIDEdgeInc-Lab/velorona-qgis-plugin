@@ -262,6 +262,7 @@ class VeloronaPlugin:
         self._viewport_timer = None
         self._usa_loaded_window = None         # (west, south, east, north) of the 1-degree tiles the USA layers currently hold
         self._usa_auto_loading = False
+        self._usa_retry_after = 0.0            # monotonic time before which a failed automatic USA refresh is not retried
         self._last_viewport_bbox = {}
         self._basemap_renderers = {}
         self._map_appearance = DEFAULT_MAP_APPEARANCE
@@ -989,10 +990,7 @@ class VeloronaPlugin:
         zoom_targets = home_layers or context_layers
         QTimer.singleShot(0, lambda: self._finalize_workspace(zoom_targets))
         self._refresh_viewport_layers()
-        if not self._extents_connected:
-            self.iface.mapCanvas().extentsChanged.connect(self._schedule_viewport_refresh)
-            project.layerTreeRoot().visibilityChanged.connect(self._on_layer_visibility_changed)
-            self._extents_connected = True
+        self._connect_viewport_signals()
 
         self._populate_records()
 
@@ -1042,6 +1040,13 @@ class VeloronaPlugin:
             self._viewport_timer.setSingleShot(True)
             self._viewport_timer.timeout.connect(self._on_viewport_settled)
         self._viewport_timer.start(VIEWPORT_REFRESH_DEBOUNCE_MS)
+
+    def _connect_viewport_signals(self) -> None:
+        """Map movement and layer visibility drive the live layers (towers, cellular) and the USA layers. Connected once, by whichever feature needs it first."""
+        if not self._extents_connected:
+            self.iface.mapCanvas().extentsChanged.connect(self._schedule_viewport_refresh)
+            QgsProject.instance().layerTreeRoot().visibilityChanged.connect(self._on_layer_visibility_changed)
+            self._extents_connected = True
 
     def _on_viewport_settled(self):
         self._refresh_viewport_layers()
@@ -1610,11 +1615,18 @@ class VeloronaPlugin:
         if dialog.remove_requested:
             QgsProject.instance().writeEntry(USA_PACK_SCOPE, USA_PACK_KEY, "")
             self._usa_provider = None
+            self._usa_loaded_window = None
             self.iface.messageBar().pushInfo("Velorona", "The saved USA data setting was removed. Canada is unaffected.")
             return False
         QgsProject.instance().writeEntry(USA_PACK_SCOPE, USA_PACK_KEY, dialog.chosen_source)
         self._usa_provider = None                 # rebuilt from the saved source on the next load
-        self.iface.messageBar().pushSuccess("Velorona", "USA data is ready. Zoom to the United States and use Explore: Load USA Links in View.")
+        self._usa_loaded_window = None
+        self._usa_retry_after = 0.0
+        self.iface.messageBar().pushSuccess(
+            "Velorona", "USA data is ready. Zoom to the United States: USA links and sites appear and follow the map as you pan and zoom "
+                        "(Explore: Load USA Links in View loads the current view on demand).")
+        self._connect_viewport_signals()
+        self._refresh_usa_view()                  # a view that already shows the US is loaded now
         return True
 
     @staticmethod
@@ -1661,6 +1673,7 @@ class VeloronaPlugin:
             self._warn("No US links in this view in the data pack. Pan or zoom to the United States and try again.")
             return
         self._apply_usa_records(loaded, dark)
+        self._connect_viewport_signals()
         self._usa_loaded_window = self._tile_window(self._current_extent_bbox_wgs84())
         self._populate_records()
         if self.dock is not None:
@@ -1706,52 +1719,64 @@ class VeloronaPlugin:
     def _refresh_usa_view(self) -> None:
         """Keeps the USA layers in step with the map, as Velorona Map does (it fetches the 1-degree tiles of the view as you pan and zoom).
 
-        Only after the user has loaded USA data once (the layers exist), only while a USA layer is switched on and only when a pack source is
-        already configured: nothing here asks a question, opens a dialog or touches the network for a user who never set USA up. A view the pack
-        refuses as too large leaves what is loaded in place and says so in the Records note; other pack problems are reported there too, not as a
-        message-bar pop-up on every pan."""
+        This is opt-in by the USA data setting: it runs only when a pack source is configured (Explore: USA Data Setup, the project entry, or the
+        VELORONA_USA_PACK environment variable), so nothing is asked, opened or fetched for a user who never set USA up. The first view that has US
+        records creates the USA layers (no extra button); afterwards they follow the map. A view with no tiles in the pack (Canada, the ocean) reads
+        only the pack's small index and creates nothing. A view the pack refuses as too large leaves what is loaded in place and says so in the
+        Records note; other pack problems are reported there too (not as a pop-up on every pan) and are retried after a minute. If the user switched
+        every USA layer off, nothing is loaded."""
+        if self._usa_auto_loading or not self._configured_usa_source() or time.monotonic() < self._usa_retry_after:
+            return
         project = QgsProject.instance()
         sites = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_US_SITES)
         links = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_US_LINKS)
-        if sites is None or links is None or self._usa_auto_loading or not self._configured_usa_source():
-            return
-        root = project.layerTreeRoot()
-        if not any(node is not None and node.isVisible() for node in (root.findLayer(sites.id()), root.findLayer(links.id()))):
-            return
+        if sites is not None and links is not None:
+            root = project.layerTreeRoot()
+            if not any(node is not None and node.isVisible() for node in (root.findLayer(sites.id()), root.findLayer(links.id()))):
+                return
         bbox = self._current_extent_bbox_wgs84()
         window = self._usa_loaded_window
         if window is not None and window[0] <= bbox[0] and window[1] <= bbox[1] and window[2] >= bbox[2] and window[3] >= bbox[3]:
-            return                                   # the tiles already loaded cover this view
+            return                                   # the tiles already loaded (or known to be empty) cover this view
+        have_layers = sites is not None and links is not None
         self._usa_auto_loading = True
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             try:
                 loaded = self._usa_pack_provider().load_bbox(bbox)
             except ViewTooLargeError:
-                note = ("USA records: this view is too large to draw, so the USA layers keep what was loaded for the last view that fitted. "
-                        "Zoom in to load the USA links and sites for the area you are looking at.")
-                for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
-                    self._set_note(key, note)
+                if have_layers:
+                    note = ("USA records: this view is too large to draw, so the USA layers keep what was loaded for the last view that fitted. "
+                            "Zoom in to load the USA links and sites for the area you are looking at.")
+                    for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
+                        self._set_note(key, note)
                 return
             except PackError as exc:
-                note = f"USA records could not be refreshed for this view: {exc}"
-                for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
-                    self._set_note(key, note)
+                self._usa_retry_after = time.monotonic() + 60.0
+                if have_layers:
+                    for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
+                        self._set_note(key, f"USA records could not be refreshed for this view: {exc}")
+                else:
+                    QgsMessageLog.logMessage(f"USA data could not be loaded for this view: {exc}", "Velorona", Qgis.MessageLevel.Warning)
                 return
         finally:
             QApplication.restoreOverrideCursor()
             self._usa_auto_loading = False
+        self._usa_loaded_window = self._tile_window(bbox)
         if not loaded.links:
-            for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
-                self._set_note(key, "USA records: the data pack has no links in this view.")
+            if have_layers:
+                for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
+                    self._set_note(key, "USA records: the data pack has no links in this view.")
             return
         self._apply_usa_records(loaded, self.map_is_dark())
-        self._usa_loaded_window = self._tile_window(bbox)
+        self._connect_viewport_signals()
         for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
             self._dataset_notes.pop(key, None)
             if self.dock is not None:
                 self.dock.records.set_dataset_note(key, "")
-        if self.dock is not None and self.dock.records.current_source_key() in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
+        if not have_layers:
+            self._populate_records()                  # the USA datasets now exist: list them in the Records picker
+        elif self.dock is not None and self.dock.records.current_source_key() in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
             self.dock.records.refresh_current()
 
     def run_microwave(self):
