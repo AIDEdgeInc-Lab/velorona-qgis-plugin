@@ -16,7 +16,7 @@ REQUIRED = ["velorona/__init__.py", "velorona/metadata.txt", "velorona/plugin.py
             "velorona/core/countries/canada.py", "velorona/core/countries/usa_fields.py", "velorona/core/record_source.py",
             "velorona/core/evidence_record.py", "velorona/core/validation.py", "velorona/core/engines/terrestrial.py",
             "velorona/core/batch.py", "velorona/core/processing/provider.py", "velorona/core/processing/terrain_batch.py"]
-FORBIDDEN_PREFIX = ["velorona/tests/", "velorona/parity/", "velorona/tools/", "velorona/examples/", "velorona/docs/acceptance/", "velorona/.git", "velorona/dist/", "velorona/docs/_"]
+FORBIDDEN_PREFIX = ["velorona/tests/", "velorona/parity/", "velorona/tools/", "velorona/examples/", "velorona/docs/acceptance/", "velorona/docs/FINALIZATION_STATUS.md", "velorona/docs/UI_INTEGRATION_AUDIT.md", "velorona/.git", "velorona/dist/", "velorona/docs/_"]
 MAX_FILE_BYTES = 20 * 1024 * 1024
 
 

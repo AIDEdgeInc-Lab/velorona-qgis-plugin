@@ -1,5 +1,7 @@
 # Finalization status (2026-10-18)
 
+> Historical engineering note written while 1.1.10 was being prepared (2026-10-18/19); its statements about the working tree, commits and open items describe that moment. The user-facing description of 1.1.10 is in `CHANGELOG.md` and `README.md`.
+
 Worktree `~/velorona-repos/_worktrees/qgis-finalize`, branch `integration/qgis-finalization`, created from `origin/main` = tag `v1.1.9` = `905d9e4`. Nothing is committed, pushed, merged, tagged, published or deployed; all changes are in the working tree / index. The earlier worktree `qgis-ui-integration` (branch `feat/ui-selection-integration`, uncommitted) was left exactly as it was; its changes were copied here (they were against the same base).
 
 ## 1. What v1.1.9 actually contains (verified)

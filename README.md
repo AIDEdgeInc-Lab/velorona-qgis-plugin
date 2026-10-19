@@ -2,11 +2,13 @@
 
 **Velorona QGIS Plugin 1.1.10** — Telecom link evidence, inside QGIS.
 
+Velorona puts public fixed-service telecom infrastructure (Canada and the United States) on your QGIS map, checks whether a radio link has line-of-sight clearance, estimates its rain exposure, and gives you the evidence behind every answer: what was observed, what was calculated, and what was assumed. It is for telecom and microwave-link engineers, spectrum and infrastructure analysts, and GIS users who need an answer and its justification, not just a number.
+
 ## Explore → Select → Analyze → Evidence → Export
 
 1. **Explore** — Load public telecom infrastructure and your own data.
 2. **Select** — Choose a site, link, or two endpoints.
-3. **Analyze** — Run path clearance, microwave weather exposure, or satellite geometry.
+3. **Analyze** — Run path clearance (one link, or many links at once), microwave weather exposure, or satellite geometry.
 4. **Evidence** — See what is observed, what is calculated, and what is inferred.
 5. **Export** — Take the evidence with you as a structured CSV result or an Excel (.xlsx) workbook.
 
@@ -22,20 +24,21 @@ results.
 
 ## Data sources (Explore)
 
-Every public source Velorona Map already ships, each at its own real
-geographic coverage — hero (on by default): ISED Fixed Service sites and
-links (national); context (present, off by default): Ontario GeoHub tower
-structures (Ontario), ISED cellular/mobile sites (Canada-wide), CelesTrak
-satellites (global), SatNOGS ground/earth stations (global). Import your
-own point data via QGIS's native Add Layer — it appears on the same map,
-analyzed the same way as public data.
+Use **Explore: Load Public Data** to start a Velorona project. Each source covers its own real geography.
 
-**United States (FCC ULS microwave links).** The USA data is a separate download and is **not included in the plugin** (size; the FCC refreshes it weekly). **Canada works without it.**
-To use it, open **Explore: USA Data Setup…** (or press **Explore: Load USA Links in View** the first time — the same guided window opens). Press **Use Velorona's online USA data**,
-or **Choose a folder…** on your computer, or paste an https address; the window checks the data and shows *Ready* with the link count, or says what is wrong and what to do.
-Then zoom to the area you want and run **Load USA Links in View**: only the map tiles under the view are read, never the whole country, and a view that would load more than
-20,000 links is refused with a request to zoom in. Source: U.S. Federal Communications Commission, Universal Licensing System (ULS) public access database (`l_micro`); the
-source-file date, pack date and attribution are shown on the layer and written into every export. It is licensee-reported record data, not a field measurement. See [docs/USA.md](docs/USA.md).
+**Canada (bundled, no download).** ISED Fixed Service sites and links (national; snapshot dated 2026-09-01, 24,859 sites and 16,956 links) are on by default, drawn as clusters that become individual sites and links as you zoom in. Present but off by default: Ontario GeoHub tower structures (Ontario), ISED cellular/mobile sites (Canada-wide) — both queried live for the area you view — CelesTrak satellites (global, live) and SatNOGS ground/earth stations (global, bundled snapshot).
+
+**United States (FCC ULS microwave links) — loaded automatically.** USA data is on by default, as in Velorona Map, and needs no setup:
+
+* After **Explore: Load Public Data**, zoom to the United States. **At broad scales** you see pale **overview count bubbles** (layer *USA overview (counts, not records)*): approximate counts of FCC sites in 2° areas. They show where the infrastructure is; they are not individual records, cannot be selected and are not listed in Records.
+* **Zoom into a smaller area** (about a state-sized window; the limit is 36 one-degree map tiles or 20,000 links per view) and the **detailed USA sites and links** of that view load by themselves (layers *Fixed Service sites (USA)* and *Fixed Service links (USA)*); the sites are drawn as the same subtle clusters as Canada's, and the bubbles disappear. **Pan or zoom and the data follows the map**; a view inside tiles already loaded reads nothing new. A view that is too large keeps the overview (and what was last loaded) and says so in the Records note; zoom in for records.
+* **USA data needs internet access.** Velorona reads Velorona's online USA data (the pack Velorona Map serves) and downloads only the tiles under the view you look at, never the whole country. The data is not included in the plugin (size; the FCC refreshes it weekly). One message states that the online data is used. Nothing is read in a QGIS project that has no Velorona layers, and **Canada works without it**.
+* **Controls.** **Explore: USA Data Setup…** lets you read the data from a folder on your computer or another https address instead, **Forget the saved setting** (back to the online default), or **Turn USA data off** (nothing is then loaded automatically; the same is set by the environment variable `VELORONA_USA_PACK=off`). **Explore: Load USA Links in View** loads the current view on demand and shows the USA links in Records. Switching every USA layer off also stops loading. A broken or unreachable source is a quiet note in Records (retried after a minute), not a pop-up on every pan.
+* Source: U.S. Federal Communications Commission, Universal Licensing System (ULS) public access database (`l_micro`); the source-file date, pack date and attribution are shown on the layer and written into every export. It is licensee-reported record data, not a field measurement. See [docs/USA.md](docs/USA.md).
+
+**Basemap imagery is not infrastructure data.** The base map and the optional **USA Aerial Imagery & Topo (USGS)** layers (off by default; US only) are pictures of the ground. They are not Velorona records and do not produce clusters; the USA sites, links, overview bubbles and clusters above are separate Velorona layers.
+
+Import your own point data via QGIS's native Add Layer — it appears on the same map, analyzed the same way as public data.
 
 ## Analysis engines (Analyze)
 
@@ -43,8 +46,9 @@ Three, all reused unmodified:
 
 - **Terrestrial Path Clearance** (`aei_link_clearance`) — Fresnel-zone /
   earth-curvature terrain clearance between two selected sites, or for ONE
-  selected Fixed Service link (its endpoints and highest published frequency
-  are used; the frequency is typed Observed only while you leave it unchanged).
+  selected Fixed Service link (its endpoints, highest published frequency and,
+  where the licensee reported them, antenna heights are used; the frequency is
+  typed Observed only while you leave it unchanged).
 - **Microwave Weather Exposure** (`aei_mw_exposure`) — ITU-R P.530
   rain-attenuation exposure between two selected sites, or for a selected
   link, with live Open-Meteo/ECCC weather evidence. The rain coefficients come
@@ -58,8 +62,15 @@ Three, all reused unmodified:
   (elevation, azimuth, slant range, visibility) between a selected ground
   station and satellite.
 
-- **Many links at once** (Processing algorithm `Velorona > Terrain clearance for many Fixed Service links`, or Analyze: Terrain Clearance for Many Links) — the Terrestrial Path
-  Clearance above for every link of a layer or its selected links, one row per link with its status and reason; each row equals the single-link result. See `docs/BATCH_TERRAIN.md`.
+### Many links at once (terrain clearance batch)
+
+**Processing Toolbox ▸ Velorona ▸ Terrain clearance for many Fixed Service links**, or **Plugins ▸ Velorona ▸ Analyze: Terrain Clearance for Many Links (batch)**.
+
+- Runs the Terrestrial Path Clearance above for every link of a line layer, or only its selected links, and writes **one row per link** with its status and reason. Each row is the same calculation as analysing that link on its own with the dialog's pre-filled values: the record's highest published frequency (Observed) and its antenna heights where the record carries them (Observed), otherwise 30 m (Assumed).
+- **Statuses per link:** CLEAR, WATCH, AT RISK, CRITICAL (the terrain result), **NO DATA** (a required input is missing or invalid, or elevation could not be retrieved — the reason is in the table, nothing is guessed), **ERROR** (an unexpected failure for that link) and **NOT RUN** (not attempted: over the limit, or the run was cancelled). One failing link never stops the others, and the input layer is never changed.
+- **Runs in the background** through QGIS's Processing framework, with progress and **Cancel**. Cancelling stops after the link in progress; links not reached are listed as NOT RUN, none are dropped.
+- **Limits:** up to 100 links per run by default (1,000 at most; a larger input is refused up front), terrain clearance only (no weather or satellite batch). Each link makes one elevation request; the elevation service rate-limits requests made close together — a rate-limited link is reported as NO DATA (transient, "try again"), never as a result — so use the **pause between links** (0–30 s; several seconds for more than a handful of links). A record without a published frequency is NO DATA unless you give a **fallback frequency** (then typed Assumed). Layers that are not Velorona Fixed Service layers carry no record frequency or heights, so give a fallback frequency.
+- Optional **CSV** output. See [docs/BATCH_TERRAIN.md](docs/BATCH_TERRAIN.md).
 
 ## Status, NO DATA and where a value came from
 
@@ -78,7 +89,7 @@ Velorona layers already loaded — dataset picker, search, sortable columns —
 so you can browse and find a link without reading QGIS's generic Attribute
 Table (which stays available if you want it). Selecting a row selects that
 feature on the map and opens its evidence; selecting a feature on the map
-highlights its row.
+highlights its row. The Operator filter covers the Canadian layers (the USA layers can be searched in the table).
 
 ## Evidence (the Results/Evidence dock)
 
@@ -88,6 +99,12 @@ and Microwave Weather Exposure both export the full canonical structure. See
 `docs/EVIDENCE_EXPORT_AUDIT.md` for the exact current export schema and
 known gaps against a canonical Evidence/Type/Source/Observation-Input/
 Calculated-result/Interpretation structure.
+
+## Export
+
+- **CSV** — a single result, a single record, a selection summary, and the batch. Exports carry product, library and data-source information as `#` comment lines above the table. **CSV safety:** text cells (names, identifiers, licensees, source and reason text) that begin with `=`, `+`, `-` or `@` are marked with a leading apostrophe so Excel and Numbers do not run them as formulas; calculated numbers, including negative ones, are unchanged. The apostrophe is visible when you open a CSV.
+- **Excel (.xlsx)** — for terrain, weather and Fixed Service link results: Summary, Link Analysis, Weather, Weather History, Elevation-Terrain, Evidence, Raw Data (un-rounded values with unit, source and calculation) and Data Dictionary. Cells are stored as plain values and text, never as formulas, so the original text is kept without the CSV apostrophe.
+- Satellite geometry is a computed snapshot at one instant and is not exported.
 
 ## Requirements
 
@@ -130,18 +147,14 @@ preference that affects every plugin and project.
 
 ## Install
 
-Velorona is distributed via the project's GitHub Release, not the QGIS
-Plugin Repository. Download `velorona-1.1.6.zip` from the
-[v1.1.6 release](https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/releases/tag/v1.1.6),
-then in QGIS: Plugins → Manage and Install Plugins → Install from ZIP, and
-pick that file.
+Velorona is published in the **QGIS Plugin Repository** ([plugins.qgis.org/plugins/velorona](https://plugins.qgis.org/plugins/velorona/)) and as a ZIP on [GitHub Releases](https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/releases). In QGIS: **Plugins → Manage and Install Plugins**, search for *Velorona* and install; or download the ZIP from GitHub and use **Install from ZIP**. Then install the Python packages listed under Requirements (QGIS does not install them for you).
 
 ## Version history
 
-See [CHANGELOG.md](CHANGELOG.md) (what changed in 1.1.5 compared with 1.1.4) and the [release page](https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/releases/tag/v1.1.5).
+**1.1.10** — Terrain-clearance **batch** (Processing algorithm and menu action, cancellable, one row per link); **USA data on by default** with overview count bubbles when zoomed out and detailed sites, links and clusters that load automatically as you pan; selection and layer-lifecycle fixes (stale selection after a reload, removed layers, Records highlight, active layer); **CSV formula-injection protection**; clearer provenance wording in Details; imagery group renamed *USA Aerial Imagery & Topo (USGS)*. No change to terrain or weather calculations, thresholds, statuses, Canada data or the satellite engine.
+
+Earlier releases: 1.1.9 field readability and stated data status; 1.1.8 satellite data path; 1.1.7 UI polish (also carries the 1.1.6 guided USA data setup); 1.1.5 corrected earth curvature, ITU-R P.838-3 rain model, five-level status contract, Observed/Assumed provenance, Canadian antenna heights and first USA support; 1.1.4 operational output (Summary / Details / Evidence, Ask, Excel). Full details: [CHANGELOG.md](CHANGELOG.md) and the [release pages](https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/releases).
 
 ## Status
 
-Version 1.1.10. Packaged and clean-profile install tested for QGIS 4.x.
-Distributed via GitHub Release; not yet submitted to the QGIS Plugin
-Repository.
+Version 1.1.10. Packaged and clean-profile install tested for QGIS 4.x (validated on QGIS 4.2.2). Velorona is decision support for operational analysis, not a field measurement and not an outage prediction.

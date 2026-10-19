@@ -144,4 +144,24 @@ Why it matters: 1.1.5 changes numbers. Terrain clearance on long paths is lower,
 Thresholds, the Fresnel/clearance formulas, the earth-model constants (k = 4/3), the satellite engine.
 
 ## 1.1.4 — 2026-10 (reference)
-Operational output: plain-language Summary / Details / Evidence, Ask box, Excel export, hourly weather history; Bandit/Flake8 cleanups. Earlier versions: see `metadata.txt`.
+Operational output: plain-language Summary / Details / Evidence, Ask box, Excel export, hourly weather history; Bandit/Flake8 cleanups. Earlier versions: below (reconstructed from `metadata.txt` and the Git tags; the 1.1.4 tag is dated 2026-10-07).
+
+## 1.1.3 — 2026-10-03
+Canada data correction: one site of the bundled Canada Fixed Service snapshot (Regina, SK) had its station role stored as the literal text `"TX"` with quote characters; it is now `TX`. Nothing else in the snapshot changed (24,859 sites and 16,956 links, same ids and order, ISED file of 2026-09-01).
+
+## 1.1.2 — (no tag; recorded in Git on 2026-10-03 as an already-published version)
+Qt6 compatibility fixes for the QGIS plugin repository scan: scoped enum names and `QMetaType.Type` field specifications. No functional changes.
+
+## 1.1.1 — 2026-09-24
+Static-analysis fixes for the plugin repository scan: narrower exception handling in the satellite source (CelesTrak requests catch only requests errors; element-set parsing catches only `ValueError` / `ZeroDivisionError`, so unexpected errors surface in the satellite status message), two lambda assignments replaced by named functions, an ambiguous loop variable renamed. No other functional changes.
+
+## 1.1.0 — 2026-09-24
+Missing-dependency guard: if `aei-link-clearance`, `aei-microwave-link-exposure`, `aei-geo-features` or `skyfield` is not installed in QGIS's Python, the plugin loads and shows a message-bar and log entry naming what to install, instead of failing with an import traceback. Adds `requirements.txt`.
+
+## 1.0.1 — 2026-09-23
+Version bump after metadata fixes (repository, tracker and homepage fields, a category value). The Git history is the only evidence; no further description was recorded.
+
+## 1.0.0 — 2026-09-22
+First production release. The ISED Fixed Service and SatNOGS ground-station snapshots are bundled with the plugin; Qt6/PyQt6 hardening (the Results dock and both analysis parameter dialogs used PyQt5-only idioms that failed on first use under QGIS 4); live tower/cellular queries debounced, skipped while their layers are hidden, deduplicated per viewport and served from a bounded session cache; the initial extent comes from the terrestrial layers; plugin unload is idempotent and removes its own analysis overlays while leaving loaded public data in place.
+
+Historical gaps: no changelog was kept before 1.1.4 other than the `metadata.txt` entries reproduced above; 1.1.2 and 1.1.6 have no Git tags (1.1.6 was never published separately and ships inside 1.1.7); the exact date of 1.1.4 is recorded only as "2026-10".
