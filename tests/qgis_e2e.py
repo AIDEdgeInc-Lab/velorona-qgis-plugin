@@ -778,7 +778,7 @@ check("Infrastructure comes before Satellite / Orbital Data",
 check("Velorona groups are Infrastructure, Satellite / Orbital Data, My Data, Evidence in order",
       group_order == ["Infrastructure", "Satellite / Orbital Data", "My Data", "Evidence"], str(group_order))
 check("optional USA imagery sits between the Velorona group and the basemap, all off by default",
-      root_children[-3:] == ["Velorona", "USA Imagery (optional)", BASEMAP_NAME], str(root_children))
+      root_children[-3:] == ["Velorona", "USA Aerial Imagery & Topo (USGS)", BASEMAP_NAME], str(root_children))
 
 # Projects saved by 1.1.7 hold the old names. A reload renames a layer/group that still carries the old Velorona name and
 # leaves one the user renamed alone; it never creates a second "Space" group beside the new one.
@@ -797,7 +797,7 @@ check("a project saved with the old 'Space' group gets it renamed, not duplicate
 check("a layer still carrying its old Velorona name is renamed on reload", _legacy_sites.name() == _new_sites_name, _legacy_sites.name())
 check("a layer the user renamed keeps their name", _legacy_links.name() == "My own name for the links", _legacy_links.name())
 _legacy_links.setName(_new_links_name)
-_img_group = project.layerTreeRoot().findGroup("USA Imagery (optional)")
+_img_group = project.layerTreeRoot().findGroup("USA Aerial Imagery & Topo (USGS)")
 from qgis.core import QgsProviderRegistry as _PR  # noqa: E402
 if "wms" in _PR.instance().providerList():
     check("both USGS layers exist, are valid and are not visible",
@@ -1667,9 +1667,12 @@ check("normal link ink differs per appearance",
 check("normal links never use the selection colour",
       layer_helpers.LINK_INK_LIGHT["color"] != plugin_module.SELECTION_COLOR_LIGHT)
 
-# Velorona must not own native QGIS panels
-check("Velorona never references the Processing Toolbox",
-      "processing" not in plugin_source.lower() and "toolbox" not in plugin_source.lower())
+# Velorona must not own or manipulate native QGIS panels. Since the batch terrain-clearance algorithm it DOES register a Processing *provider* (an
+# entry in the registry, listed by QGIS under its own Processing Toolbox) -- that is the supported extension point, not ownership of the panel. What stays
+# forbidden is reaching into the Toolbox panel itself (finding, showing, hiding or re-parenting it).
+import re as _re
+check("Velorona never reaches into the Processing Toolbox panel (a registered provider is allowed)",
+      not _re.search(r"ProcessingToolbox|processingToolbox|\.toolbox\b|findChild[^\n]*[Tt]oolbox|[Tt]oolbox\w*\.(show|hide|setParent)", plugin_source))
 
 # No risk/health/outage *claim* introduced by clustering. Whole-word matching,
 # because "fault" is a substring of "default"; and the one line that names

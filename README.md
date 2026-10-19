@@ -1,6 +1,6 @@
 # Velorona for QGIS
 
-**Velorona QGIS Plugin 1.1.6** — Telecom link evidence, inside QGIS.
+**Velorona QGIS Plugin 1.1.10** — Telecom link evidence, inside QGIS.
 
 ## Explore → Select → Analyze → Evidence → Export
 
@@ -57,6 +57,9 @@ Three, all reused unmodified:
 - **Satellite / Earth-Space** (`skyfield`/SGP4) — look-angle geometry
   (elevation, azimuth, slant range, visibility) between a selected ground
   station and satellite.
+
+- **Many links at once** (Processing algorithm `Velorona > Terrain clearance for many Fixed Service links`, or Analyze: Terrain Clearance for Many Links) — the Terrestrial Path
+  Clearance above for every link of a layer or its selected links, one row per link with its status and reason; each row equals the single-link result. See `docs/BATCH_TERRAIN.md`.
 
 ## Status, NO DATA and where a value came from
 
@@ -139,6 +142,6 @@ See [CHANGELOG.md](CHANGELOG.md) (what changed in 1.1.5 compared with 1.1.4) and
 
 ## Status
 
-Version 1.1.9. Packaged and clean-profile install tested for QGIS 4.x.
+Version 1.1.10. Packaged and clean-profile install tested for QGIS 4.x.
 Distributed via GitHub Release; not yet submitted to the QGIS Plugin
 Repository.

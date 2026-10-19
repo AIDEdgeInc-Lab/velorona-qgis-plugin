@@ -151,3 +151,25 @@ def test_status_boundaries_are_inclusive_where_specified(pct, ratio, expected):
     los = "obstructed" if pct < 0.30 else "marginal" if pct < 0.60 else "clear"
     r = SimpleNamespace(profile=[object()], los_status=los, near_threshold=True, clearance_ratio=ratio, terrain_clearance_m=1.0, required_clearance_m=1.0)
     assert T.terrain_status(r)[0] == expected
+
+
+def test_details_state_where_a_link_record_run_got_its_heights_and_frequency():
+    """A run started from a link record carries the origin of each value; the Details facts must say what the Evidence view and the exports say
+    (the record's own value is Observed), not "entered by the user"."""
+    res = terrain_result()
+    res.height_origins = {"a": ("Observed", "ISED record -- antenna height 41 m"), "b": ("Assumed", "User, via analysis dialog (default shown, user-confirmed)")}
+    res.frequency_origin = ("Observed", "ISED record -- Highest of 2 published frequencies (6226.9 MHz)")
+    brief = T.terrain_brief(res)
+    facts = {f.label: f for f in brief.technical}
+    assert facts["Antenna height A"].comparison.startswith("observed: ISED record")
+    assert "entered by the user" not in facts["Antenna height A"].comparison
+    assert facts["Antenna height B"].comparison.startswith("assumed:")
+    assert facts["Analysis frequency"].comparison.startswith("observed: ISED record")
+    assert brief.data["frequency_origin_text"].startswith("observed: ISED record")
+
+
+def test_two_site_run_without_origins_keeps_the_user_wording():
+    brief = T.terrain_brief(terrain_result())
+    facts = {f.label: f for f in brief.technical}
+    assert "entered by the user" in facts["Analysis frequency"].comparison
+    assert "entered by the user" in facts["Antenna height A"].comparison

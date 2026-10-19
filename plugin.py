@@ -7,13 +7,13 @@ import time
 
 from qgis.core import (
     Qgis,
+    QgsApplication,
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
     QgsLayerTreeLayer,
     QgsMessageLog,
     QgsMapBoxGlStyleConverter,
     QgsPointClusterRenderer,
-    QgsApplication,
     QgsSingleSymbolRenderer,
     QgsProject,
     QgsTask,
@@ -95,7 +95,8 @@ BASEMAP_NAME = "Velorona Basemap (CARTO)"
 INFRA_GROUP_NAME = "Infrastructure"
 SPACE_GROUP_NAME = "Satellite / Orbital Data"
 LEGACY_SPACE_GROUP_NAME = "Space"
-IMAGERY_GROUP_NAME = "USA Imagery (optional)"
+IMAGERY_GROUP_NAME = "USA Aerial Imagery & Topo (USGS)"
+LEGACY_IMAGERY_GROUP_NAMES = ("USA Imagery (optional)", "USA Imagery")     # projects saved by 1.1.9 and earlier: renamed in place, never duplicated
 NAME_CA_SITES = "Fixed Service sites (CAN)"
 NAME_CA_LINKS = "Fixed Service links (CAN)"
 NAME_TOWERS = "Ontario Towers (GeoHub)"
@@ -248,6 +249,7 @@ class VeloronaPlugin:
         self.iface = iface
         self.dock = None
         self.actions = []
+        self.processing_provider = None
         self.layer_group = None
         self.towers_layer = None
         self.cellular_layer = None
@@ -270,6 +272,10 @@ class VeloronaPlugin:
         # must not re-hit the live weather services.
         self._link_weather_cache = ViewportCache()
         self._selecting_from_table = False
+        self._syncing_active_layer = False     # True while the Records picker and the QGIS active layer are being aligned (no echo)
+        self._wired_layers = {}                # layer id -> (layer, slot): the one selectionChanged handler per Velorona layer
+        self._project_wiring_connected = False
+        self._active_layer_connected = False
         self.satellites_layer = None
         self._satellites_fetched_at = None
         self._dataset_notes = {}               # source key -> provenance/status line shown in Records (replayed when the dock is created)
@@ -317,11 +323,19 @@ class VeloronaPlugin:
             "Select exactly one Ground/Earth Station feature and one Satellite feature.",
             self.run_satellite,
         )
+        self.action_batch_terrain = self._make_action(
+            "Analyze: Terrain Clearance for Many Links (batch)",
+            "Opens the Processing algorithm that runs Terrestrial Path Clearance for every link of a Fixed Service link layer (or its selected links), one row per link with its "
+            "status and reason. Also in the Processing Toolbox under Velorona.",
+            self.run_batch_terrain,
+        )
         self.action_show_dock = self._make_action(
             "Show Velorona Panel",
             "Reopens the Velorona Records / Results panel if it was closed.",
             self.show_panel,
         )
+
+        self._register_processing_provider()
 
         # Guard against a stale/pre-existing project: one saved before
         # PROJECT_CRS was forced to EPSG:3857, or one whose CRS was later
@@ -338,6 +352,33 @@ class VeloronaPlugin:
         QgsProject.instance().readProject.connect(self._check_stale_project_crs)
         self._project_read_connected = True
         self._check_stale_project_crs()
+        # Velorona layers already in the project (the plugin was reloaded, or the project was reopened) get their one selection handler now,
+        # not only when Load Public Data next creates them; layers leaving the project are forgotten before QGIS deletes them.
+        self._adopt_existing_layers()
+        QgsProject.instance().layersWillBeRemoved.connect(self._on_layers_will_be_removed)
+        QgsProject.instance().layersAdded.connect(self._on_layers_added)
+        self._project_wiring_connected = True
+        current_changed = getattr(self.iface, "currentLayerChanged", None)
+        if current_changed is not None:
+            current_changed.connect(self._on_active_layer_changed)
+            self._active_layer_connected = True
+
+    def _register_processing_provider(self):
+        """Velorona's Processing algorithms (Processing Toolbox, Graphical Modeler, batch mode, qgis_process). A failure here must not stop the plugin loading."""
+        try:
+            from .core.processing.provider import VeloronaProcessingProvider
+            self.processing_provider = VeloronaProcessingProvider()
+            QgsApplication.processingRegistry().addProvider(self.processing_provider)
+        except Exception as exc:
+            self.processing_provider = None
+            self.iface.messageBar().pushMessage("Velorona", f"The Velorona Processing algorithms could not be registered: {exc}", level=Qgis.MessageLevel.Warning, duration=0)
+
+    def run_batch_terrain(self):
+        if self.processing_provider is None:
+            self._warn("The Velorona Processing algorithms are not available in this session (see the message shown when Velorona loaded).")
+            return
+        from qgis import processing
+        processing.execAlgorithmDialog("velorona:terrain_clearance_batch", {})
 
     def show_panel(self):
         """Reopens the one Velorona dock. QGIS also lists it under View >
@@ -372,6 +413,9 @@ class VeloronaPlugin:
         return action
 
     def unload(self):
+        if self.processing_provider is not None:
+            QgsApplication.processingRegistry().removeProvider(self.processing_provider)
+            self.processing_provider = None
         for action in self.actions:
             self.iface.removePluginMenu(MENU_NAME, action)
             self.iface.removeToolBarIcon(action)
@@ -387,6 +431,14 @@ class VeloronaPlugin:
         if self._project_read_connected:
             self._safe_disconnect(QgsProject.instance().readProject, self._check_stale_project_crs)
             self._project_read_connected = False
+        if self._project_wiring_connected:
+            self._safe_disconnect(QgsProject.instance().layersWillBeRemoved, self._on_layers_will_be_removed)
+            self._safe_disconnect(QgsProject.instance().layersAdded, self._on_layers_added)
+            self._project_wiring_connected = False
+        if self._active_layer_connected:
+            self._safe_disconnect(self.iface.currentLayerChanged, self._on_active_layer_changed)
+            self._active_layer_connected = False
+        self._unwire_all_inspectors()       # a reloaded plugin must not leave this instance answering selections beside the new one
         if self._satellites_task is not None:
             self._satellites_task.cancel()      # the worker checks this between requests; its result is ignored once the layer is gone
             self._satellites_task.waitForFinished(3000)   # do not leave a worker thread running into a torn-down plugin (bounded wait)
@@ -462,10 +514,17 @@ class VeloronaPlugin:
         return velorona, groups
 
     def _ensure_imagery_group(self):
-        """'USA Imagery (optional)': a root-level group directly under Velorona and above the basemap, so a switched-on
-        aerial/topo layer covers the basemap but never Velorona's own data."""
+        """'USA Aerial Imagery & Topo (USGS)': a root-level group directly under Velorona and above the basemap, so a switched-on
+        aerial/topo layer covers the basemap but never Velorona's own data. It is off by default."""
         root = QgsProject.instance().layerTreeRoot()
         existing = root.findGroup(IMAGERY_GROUP_NAME)
+        if existing is None:
+            for legacy in LEGACY_IMAGERY_GROUP_NAMES:
+                old = root.findGroup(legacy)
+                if old is not None:
+                    old.setName(IMAGERY_GROUP_NAME)
+                    existing = old
+                    break
         if existing is not None:
             return existing
         velorona = root.findGroup("Velorona")
@@ -482,9 +541,9 @@ class VeloronaPlugin:
                 continue
             layer = imagery.build_imagery_layer(name, service, abstract)
             if not layer.isValid():
-                # Optional, off-by-default layers: never interrupt Load Public Data with a dialog for them (the 'wms'
+                # Off-by-default layers: never interrupt Load Public Data with a dialog for them (the 'wms'
                 # provider is absent from some headless QGIS builds); the reason goes to the QGIS log panel.
-                QgsMessageLog.logMessage(f"Optional layer '{name}' was not added: {layer.error().summary()}", "Velorona", Qgis.MessageLevel.Warning)
+                QgsMessageLog.logMessage(f"Imagery layer '{name}' was not added: {layer.error().summary()}", "Velorona", Qgis.MessageLevel.Warning)
                 continue
             layer_helpers.add_to_group(project, layer, group, visible=False, source_key=key)
 
@@ -527,6 +586,7 @@ class VeloronaPlugin:
             node = project.layerTreeRoot().findLayer(existing.id())
             if node is None:  # removed from the tree but still registered
                 group.addLayer(existing).setItemVisibilityChecked(visible)
+            self._wire_inspector(existing, kind)       # idempotent: a layer that survived a plugin reload is wired exactly once
             return existing
 
         layer = build()
@@ -1208,7 +1268,72 @@ class VeloronaPlugin:
     # QGIS's generic Attribute Table.
 
     def _wire_inspector(self, layer, kind: str):
-        layer.selectionChanged.connect(lambda *_, lyr=layer, k=kind: self._on_feature_selected(lyr, k))
+        """Connects the one selectionChanged handler for this layer. Idempotent: a layer is wired once per plugin instance, however many times
+        it is found again, and unwired when it leaves the project or the plugin unloads (no duplicate or orphaned handlers)."""
+        if layer.id() in self._wired_layers:
+            return
+        slot = lambda *_, lyr=layer, k=kind: self._on_feature_selected(lyr, k)      # noqa: E731
+        layer.selectionChanged.connect(slot)
+        self._wired_layers[layer.id()] = (layer, slot)
+
+    def _unwire_inspector(self, layer_id: str) -> None:
+        entry = self._wired_layers.pop(layer_id, None)
+        if entry is not None:
+            self._safe_disconnect(entry[0].selectionChanged, entry[1])
+
+    def _unwire_all_inspectors(self) -> None:
+        for layer_id in list(self._wired_layers):
+            self._unwire_inspector(layer_id)
+
+    def _adopt_existing_layers(self) -> None:
+        for layer in QgsProject.instance().mapLayers().values():
+            self._adopt_layer(layer)
+
+    def _adopt_layer(self, layer) -> None:
+        if not layer_helpers.is_velorona_owned(layer) or not hasattr(layer, "selectedFeatureIds"):
+            return
+        kind = records_table.KINDS.get(layer_helpers.layer_source_key(layer))
+        if kind is not None:
+            self._wire_inspector(layer, kind)
+
+    def _on_layers_added(self, layers) -> None:
+        for layer in layers:
+            self._adopt_layer(layer)
+
+    def _on_layers_will_be_removed(self, layer_ids) -> None:
+        """Layers leaving the project: no handler, cached index or Records row may keep a reference to a layer QGIS is about to delete, and the
+        details of a removed layer's selection must not stay on screen."""
+        had_selection = False
+        for layer_id in layer_ids:
+            entry = self._wired_layers.get(layer_id)
+            if entry is not None and records_table.layer_alive(entry[0]) and entry[0].selectedFeatureCount():
+                had_selection = True
+            self._unwire_inspector(layer_id)
+            self._endpoint_index.pop(layer_id, None)
+            self._last_viewport_bbox.pop(layer_id, None)
+        if self.dock is not None:
+            self.dock.records.drop_layers(layer_ids)
+            if had_selection:
+                self.dock.show_empty_state()
+
+    def _on_active_layer_changed(self, layer) -> None:
+        """QGIS active layer (Layers panel) -> Records: the table follows the layer the user picked. Never selects anything."""
+        if self.dock is None or layer is None or self._syncing_active_layer:
+            return
+        key = layer_helpers.layer_source_key(layer) if layer_helpers.is_velorona_owned(layer) else ""
+        if key:
+            self.dock.records.select_dataset(key)
+
+    def _on_dataset_activated(self, layer) -> None:
+        """Records dataset picker -> QGIS active layer, so QGIS's own tools (Select Features, Zoom to Layer, Attribute Table) act on the layer the user is
+        looking at. Selections are left exactly as they are."""
+        if self._syncing_active_layer or self.iface.activeLayer() is layer:
+            return
+        self._syncing_active_layer = True
+        try:
+            self.iface.setActiveLayer(layer)
+        finally:
+            self._syncing_active_layer = False
 
     def _on_feature_selected(self, layer, kind: str):
         """One selected feature is a detailed investigation; several are a
@@ -1600,6 +1725,7 @@ class VeloronaPlugin:
             self.dock.records.featureChosen.connect(self._on_record_chosen)
             self.dock.records.featuresChosen.connect(self._on_records_chosen)
             self.dock.records.licenseeChanged.connect(self.set_licensee_filter)
+            self.dock.records.datasetActivated.connect(self._on_dataset_activated)
             self.iface.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock)
             self._size_dock()
         return self.dock

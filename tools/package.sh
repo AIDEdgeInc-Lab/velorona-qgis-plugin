@@ -38,6 +38,7 @@ tar -C "$PLUGIN" -cf - \
     --exclude='dist' \
     --exclude='tests' \
     --exclude='examples' \
+    --exclude='docs/acceptance' \
     --exclude='tools' \
     --exclude='parity' \
     --exclude='SESSION_HANDOFF.md' \

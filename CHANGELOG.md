@@ -3,6 +3,34 @@
 Canonical human-readable version history. (The plugin manager shows the shorter `changelog=` text in `metadata.txt`; this file is the detailed record.)
 Compare any two releases: https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/compare/v1.1.4...v1.1.5
 
+## 1.1.10 — 2026-10-19 (compared with 1.1.9)
+
+Why it matters: terrain clearance can now be run for many links at once with the same result as the single-link analysis; a selected record can no longer be left selected, or shown, against a different record after a layer reloads, a layer is removed or the plugin is reloaded; and exported CSV files can no longer run formulas in a spreadsheet. No terrain, weather, status or threshold calculation changed.
+
+### Added
+- **Terrain clearance for many links**: a native Processing algorithm (`velorona:terrain_clearance_batch`, Processing Toolbox > Velorona, and Analyze: Terrain Clearance for Many Links) runs the existing single-link analysis for every link of a layer or its selected links. One row per link, each equal to the single-link result; per-row status and reason (CLEAR / WATCH / AT RISK / CRITICAL / NO DATA / ERROR / NOT RUN); one failing link never stops the run; optional CSV. See `docs/BATCH_TERRAIN.md`.
+- Batch terrain clearance: the pause parameter and help now explain the elevation provider's HTTP 429 limit (rate-limited links are NO DATA, transient, never a result) and advise several seconds of pause for more than a handful of links; the default stays 0.
+
+### Fixed
+- **Selection after a layer reload.** A selected record is kept by its record id and unchanged content (never by a reissued feature id); a record that is gone, changed, or has no id is deselected and the details panel empties. Resolves the 1.1.9 known issue "after a live layer refresh a previous selection can remain while the details panel still shows the earlier record".
+- **Layer lifecycle.** The selection handler is connected once per Velorona layer, also for layers already in the project after a plugin reload or when a project restores its layers; it is disconnected on unload and when a layer is removed.
+- **Removed layers.** Removing a Velorona layer no longer breaks the Records picker (an uncaught "object has been deleted" error); its details are cleared.
+- **Records table.** No row stays highlighted when the map selection moved to a record the search hides; switching dataset shows that layer's own selection; the Records dataset and the QGIS active layer follow each other without selecting anything.
+- **Terrain Details wording.** Antenna heights and the analysis frequency now say where each value came from (the link record's own value is Observed; a default or override is Assumed), as the Evidence view and the exports already did. The Excel Summary says the same. Previously Details said "entered by the user" even for link-record runs.
+
+### Changed
+- The imagery group `USA Imagery (optional)` is now `USA Aerial Imagery & Topo (USGS)` (projects saved with the old name are renamed in place; the layers are still off by default and the layer metadata says so). The plugin description no longer claims a GeoJSON export (CSV and Excel only). The Operator filter text says it covers the Canadian layers; an empty search says which search matched nothing.
+
+### Security
+- **CSV formula injection.** Exported CSV text cells that begin with `=`, `+`, `-`, `@`, tab or CR (identifiers, names, licensees, source and reason text from imported or public records) are prefixed with an apostrophe so Excel and Numbers do not evaluate them; calculated numbers (negative ones too) are unchanged. Applies to the single-link, single-record, selection-summary and Batch CSV exports (`core/csvsafe.py`); the Excel export stores plain strings and is unaffected. The apostrophe is visible when a CSV is opened.
+
+### Tests
+- New `tests/test_csv_safety.py` (35 tests), `tests/qgis_selection_sync_e2e.py` (58 checks), `tests/test_satellite_reliability.py`, a satellite refresh scenario in `tests/qgis_workflow_e2e.py`, terrain-origin wording tests, and `tests/test_workflow_core_semantics.py` (compares the unmerged shared workflow core with the plugin flow; skipped when that package is absent). `tests/qgis_e2e.py` now forbids reaching into the Processing Toolbox panel instead of forbidding any mention of Processing, because the batch algorithm registers a Processing provider.
+- `tests/test_terrain_batch.py` (QGIS-free) compares every batch row with an independent single-link analysis on all shared parity fixtures. `tests/qgis_batch_e2e.py` is the QGIS runtime test of the Processing layer; it passes 13/13 headless in QGIS 4.2.2 (offscreen, stand-in `iface`). It is not an interactive desktop test: the Processing dialog, Cancel, Task Manager and project reopening are still to be verified by hand.
+
+### Verified, and known limits
+- Headless QGIS 4.2.2 runs (offscreen), live Open-Meteo for Batch-versus-single-link parity (7 Canadian links, 11 numeric fields each, exact equality; one USA link) and Excel 16.114 for the CSV and .xlsx exports. **Not run:** the live-satellite end-to-end tests (CelesTrak was unreachable from the test machine, so no orbit cache existed; nothing was substituted). Open-Meteo rate-limits requests made closer together than a few seconds (see the pause parameter).
+
 ## 1.1.9 — 2026-10-15 (compared with 1.1.8)
 
 Why it matters: the map is readable in the light theme in the field, the layer list says what each layer is and where its data comes from, and every live or bundled data source now states its status (live, cached with a time, empty, unavailable, or a dated snapshot) instead of failing silently.

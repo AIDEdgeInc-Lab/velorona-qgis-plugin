@@ -1,4 +1,4 @@
-"""Optional USA base imagery, off by default.
+"""USA base imagery and topographic map (USGS), off by default.
 
 Both sources are the U.S. Geological Survey's The National Map tile services. They were chosen because they are the
 only keyless US imagery/basemap services whose terms are clear: USGS-authored data is public domain and USGS asks for
@@ -23,10 +23,10 @@ USGS_ATTRIBUTION = "Imagery: USDA, USGS The National Map (public domain; credit 
 IMAGERY_SOURCES = (
     ("imagery_usgs_aerial", "USA aerial imagery (USGS, US only)", "USGSImageryOnly",
      "USGS The National Map orthoimagery (aerial and satellite photography, mostly USDA NAIP). United States only: "
-     "outside the US the service returns a blank tile. Zoom 0-16. " + USGS_ATTRIBUTION),
+     "outside the US the service returns a blank tile. Zoom 0-16. Off by default: nothing is requested until you switch the layer on. " + USGS_ATTRIBUTION),
     ("imagery_usgs_topo", "USA topographic map (USGS, US only)", "USGSTopo",
      "USGS US Topo basemap (roads, contours, hydrography, place names). United States only: outside the US the "
-     "service returns a blank tile. Zoom 0-16. " + USGS_ATTRIBUTION),
+     "service returns a blank tile. Zoom 0-16. Off by default: nothing is requested until you switch the layer on. " + USGS_ATTRIBUTION),
 )
 
 

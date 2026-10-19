@@ -96,7 +96,7 @@ def _summary(result, ctx: AskContext, generated: str) -> Sheet:
             ["Link status", _status_cell(t.status), t.reason],
             ["Plain-language answer", t.answer, ""],
             ["Distance", t.key_facts[0].value, "Link distance"],
-            ["Frequency", f"{_g(t.data['frequency_ghz'])} GHz", "Analysis frequency (entered by the user)"],
+            ["Frequency", f"{_g(t.data['frequency_ghz'])} GHz", f"Analysis frequency ({t.data.get('frequency_origin_text', 'entered by the user')})"],
             ["Required clearance", t.key_facts[2].value, "Minimum required at the tightest point"],
             ["Available clearance", t.key_facts[1].value, "Terrain clearance at the tightest point"],
             ["Clearance margin", t.key_facts[3].value, t.key_facts[3].comparison],
