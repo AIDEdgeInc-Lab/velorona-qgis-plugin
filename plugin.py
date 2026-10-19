@@ -7,13 +7,13 @@ import time
 
 from qgis.core import (
     Qgis,
+    QgsApplication,
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
     QgsLayerTreeLayer,
     QgsMessageLog,
     QgsMapBoxGlStyleConverter,
     QgsPointClusterRenderer,
-    QgsApplication,
     QgsSingleSymbolRenderer,
     QgsProject,
     QgsTask,
@@ -31,7 +31,7 @@ from .core import network_context
 from .core import overlays
 from .core.colors import COLORS, layer_color
 from .core.countries import usa as usa_pack
-from .core.countries.base import PackError
+from .core.countries.base import PackError, ViewTooLargeError
 from .core.countries.canada import CanadaProvider
 from .core.countries.usa_fields import US_LINK_FIELDS, US_SITE_FIELDS
 from .core.engines import microwave_exposure, satellite_earth_space, terrestrial
@@ -95,7 +95,8 @@ BASEMAP_NAME = "Velorona Basemap (CARTO)"
 INFRA_GROUP_NAME = "Infrastructure"
 SPACE_GROUP_NAME = "Satellite / Orbital Data"
 LEGACY_SPACE_GROUP_NAME = "Space"
-IMAGERY_GROUP_NAME = "USA Imagery (optional)"
+IMAGERY_GROUP_NAME = "USA Aerial Imagery & Topo (USGS)"
+LEGACY_IMAGERY_GROUP_NAMES = ("USA Imagery (optional)", "USA Imagery")     # projects saved by 1.1.9 and earlier: renamed in place, never duplicated
 NAME_CA_SITES = "Fixed Service sites (CAN)"
 NAME_CA_LINKS = "Fixed Service links (CAN)"
 NAME_TOWERS = "Ontario Towers (GeoHub)"
@@ -248,6 +249,7 @@ class VeloronaPlugin:
         self.iface = iface
         self.dock = None
         self.actions = []
+        self.processing_provider = None
         self.layer_group = None
         self.towers_layer = None
         self.cellular_layer = None
@@ -258,6 +260,9 @@ class VeloronaPlugin:
         self._extents_connected = False
         self._project_read_connected = False
         self._viewport_timer = None
+        self._usa_loaded_window = None         # (west, south, east, north) of the 1-degree tiles the USA layers currently hold
+        self._usa_auto_loading = False
+        self._usa_retry_after = 0.0            # monotonic time before which a failed automatic USA refresh is not retried
         self._last_viewport_bbox = {}
         self._basemap_renderers = {}
         self._map_appearance = DEFAULT_MAP_APPEARANCE
@@ -270,6 +275,10 @@ class VeloronaPlugin:
         # must not re-hit the live weather services.
         self._link_weather_cache = ViewportCache()
         self._selecting_from_table = False
+        self._syncing_active_layer = False     # True while the Records picker and the QGIS active layer are being aligned (no echo)
+        self._wired_layers = {}                # layer id -> (layer, slot): the one selectionChanged handler per Velorona layer
+        self._project_wiring_connected = False
+        self._active_layer_connected = False
         self.satellites_layer = None
         self._satellites_fetched_at = None
         self._dataset_notes = {}               # source key -> provenance/status line shown in Records (replayed when the dock is created)
@@ -317,11 +326,19 @@ class VeloronaPlugin:
             "Select exactly one Ground/Earth Station feature and one Satellite feature.",
             self.run_satellite,
         )
+        self.action_batch_terrain = self._make_action(
+            "Analyze: Terrain Clearance for Many Links (batch)",
+            "Opens the Processing algorithm that runs Terrestrial Path Clearance for every link of a Fixed Service link layer (or its selected links), one row per link with its "
+            "status and reason. Also in the Processing Toolbox under Velorona.",
+            self.run_batch_terrain,
+        )
         self.action_show_dock = self._make_action(
             "Show Velorona Panel",
             "Reopens the Velorona Records / Results panel if it was closed.",
             self.show_panel,
         )
+
+        self._register_processing_provider()
 
         # Guard against a stale/pre-existing project: one saved before
         # PROJECT_CRS was forced to EPSG:3857, or one whose CRS was later
@@ -338,6 +355,33 @@ class VeloronaPlugin:
         QgsProject.instance().readProject.connect(self._check_stale_project_crs)
         self._project_read_connected = True
         self._check_stale_project_crs()
+        # Velorona layers already in the project (the plugin was reloaded, or the project was reopened) get their one selection handler now,
+        # not only when Load Public Data next creates them; layers leaving the project are forgotten before QGIS deletes them.
+        self._adopt_existing_layers()
+        QgsProject.instance().layersWillBeRemoved.connect(self._on_layers_will_be_removed)
+        QgsProject.instance().layersAdded.connect(self._on_layers_added)
+        self._project_wiring_connected = True
+        current_changed = getattr(self.iface, "currentLayerChanged", None)
+        if current_changed is not None:
+            current_changed.connect(self._on_active_layer_changed)
+            self._active_layer_connected = True
+
+    def _register_processing_provider(self):
+        """Velorona's Processing algorithms (Processing Toolbox, Graphical Modeler, batch mode, qgis_process). A failure here must not stop the plugin loading."""
+        try:
+            from .core.processing.provider import VeloronaProcessingProvider
+            self.processing_provider = VeloronaProcessingProvider()
+            QgsApplication.processingRegistry().addProvider(self.processing_provider)
+        except Exception as exc:
+            self.processing_provider = None
+            self.iface.messageBar().pushMessage("Velorona", f"The Velorona Processing algorithms could not be registered: {exc}", level=Qgis.MessageLevel.Warning, duration=0)
+
+    def run_batch_terrain(self):
+        if self.processing_provider is None:
+            self._warn("The Velorona Processing algorithms are not available in this session (see the message shown when Velorona loaded).")
+            return
+        from qgis import processing
+        processing.execAlgorithmDialog("velorona:terrain_clearance_batch", {})
 
     def show_panel(self):
         """Reopens the one Velorona dock. QGIS also lists it under View >
@@ -372,6 +416,9 @@ class VeloronaPlugin:
         return action
 
     def unload(self):
+        if self.processing_provider is not None:
+            QgsApplication.processingRegistry().removeProvider(self.processing_provider)
+            self.processing_provider = None
         for action in self.actions:
             self.iface.removePluginMenu(MENU_NAME, action)
             self.iface.removeToolBarIcon(action)
@@ -387,6 +434,14 @@ class VeloronaPlugin:
         if self._project_read_connected:
             self._safe_disconnect(QgsProject.instance().readProject, self._check_stale_project_crs)
             self._project_read_connected = False
+        if self._project_wiring_connected:
+            self._safe_disconnect(QgsProject.instance().layersWillBeRemoved, self._on_layers_will_be_removed)
+            self._safe_disconnect(QgsProject.instance().layersAdded, self._on_layers_added)
+            self._project_wiring_connected = False
+        if self._active_layer_connected:
+            self._safe_disconnect(self.iface.currentLayerChanged, self._on_active_layer_changed)
+            self._active_layer_connected = False
+        self._unwire_all_inspectors()       # a reloaded plugin must not leave this instance answering selections beside the new one
         if self._satellites_task is not None:
             self._satellites_task.cancel()      # the worker checks this between requests; its result is ignored once the layer is gone
             self._satellites_task.waitForFinished(3000)   # do not leave a worker thread running into a torn-down plugin (bounded wait)
@@ -462,10 +517,17 @@ class VeloronaPlugin:
         return velorona, groups
 
     def _ensure_imagery_group(self):
-        """'USA Imagery (optional)': a root-level group directly under Velorona and above the basemap, so a switched-on
-        aerial/topo layer covers the basemap but never Velorona's own data."""
+        """'USA Aerial Imagery & Topo (USGS)': a root-level group directly under Velorona and above the basemap, so a switched-on
+        aerial/topo layer covers the basemap but never Velorona's own data. It is off by default."""
         root = QgsProject.instance().layerTreeRoot()
         existing = root.findGroup(IMAGERY_GROUP_NAME)
+        if existing is None:
+            for legacy in LEGACY_IMAGERY_GROUP_NAMES:
+                old = root.findGroup(legacy)
+                if old is not None:
+                    old.setName(IMAGERY_GROUP_NAME)
+                    existing = old
+                    break
         if existing is not None:
             return existing
         velorona = root.findGroup("Velorona")
@@ -482,9 +544,9 @@ class VeloronaPlugin:
                 continue
             layer = imagery.build_imagery_layer(name, service, abstract)
             if not layer.isValid():
-                # Optional, off-by-default layers: never interrupt Load Public Data with a dialog for them (the 'wms'
+                # Off-by-default layers: never interrupt Load Public Data with a dialog for them (the 'wms'
                 # provider is absent from some headless QGIS builds); the reason goes to the QGIS log panel.
-                QgsMessageLog.logMessage(f"Optional layer '{name}' was not added: {layer.error().summary()}", "Velorona", Qgis.MessageLevel.Warning)
+                QgsMessageLog.logMessage(f"Imagery layer '{name}' was not added: {layer.error().summary()}", "Velorona", Qgis.MessageLevel.Warning)
                 continue
             layer_helpers.add_to_group(project, layer, group, visible=False, source_key=key)
 
@@ -527,6 +589,7 @@ class VeloronaPlugin:
             node = project.layerTreeRoot().findLayer(existing.id())
             if node is None:  # removed from the tree but still registered
                 group.addLayer(existing).setItemVisibilityChecked(visible)
+            self._wire_inspector(existing, kind)       # idempotent: a layer that survived a plugin reload is wired exactly once
             return existing
 
         layer = build()
@@ -927,10 +990,7 @@ class VeloronaPlugin:
         zoom_targets = home_layers or context_layers
         QTimer.singleShot(0, lambda: self._finalize_workspace(zoom_targets))
         self._refresh_viewport_layers()
-        if not self._extents_connected:
-            self.iface.mapCanvas().extentsChanged.connect(self._schedule_viewport_refresh)
-            project.layerTreeRoot().visibilityChanged.connect(self._on_layer_visibility_changed)
-            self._extents_connected = True
+        self._connect_viewport_signals()
 
         self._populate_records()
 
@@ -978,13 +1038,29 @@ class VeloronaPlugin:
         if self._viewport_timer is None:
             self._viewport_timer = QTimer(self.iface.mainWindow())
             self._viewport_timer.setSingleShot(True)
-            self._viewport_timer.timeout.connect(self._refresh_viewport_layers)
+            self._viewport_timer.timeout.connect(self._on_viewport_settled)
         self._viewport_timer.start(VIEWPORT_REFRESH_DEBOUNCE_MS)
+
+    def _connect_viewport_signals(self) -> None:
+        """Map movement and layer visibility drive the live layers (towers, cellular) and the USA layers. Connected once, by whichever feature needs it first."""
+        if not self._extents_connected:
+            self.iface.mapCanvas().extentsChanged.connect(self._schedule_viewport_refresh)
+            QgsProject.instance().layerTreeRoot().visibilityChanged.connect(self._on_layer_visibility_changed)
+            self._extents_connected = True
+
+    def _on_viewport_settled(self):
+        self._refresh_viewport_layers()
+        self._refresh_usa_view()
 
     def _on_layer_visibility_changed(self, node):
         """A layer switched on holds no data yet, since nothing was fetched
         while it was hidden."""
         if not isinstance(node, QgsLayerTreeLayer) or not node.isVisible():
+            return
+        if node.layerId() in {lyr.id() for lyr in (layer_helpers.find_owned_layer(QgsProject.instance(), k)
+                                                   for k in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS)) if lyr is not None}:
+            self._usa_loaded_window = None        # switched back on: the view may have moved while it was off
+            self._schedule_viewport_refresh()
             return
         if self.satellites_layer is not None and node.layerId() == self.satellites_layer.id():
             self._populate_satellites()
@@ -1208,7 +1284,72 @@ class VeloronaPlugin:
     # QGIS's generic Attribute Table.
 
     def _wire_inspector(self, layer, kind: str):
-        layer.selectionChanged.connect(lambda *_, lyr=layer, k=kind: self._on_feature_selected(lyr, k))
+        """Connects the one selectionChanged handler for this layer. Idempotent: a layer is wired once per plugin instance, however many times
+        it is found again, and unwired when it leaves the project or the plugin unloads (no duplicate or orphaned handlers)."""
+        if layer.id() in self._wired_layers:
+            return
+        slot = lambda *_, lyr=layer, k=kind: self._on_feature_selected(lyr, k)      # noqa: E731
+        layer.selectionChanged.connect(slot)
+        self._wired_layers[layer.id()] = (layer, slot)
+
+    def _unwire_inspector(self, layer_id: str) -> None:
+        entry = self._wired_layers.pop(layer_id, None)
+        if entry is not None:
+            self._safe_disconnect(entry[0].selectionChanged, entry[1])
+
+    def _unwire_all_inspectors(self) -> None:
+        for layer_id in list(self._wired_layers):
+            self._unwire_inspector(layer_id)
+
+    def _adopt_existing_layers(self) -> None:
+        for layer in QgsProject.instance().mapLayers().values():
+            self._adopt_layer(layer)
+
+    def _adopt_layer(self, layer) -> None:
+        if not layer_helpers.is_velorona_owned(layer) or not hasattr(layer, "selectedFeatureIds"):
+            return
+        kind = records_table.KINDS.get(layer_helpers.layer_source_key(layer))
+        if kind is not None:
+            self._wire_inspector(layer, kind)
+
+    def _on_layers_added(self, layers) -> None:
+        for layer in layers:
+            self._adopt_layer(layer)
+
+    def _on_layers_will_be_removed(self, layer_ids) -> None:
+        """Layers leaving the project: no handler, cached index or Records row may keep a reference to a layer QGIS is about to delete, and the
+        details of a removed layer's selection must not stay on screen."""
+        had_selection = False
+        for layer_id in layer_ids:
+            entry = self._wired_layers.get(layer_id)
+            if entry is not None and records_table.layer_alive(entry[0]) and entry[0].selectedFeatureCount():
+                had_selection = True
+            self._unwire_inspector(layer_id)
+            self._endpoint_index.pop(layer_id, None)
+            self._last_viewport_bbox.pop(layer_id, None)
+        if self.dock is not None:
+            self.dock.records.drop_layers(layer_ids)
+            if had_selection:
+                self.dock.show_empty_state()
+
+    def _on_active_layer_changed(self, layer) -> None:
+        """QGIS active layer (Layers panel) -> Records: the table follows the layer the user picked. Never selects anything."""
+        if self.dock is None or layer is None or self._syncing_active_layer:
+            return
+        key = layer_helpers.layer_source_key(layer) if layer_helpers.is_velorona_owned(layer) else ""
+        if key:
+            self.dock.records.select_dataset(key)
+
+    def _on_dataset_activated(self, layer) -> None:
+        """Records dataset picker -> QGIS active layer, so QGIS's own tools (Select Features, Zoom to Layer, Attribute Table) act on the layer the user is
+        looking at. Selections are left exactly as they are."""
+        if self._syncing_active_layer or self.iface.activeLayer() is layer:
+            return
+        self._syncing_active_layer = True
+        try:
+            self.iface.setActiveLayer(layer)
+        finally:
+            self._syncing_active_layer = False
 
     def _on_feature_selected(self, layer, kind: str):
         """One selected feature is a detailed investigation; several are a
@@ -1474,11 +1615,18 @@ class VeloronaPlugin:
         if dialog.remove_requested:
             QgsProject.instance().writeEntry(USA_PACK_SCOPE, USA_PACK_KEY, "")
             self._usa_provider = None
+            self._usa_loaded_window = None
             self.iface.messageBar().pushInfo("Velorona", "The saved USA data setting was removed. Canada is unaffected.")
             return False
         QgsProject.instance().writeEntry(USA_PACK_SCOPE, USA_PACK_KEY, dialog.chosen_source)
         self._usa_provider = None                 # rebuilt from the saved source on the next load
-        self.iface.messageBar().pushSuccess("Velorona", "USA data is ready. Zoom to the United States and use Explore: Load USA Links in View.")
+        self._usa_loaded_window = None
+        self._usa_retry_after = 0.0
+        self.iface.messageBar().pushSuccess(
+            "Velorona", "USA data is ready. Zoom to the United States: USA links and sites appear and follow the map as you pan and zoom "
+                        "(Explore: Load USA Links in View loads the current view on demand).")
+        self._connect_viewport_signals()
+        self._refresh_usa_view()                  # a view that already shows the US is loaded now
         return True
 
     @staticmethod
@@ -1524,6 +1672,27 @@ class VeloronaPlugin:
         if not loaded.links:
             self._warn("No US links in this view in the data pack. Pan or zoom to the United States and try again.")
             return
+        self._apply_usa_records(loaded, dark)
+        self._connect_viewport_signals()
+        self._usa_loaded_window = self._tile_window(self._current_extent_bbox_wgs84())
+        self._populate_records()
+        if self.dock is not None:
+            self.dock.records.select_dataset(layer_helpers.SOURCE_US_LINKS)    # the user just asked for USA links: Records shows them, not Canada's
+        self.iface.messageBar().pushInfo(
+            "Velorona",
+            f"Loaded {len(loaded.links):,} US links and {len(loaded.sites):,} sites from {loaded.tiles_requested} tile(s) "
+            f"({loaded.duplicate_links_dropped:,} tile-edge duplicates removed). {loaded.attribution.attribution_text} "
+            f"Source file dated {loaded.attribution.source_file_updated}. "
+            "Once loaded, the USA layers follow the map as you pan and zoom (a view that is too large to draw keeps what is loaded).")
+
+    @staticmethod
+    def _tile_window(bbox):
+        """The whole 1-degree tiles a view touches: what the pack actually returns for it."""
+        return (math.floor(bbox[0]), math.floor(bbox[1]), math.ceil(bbox[2]), math.ceil(bbox[3]))
+
+    def _apply_usa_records(self, loaded, dark: bool) -> None:
+        """Puts the loaded US records into the two USA layers (created on first use, refreshed in place afterwards). The clusters are the same
+        clustered renderer as Canada's sites (layer_helpers.build_point_layer), restyled with the same appearance-aware cluster symbol."""
         self._ensure_basemap()
         infra_group = self._ensure_velorona_groups()[1]["Infrastructure"]
         abstract = f"{loaded.attribution.one_line()} {PUBLIC_RECORDS_DISCLOSURE.capitalize()}."
@@ -1546,12 +1715,69 @@ class VeloronaPlugin:
         self._apply_selection_symbols(dark)
         self._restyle_links(dark)
         self._restyle_clusters(dark)
-        self._populate_records()
-        self.iface.messageBar().pushInfo(
-            "Velorona",
-            f"Loaded {len(loaded.links):,} US links and {len(loaded.sites):,} sites from {loaded.tiles_requested} tile(s) "
-            f"({loaded.duplicate_links_dropped:,} tile-edge duplicates removed). {loaded.attribution.attribution_text} "
-            f"Source file dated {loaded.attribution.source_file_updated}.")
+
+    def _refresh_usa_view(self) -> None:
+        """Keeps the USA layers in step with the map, as Velorona Map does (it fetches the 1-degree tiles of the view as you pan and zoom).
+
+        This is opt-in by the USA data setting: it runs only when a pack source is configured (Explore: USA Data Setup, the project entry, or the
+        VELORONA_USA_PACK environment variable), so nothing is asked, opened or fetched for a user who never set USA up. The first view that has US
+        records creates the USA layers (no extra button); afterwards they follow the map. A view with no tiles in the pack (Canada, the ocean) reads
+        only the pack's small index and creates nothing. A view the pack refuses as too large leaves what is loaded in place and says so in the
+        Records note; other pack problems are reported there too (not as a pop-up on every pan) and are retried after a minute. If the user switched
+        every USA layer off, nothing is loaded."""
+        if self._usa_auto_loading or not self._configured_usa_source() or time.monotonic() < self._usa_retry_after:
+            return
+        project = QgsProject.instance()
+        sites = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_US_SITES)
+        links = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_US_LINKS)
+        if sites is not None and links is not None:
+            root = project.layerTreeRoot()
+            if not any(node is not None and node.isVisible() for node in (root.findLayer(sites.id()), root.findLayer(links.id()))):
+                return
+        bbox = self._current_extent_bbox_wgs84()
+        window = self._usa_loaded_window
+        if window is not None and window[0] <= bbox[0] and window[1] <= bbox[1] and window[2] >= bbox[2] and window[3] >= bbox[3]:
+            return                                   # the tiles already loaded (or known to be empty) cover this view
+        have_layers = sites is not None and links is not None
+        self._usa_auto_loading = True
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            try:
+                loaded = self._usa_pack_provider().load_bbox(bbox)
+            except ViewTooLargeError:
+                if have_layers:
+                    note = ("USA records: this view is too large to draw, so the USA layers keep what was loaded for the last view that fitted. "
+                            "Zoom in to load the USA links and sites for the area you are looking at.")
+                    for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
+                        self._set_note(key, note)
+                return
+            except PackError as exc:
+                self._usa_retry_after = time.monotonic() + 60.0
+                if have_layers:
+                    for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
+                        self._set_note(key, f"USA records could not be refreshed for this view: {exc}")
+                else:
+                    QgsMessageLog.logMessage(f"USA data could not be loaded for this view: {exc}", "Velorona", Qgis.MessageLevel.Warning)
+                return
+        finally:
+            QApplication.restoreOverrideCursor()
+            self._usa_auto_loading = False
+        self._usa_loaded_window = self._tile_window(bbox)
+        if not loaded.links:
+            if have_layers:
+                for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
+                    self._set_note(key, "USA records: the data pack has no links in this view.")
+            return
+        self._apply_usa_records(loaded, self.map_is_dark())
+        self._connect_viewport_signals()
+        for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
+            self._dataset_notes.pop(key, None)
+            if self.dock is not None:
+                self.dock.records.set_dataset_note(key, "")
+        if not have_layers:
+            self._populate_records()                  # the USA datasets now exist: list them in the Records picker
+        elif self.dock is not None and self.dock.records.current_source_key() in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
+            self.dock.records.refresh_current()
 
     def run_microwave(self):
         entries = self._selected_by_kind("site")
@@ -1600,6 +1826,7 @@ class VeloronaPlugin:
             self.dock.records.featureChosen.connect(self._on_record_chosen)
             self.dock.records.featuresChosen.connect(self._on_records_chosen)
             self.dock.records.licenseeChanged.connect(self.set_licensee_filter)
+            self.dock.records.datasetActivated.connect(self._on_dataset_activated)
             self.iface.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock)
             self._size_dock()
         return self.dock

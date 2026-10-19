@@ -6,6 +6,10 @@
 A skipped gate is no gate: a test that silently starts skipping (missing dependency, renamed marker) must break CI,
 not shrink it. The two allowed skips need real USA data that lives in the Velorona Map repo (see the skip messages);
 they are covered by the synthetic-pack tests in the QGIS runtime lane instead.
+
+The third, tests.test_workflow_core_semantics, compares the plugin's single-link decisions with the shared workflow core (`aei_workflow`)
+that the unmerged automation branch uses. That package is deliberately NOT a dependency of the released plugin, so the module always skips in CI;
+it is a documented evidence check (docs/FINALIZATION_STATUS.md section 3), not a gate, and runs where aei-workflow-runner is installed.
 """
 import sys
 import xml.etree.ElementTree as ET
@@ -13,6 +17,7 @@ import xml.etree.ElementTree as ET
 ALLOWED = {
     "tests.test_usa_provider::test_real_pack_dedup_matches_the_index",
     "tests.test_usa_provider::test_real_extract_loads_whole_with_contract_counts",
+    "::tests.test_workflow_core_semantics",     # module-level importorskip("aei_workflow"): reported by pytest without a test name
 }
 
 

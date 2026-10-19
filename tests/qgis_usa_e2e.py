@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.join(PLUGIN_DIR, "tests"))
 
 from qgis.core import QgsApplication, QgsProject, QgsRectangle, QgsCoordinateReferenceSystem  # noqa: E402
 from qgis.gui import QgsMapCanvas, QgsMessageBar  # noqa: E402
-from qgis.PyQt.QtWidgets import QMainWindow  # noqa: E402
+from qgis.PyQt.QtWidgets import QApplication, QMainWindow  # noqa: E402
 
 qgs = QgsApplication([], True)
 qgs.initQgis()
@@ -127,6 +127,9 @@ try:
           and feat["attribution"] == ATTRIBUTION)
     check("the Records table can list the US layers", plugin.dock.records is not None
           and layer_helpers.SOURCE_US_LINKS in plugin.dock.records._layers)
+    check("after an explicit USA load the Records table shows the USA links (not a Canadian dataset)",
+          plugin.dock.records.current_source_key() == layer_helpers.SOURCE_US_LINKS and plugin.dock.records.model.rowCount() == links.featureCount(),
+          plugin.dock.records.current_source_key())
 
     print("\n== reload of another view refreshes in place (no second layer) and clears the endpoint-index cache ==")
     plugin._endpoint_index[links.id()] = {"stale": True}
@@ -334,9 +337,164 @@ try:
           terrestrial.analyze_link_record(one, (one["site_a"]["latitude"], one["site_a"]["longitude"]), (one["site_b"]["latitude"], one["site_b"]["longitude"]),
                                           {**params, "site_a_height_m": params["site_a_height_m"] + 5}).height_origins["a"][0] == "Assumed")
 
+    print("\n== USA layers follow the map, like Velorona Map (view-driven refresh) ==")
+    from velorona.core.colors import layer_color
+    from velorona.core.countries import usa as _usa
+    from velorona.core.countries.usa_fields import US_SITE_FIELDS
+    from velorona.core.sources.terrestrial_public import FIXED_SITE_FIELDS
+    from qgis.core import QgsMapRendererParallelJob, QgsMapSettings, QgsPointClusterRenderer
+    from qgis.PyQt.QtCore import QSize
+    from qgis.PyQt.QtGui import QColor
+    set_source(pack_dir)
+    plugin._usa_provider = None
+    set_view(-106.0, 40.0, -105.0, 40.9)
+    plugin.load_usa_view()
+    links, sites = find(layer_helpers.SOURCE_US_LINKS), find(layer_helpers.SOURCE_US_SITES)
+    calls = []
+    _real_load = _usa.UsaPackProvider.load_bbox
+    _usa.UsaPackProvider.load_bbox = lambda self, bbox: (calls.append(bbox), _real_load(self, bbox))[1]
+    set_view(-105.9, 40.1, -105.1, 40.8)
+    plugin._refresh_usa_view()
+    check("a view inside the loaded tiles reads nothing again", not calls, str(calls))
+    set_view(10.0, 10.0, 11.0, 11.0)
+    plugin._refresh_usa_view()
+    check("panning to another tile loads it into the SAME layers", len(calls) == 1 and find(layer_helpers.SOURCE_US_SITES) is sites
+          and find(layer_helpers.SOURCE_US_LINKS) is links)
+    check("... which now hold that tile's records and no longer the old view's",
+          sorted(f["call_signs"] for f in sites.getFeatures()) == ["WCCC003", "WCCC003"] and [f["authorization_number"] for f in links.getFeatures()] != [],
+          str([f["call_signs"] for f in sites.getFeatures()]))
+    set_view(10.2, 10.2, 10.8, 10.8)
+    plugin._refresh_usa_view()
+    check("zooming within the loaded tile does not reload", len(calls) == 1)
+
+    print("\n== USA clusters are drawn, and look exactly like Canada's ==")
+    check("the USA sites layer uses the clustered renderer", isinstance(sites.renderer(), QgsPointClusterRenderer))
+    dark = plugin.map_is_dark()
+    recs = [{"id": f"p{i}", "latitude": 10.5 + i * 0.01, "longitude": 10.5 + i * 0.01, "name": "x", "source": "t"} for i in range(6)]
+    ca = layer_helpers.build_point_layer("ca-like", recs, FIXED_SITE_FIELDS, layer_color("fixed-sites", dark))
+    us = layer_helpers.build_point_layer("us-like", recs, US_SITE_FIELDS, layer_color("fixed-sites", dark))
+    for lyr in (ca, us):
+        lyr.renderer().setClusterSymbol(layer_helpers.cluster_symbol(layer_color("fixed-sites", dark), dark))
+
+    def draw(layer, box=(8.0, 8.0, 13.0, 13.0)):
+        ms = QgsMapSettings()
+        ms.setDestinationCrs(QgsCoordinateReferenceSystem("EPSG:4326"))
+        ms.setOutputSize(QSize(500, 500))
+        ms.setBackgroundColor(QColor("#ffffff"))
+        ms.setLayers([layer])
+        ms.setExtent(QgsRectangle(*box))
+        job = QgsMapRendererParallelJob(ms)
+        job.start()
+        job.waitForFinished()
+        return job.renderedImage()
+
+    img_ca, img_us = draw(ca), draw(us)
+    white = QColor("#ffffff").rgb()
+    painted = sum(1 for x in range(500) for y in range(500) if img_us.pixel(x, y) != white)
+    check("a USA cluster paints pixels at a wide view", painted > 50, str(painted))
+    check("the USA cluster image is pixel-identical to Canada's for the same points and appearance", img_us == img_ca)
+    real_sites = draw(sites, (8.0, 8.0, 13.0, 13.0))
+    check("the real, loaded USA sites layer is drawn as a cluster too", sum(1 for x in range(500) for y in range(500) if real_sites.pixel(x, y) != white) > 50)
+    ink_us = layer_helpers.cluster_ink(layer_color("fixed-sites", dark), dark)
+    alpha_wide = int(ink_us["fill"].split(",")[3]) if ink_us["fill"].count(",") == 3 else None
+    check("the cluster ink is the subtle one (fill alpha well below opaque)", alpha_wide is not None and alpha_wide <= 160, str(ink_us))
+
+    print("\n== a USA record selected on the map opens its details and its Records row ==")
+    set_view(10.0, 10.0, 11.0, 11.0)
+    first = next(sites.getFeatures())
+    iface.setActiveLayer(sites)
+    sites.selectByIds([first.id()])
+    for _ in range(8):
+        QApplication.processEvents()
+    check("details open for that US site", plugin.dock._result is not None)
+    sel_rows = plugin.dock.records.view.selectionModel().selectedRows()
+    check("Records switches to the USA sites dataset and highlights that record",
+          plugin.dock.records.current_source_key() == layer_helpers.SOURCE_US_SITES and len(sel_rows) == 1)
+    sites.removeSelection()
+
+    print("\n== when the view is too large the USA layers keep what is loaded and say so ==")
+    plugin._usa_provider = _usa.UsaPackProvider(pack_dir, max_links=1)
+    before = (sites.featureCount(), links.featureCount())
+    plugin._usa_loaded_window = None
+    set_view(-110.0, 38.0, -100.0, 44.0)
+    plugin._refresh_usa_view()
+    check("existing records stay", (sites.featureCount(), links.featureCount()) == before)
+    check("the Records note says to zoom in", "too large" in plugin._dataset_notes.get(layer_helpers.SOURCE_US_SITES, ""),
+          str(plugin._dataset_notes.get(layer_helpers.SOURCE_US_SITES)))
+    plugin._usa_provider = None
+
+    print("\n== the refresh never asks, never fetches for a user who did not set USA up ==")
+    _usa.UsaPackProvider.load_bbox = _real_load
+    calls.clear()
+    set_source("")
+    plugin._usa_loaded_window = None
+    plugin._usa_provider = None
+    _usa.UsaPackProvider.load_bbox = lambda self, bbox: (calls.append(bbox), _real_load(self, bbox))[1]
+    set_view(-106.0, 40.0, -105.0, 40.9)
+    plugin._refresh_usa_view()
+    check("no pack source configured: nothing is read and no dialog opens", not calls)
+    set_source(pack_dir)
+    plugin._usa_loaded_window = None
+    root_node = QgsProject.instance().layerTreeRoot()
+    for lyr in (sites, links):
+        root_node.findLayer(lyr.id()).setItemVisibilityChecked(False)
+    plugin._refresh_usa_view()
+    check("both USA layers switched off: nothing is read", not calls)
+    for lyr in (sites, links):
+        root_node.findLayer(lyr.id()).setItemVisibilityChecked(True)
+    plugin._refresh_usa_view()
+    check("switched back on: the view is loaded", len(calls) == 1)
+    _usa.UsaPackProvider.load_bbox = _real_load
+
     print("\n== unload leaves nothing behind ==")
     plugin.unload()
     check("unload completes", True)
+
+    print("\n== opt-in by the USA setting: the first US view creates the USA layers, with no button ==")
+    QgsProject.instance().clear()
+    plugin3 = VeloronaPlugin(iface)
+    plugin3._ensure_basemap = lambda: None
+    plugin3._warn = lambda m: SHOWN.append(m)
+    plugin3._error = lambda m: SHOWN.append(m)
+    plugin3.initGui()
+    reads = []
+    _orig = _usa.UsaPackProvider.load_bbox
+    _usa.UsaPackProvider.load_bbox = lambda self, bbox: (reads.append(bbox), _orig(self, bbox))[1]
+    _reset_messages()
+    set_source("")
+    set_view(-106.0, 40.0, -105.0, 40.9)
+    plugin3._refresh_usa_view()
+    check("no USA setting: nothing read, nothing created", not reads and find(layer_helpers.SOURCE_US_SITES) is None)
+    set_source(pack_dir)
+    plugin3._usa_provider = None
+    set_view(-80.0, 43.0, -79.0, 44.0)
+    plugin3._refresh_usa_view()
+    check("a Canadian view with USA set up: the pack is consulted, nothing is created, no message", len(reads) == 1
+          and find(layer_helpers.SOURCE_US_SITES) is None and not messages(), str(messages()))
+    plugin3._refresh_usa_view()
+    check("... and the empty answer is remembered (no second read for the same view)", len(reads) == 1)
+    set_view(-106.0, 40.0, -105.0, 40.9)
+    plugin3._refresh_usa_view()
+    sites3, links3 = find(layer_helpers.SOURCE_US_SITES), find(layer_helpers.SOURCE_US_LINKS)
+    check("panning to a US view creates the USA layers by itself", sites3 is not None and links3 is not None and links3.featureCount() == 2)
+    check("... as clustered sites like Canada's", isinstance(sites3.renderer(), QgsPointClusterRenderer))
+    check("... and the Records picker lists the USA datasets without switching away from the user's dataset",
+          plugin3.dock.records.dataset_combo.findData(layer_helpers.SOURCE_US_LINKS) >= 0)
+    set_view(10.0, 10.0, 11.0, 11.0)
+    plugin3._refresh_usa_view()
+    check("panning on to another tile follows the map", sorted(f["call_signs"] for f in sites3.getFeatures()) == ["WCCC003", "WCCC003"])
+    plugin3._usa_loaded_window = None
+    set_source(os.path.join(pack_dir, "does-not-exist"))
+    plugin3._usa_provider = None
+    n = len(reads)
+    _reset_messages()
+    set_view(-106.0, 40.0, -105.0, 40.9)
+    plugin3._refresh_usa_view()
+    plugin3._refresh_usa_view()
+    check("a broken pack is a quiet note, not a pop-up, and is not retried on every pan", not [m for m in messages() if "does not exist" in m]
+          and "could not be refreshed" in plugin3._dataset_notes.get(layer_helpers.SOURCE_US_SITES, "") and plugin3._usa_retry_after > 0)
+    _usa.UsaPackProvider.load_bbox = _orig
+    plugin3.unload()
 finally:
     pass
 

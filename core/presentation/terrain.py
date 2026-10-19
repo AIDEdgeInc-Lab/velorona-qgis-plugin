@@ -160,8 +160,9 @@ def terrain_brief(result) -> Brief:
              else "Share of the first Fresnel radius that is clear at the critical point"),
         Fact("Bearing", f"{fmt(r.bearing_deg)}°", "from Site A to Site B"),
         Fact("Effective earth radius factor k", exact(r.k_factor), "standard atmosphere (ITU-R P.530 median)"),
-        Fact("Antenna height A", f"{exact(result.site_a_height_m)} m", _origin(result.site_a_height_from_feature)),
-        Fact("Antenna height B", f"{exact(result.site_b_height_m)} m", _origin(result.site_b_height_from_feature)),
+        Fact("Analysis frequency", f"{exact(r.frequency_ghz)} GHz", frequency_origin_text(result)),
+        Fact("Antenna height A", f"{exact(result.site_a_height_m)} m", _height_origin_text(result, "a", result.site_a_height_from_feature)),
+        Fact("Antenna height B", f"{exact(result.site_b_height_m)} m", _height_origin_text(result, "b", result.site_b_height_from_feature)),
     ]
     evidence = [
         Fact("Evidence", f"{len(r.profile)} elevation samples along the path"),
@@ -189,7 +190,7 @@ def terrain_brief(result) -> Brief:
         key_facts=key_facts, technical=technical, evidence=evidence, caveats=caveats, inspect=inspect,
         data={
             "link_id": r.link_id, "distance_km": r.distance_km, "bearing_deg": r.bearing_deg,
-            "frequency_ghz": r.frequency_ghz, "k_factor": r.k_factor,
+            "frequency_ghz": r.frequency_ghz, "frequency_origin_text": frequency_origin_text(result), "k_factor": r.k_factor,
             "first_fresnel_radius_m": r.first_fresnel_radius_m, "required_clearance_m": required,
             "terrain_clearance_m": available, "margin_m": margin, "clearance_ratio": r.clearance_ratio,
             "percent_fresnel_clear": r.percent_fresnel_clear, "los_status": r.los_status,
@@ -207,6 +208,24 @@ def terrain_brief(result) -> Brief:
 
 def _origin(from_feature: bool) -> str:
     return "from the feature's own attribute" if from_feature else "entered by the user (default shown, user-confirmed)"
+
+
+def _height_origin_text(result, which: str, from_feature: bool) -> str:
+    """Where an antenna height came from, as the Evidence view and the exports state it: a link-record run carries the origin of each value
+    (the record's own value is Observed; a default or an override is Assumed). Only an analysis that carries no origin falls back to the
+    two-site wording."""
+    found = (getattr(result, "height_origins", None) or {}).get(which)
+    if found:
+        return f"{found[0].lower()}: {found[1]}"
+    return _origin(from_feature)
+
+
+def frequency_origin_text(result) -> str:
+    """Where the analysis frequency came from (same sources as the Evidence view and the exports)."""
+    found = getattr(result, "frequency_origin", None)
+    if found:
+        return f"{found[0].lower()}: {found[1]}"
+    return "entered by the user (default shown, user-confirmed)"
 
 
 def profile_rows(r) -> list:

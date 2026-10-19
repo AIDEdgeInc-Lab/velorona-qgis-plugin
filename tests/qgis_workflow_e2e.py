@@ -327,6 +327,67 @@ check("the satellite view is wider than 1,000 km", canvas.extent().width() > 1.0
 sats.removeSelection()
 L.replace_point_features(sats, [], space_public.SATELLITE_FIELDS)
 
+print("== 6c. satellite refresh: one request set, no duplicate task, selection and details stay consistent ==")
+import json as _json2  # noqa: E402
+import tempfile as _tf  # noqa: E402
+from velorona.core.sources import satellite_feed as _sf  # noqa: E402
+_calls = []
+
+
+def _geo(cat, name, ma):
+    return {"OBJECT_NAME": name, "OBJECT_ID": "2026-001A", "EPOCH": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000000"), "MEAN_MOTION": 1.0027,
+            "ECCENTRICITY": 0.0002, "INCLINATION": 0.05, "RA_OF_ASC_NODE": 80.0, "ARG_OF_PERICENTER": 100.0, "MEAN_ANOMALY": ma, "EPHEMERIS_TYPE": 0,
+            "CLASSIFICATION_TYPE": "U", "NORAD_CAT_ID": cat, "ELEMENT_SET_NO": 999, "REV_AT_EPOCH": 1, "BSTAR": 0.0, "MEAN_MOTION_DOT": 0.0, "MEAN_MOTION_DDOT": 0.0}
+
+
+def _fake_fetch(url):
+    _calls.append(url)
+    return orbit_data.FetchResult(status=200, text=_json2.dumps([_geo(90001, "TEST-ONLY-A", 20.0), _geo(90002, "TEST-ONLY-B", 200.0)]))
+
+
+_sf.http_fetch = _fake_fetch            # test double: the real provider is never contacted by this test
+_real_load = _sf.load_groups
+_sf.load_groups = lambda groups, cache, now, fetch=_fake_fetch, **kw: _real_load(groups, cache, now, fetch, **kw)
+_cache_dir = _tf.mkdtemp()
+plugin._orbit_cache = lambda: orbit_data.OrbitCache(_cache_dir)
+sats = lay(L.SOURCE_SATELLITES)
+plugin._satellites_fetched_at = None
+root.findLayer(sats.id()).setItemVisibilityChecked(True)       # triggers the load through the real visibility handler
+plugin._populate_satellites()                                   # a second trigger while the task runs must not start a second one
+import time as _t  # noqa: E402
+_t0 = _t.time()
+while (plugin._satellites_task is not None or sats.featureCount() == 0) and _t.time() - _t0 < 30:
+    qgs.processEvents()
+    _t.sleep(0.05)
+for _ in range(10):
+    qgs.processEvents()
+check("two triggers produce one request set (five groups, each once)", len(_calls) == 5 and len(set(_calls)) == 5, len(_calls))
+check("both TEST-ONLY records are drawn with fresh status and a retrieval time",
+      sats.featureCount() == 2 and all(f["data_status"] == "fresh" and f["retrieved_at"] for f in sats.getFeatures()),
+      sats.featureCount())
+rec.dataset_combo.setCurrentIndex(rec.dataset_combo.findData(L.SOURCE_SATELLITES))
+qgs.processEvents()
+rec.view.selectRow(0)
+for _ in range(10):
+    qgs.processEvents()
+selected_name = sats.selectedFeatures()[0]["name"] if sats.selectedFeatureCount() == 1 else None
+check("a satellite selected from Records is the one the details panel shows", selected_name and selected_name in dock.browser.toPlainText(), selected_name)
+plugin._satellites_fetched_at = None                            # simulate "layer shown again later": positions are rebuilt from the cache
+n_calls = len(_calls)
+plugin._populate_satellites()
+_t0 = _t.time()
+while plugin._satellites_task is not None and _t.time() - _t0 < 30:
+    qgs.processEvents()
+    _t.sleep(0.05)
+for _ in range(10):
+    qgs.processEvents()
+check("the refresh inside the cache window makes no provider request", len(_calls) == n_calls, len(_calls) - n_calls)
+check("after the refresh the layer still has both records and nothing stale is highlighted or shown",
+      sats.featureCount() == 2 and sats.selectedFeatureCount() == 0 and dock._result is None and len(rec.view.selectionModel().selectedRows()) == 0,
+      (sats.featureCount(), sats.selectedFeatureCount(), dock._result is not None))
+root.findLayer(sats.id()).setItemVisibilityChecked(False)
+L.replace_point_features(sats, [], space_public.SATELLITE_FIELDS)
+
 print("== 7. invalid or missing coordinates never navigate ==")
 mem = L.build_point_layer("bad", [{"id": "b", "latitude": 12.0, "longitude": 30.0, "name": "n"}], [("id", QMetaType.Type.QString), ("name", QMetaType.Type.QString)], "#ffffff")
 bad_f = QgsFeature(mem.fields())

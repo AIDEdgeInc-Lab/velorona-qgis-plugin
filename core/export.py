@@ -18,10 +18,10 @@ record or a link result with a stable identity to export)."""
 
 from __future__ import annotations
 
-import csv
 import io
 from datetime import datetime, timezone
 
+from . import csvsafe
 from .evidence_record import identity_lines, source_lines
 from .record_source import record_labels
 from .presentation.terrain import ratio_meaning, ratio_value, terrain_explanation, terrain_status
@@ -65,7 +65,7 @@ def feature_to_csv(attrs: dict, latitude: float, longitude: float) -> str:
     ])
     buf = io.StringIO()
     buf.write(preamble)
-    writer = csv.writer(buf)
+    writer = csvsafe.writer(buf)
     writer.writerow(_FEATURE_CSV_HEADER)
     writer.writerow([
         attrs.get("name") or attrs.get("licensee"), attrs.get("record_id"),
@@ -87,7 +87,7 @@ def link_feature_to_csv(attrs: dict, site_a_point, site_b_point) -> str:
     ])
     buf = io.StringIO()
     buf.write(preamble)
-    writer = csv.writer(buf)
+    writer = csvsafe.writer(buf)
     writer.writerow(_FEATURE_CSV_HEADER)
     writer.writerow([
         attrs.get("licensee"), attrs.get("authorization_number"), "", attrs.get("frequencies_mhz"),
@@ -228,7 +228,7 @@ def selection_summary_to_csv(result) -> str:
 
     buf = io.StringIO()
     buf.write(_preamble(lines))
-    writer = csv.writer(buf)
+    writer = csvsafe.writer(buf)
     if result.columns:
         writer.writerow(result.columns)
     for row in rows:
@@ -275,7 +275,9 @@ def result_to_xlsx(result) -> bytes:
         raise NotExportable(
             "An Excel workbook is available for terrain clearance, weather exposure and Fixed Service link "
             "results. Single records and selections export as CSV; satellite geometry is not exported.")
-    return build_workbook(result, result_to_csv(result))
+    with csvsafe.disabled():          # the workbook stores plain strings, never formulas: no apostrophes in its EVIDENCE sheet
+        evidence_csv = result_to_csv(result)
+    return build_workbook(result, evidence_csv)
 
 
 def _terrain_height_row(result, which, label, height_m, from_feature) -> list:
@@ -319,7 +321,7 @@ def _terrestrial_to_csv(result) -> str:
     ])
     buf = io.StringIO()
     buf.write(preamble)
-    writer = csv.writer(buf)
+    writer = csvsafe.writer(buf)
     writer.writerow(EVIDENCE_HEADER)
 
     rows = [
@@ -375,7 +377,7 @@ def _microwave_to_csv(result) -> str:
     ])
     buf = io.StringIO()
     buf.write(preamble)
-    writer = csv.writer(buf)
+    writer = csvsafe.writer(buf)
     writer.writerow(EVIDENCE_HEADER)
 
     rows = [
@@ -516,7 +518,7 @@ def _link_investigation_to_csv(result) -> str:
     ])
     buf = io.StringIO()
     buf.write(preamble)
-    writer = csv.writer(buf)
+    writer = csvsafe.writer(buf)
     writer.writerow(EVIDENCE_HEADER)
 
     a_lat, a_lon = entry.site_a_point or (None, None)
