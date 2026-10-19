@@ -5,6 +5,7 @@ Offline on purpose: the basemap and the live providers are replaced by test doub
 test file only; nothing here ships. Run like qgis_e2e.py (see tests/run_qgis_tests.sh). A pass here is NOT proof of a live integration: the live checks
 are the real-provider smoke test (tools/live_orbit_probe.py and the real-QGIS session notes in the release notes)."""
 import os
+os.environ.setdefault("VELORONA_USA_PACK", "off")       # USA data is on by default (online); these suites are offline and about other things
 import sys
 
 PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

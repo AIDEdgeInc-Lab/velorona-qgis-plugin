@@ -1,6 +1,7 @@
 """UI polish regression checks in real QGIS (offscreen): zoom-dependent cluster/link styling, link title, NO DATA
 wording, baseline grouping, Records column show/hide. Run like qgis_usa_e2e.py (see tests/run_qgis_tests.sh)."""
 import os
+os.environ.setdefault("VELORONA_USA_PACK", "off")       # USA data is on by default (online); these suites are offline and about other things
 import sys
 
 PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

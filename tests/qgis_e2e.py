@@ -6,6 +6,7 @@ rendering, pan/zoom, then the analysis engines, inspector, dock and export.
 """
 
 import os
+os.environ.setdefault("VELORONA_USA_PACK", "off")       # USA data is on by default (online); these suites are offline and about other things
 import sys
 import time
 

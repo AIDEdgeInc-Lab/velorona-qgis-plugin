@@ -10,6 +10,7 @@ Usage: python3.12 bench.py <label>
 
 import json
 import os
+os.environ.setdefault("VELORONA_USA_PACK", "off")       # USA data is on by default (online); these suites are offline and about other things
 import sys
 import time
 

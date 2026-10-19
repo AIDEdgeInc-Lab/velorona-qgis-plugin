@@ -17,7 +17,7 @@ _HEADLINE = {usa_setup.NOT_CONFIGURED: "Not set up yet", usa_setup.LOADED: "Read
 
 
 class UsaSetupDialog(QDialog):
-    def __init__(self, parent, current_source: str = "", intro: bool = False, check=usa_setup.check_source, pick_folder=None):
+    def __init__(self, parent, current_source: str = "", intro: bool = False, check=usa_setup.check_source, pick_folder=None, is_off: bool = False):
         super().__init__(parent)
         self.setWindowTitle("Velorona — USA data (FCC)")
         self.setMinimumWidth(560)
@@ -26,11 +26,13 @@ class UsaSetupDialog(QDialog):
         self._result = usa_setup.SetupCheck(usa_setup.NOT_CONFIGURED)
         self.chosen_source = ""            # set only after a successful check
         self.remove_requested = False
+        self.off_requested = False
 
         layout = QVBoxLayout(self)
-        lead = ("To show US links, Velorona needs the USA data pack. " if intro else "") + \
-            ("It is a separate download (public FCC licence records) and is <b>not included in the plugin</b>. "
-             "<b>Canada works without it.</b>")
+        lead = ("USA data is turned off for this project. " if is_off else "") + \
+            ("By default Velorona reads <b>Velorona's online USA data</b> (public FCC licence records, the same data Velorona Map shows) for the area you "
+             "look at: USA links and sites appear as you move the map, and nothing is downloaded for areas you do not view. The data is <b>not included in "
+             "the plugin</b>. Use this window to read it from a folder or another address instead, or to turn it off. <b>Canada works without it.</b>")
         self.lead = QLabel(lead)
         self.lead.setWordWrap(True)
         layout.addWidget(self.lead)
@@ -72,7 +74,8 @@ class UsaSetupDialog(QDialog):
 
         self.buttons = QDialogButtonBox(self)
         self.btn_use = self.buttons.addButton("Use this data", QDialogButtonBox.ButtonRole.AcceptRole)
-        self.btn_remove = self.buttons.addButton("Forget the saved setting", QDialogButtonBox.ButtonRole.DestructiveRole)
+        self.btn_remove = self.buttons.addButton("Forget the saved setting (use the online data)", QDialogButtonBox.ButtonRole.DestructiveRole)
+        self.btn_off = self.buttons.addButton("Turn USA data off", QDialogButtonBox.ButtonRole.DestructiveRole)
         self.btn_cancel = self.buttons.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
         layout.addWidget(self.buttons)
 
@@ -83,9 +86,11 @@ class UsaSetupDialog(QDialog):
         self.btn_help.clicked.connect(lambda: self.help.setVisible(not self.help.isVisible()))
         self.btn_use.clicked.connect(self._on_use)
         self.btn_remove.clicked.connect(self._on_remove)
+        self.btn_off.clicked.connect(self._on_off)
         self.btn_cancel.clicked.connect(self.reject)
 
-        self.btn_remove.setVisible(bool(current_source))
+        self.btn_remove.setVisible(bool(current_source) or is_off)
+        self.btn_off.setVisible(not is_off)
         self._render()
         if current_source:                       # an existing setting is re-checked so the status is true today, not remembered
             self.address.setText(current_source if current_source.lower().startswith("http") else "")
@@ -130,4 +135,8 @@ class UsaSetupDialog(QDialog):
 
     def _on_remove(self):
         self.remove_requested = True
+        self.accept()
+
+    def _on_off(self):
+        self.off_requested = True
         self.accept()

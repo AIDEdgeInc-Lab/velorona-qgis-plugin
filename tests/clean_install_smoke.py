@@ -7,6 +7,7 @@ Evidence -> Export workflow, plus enable/disable/re-enable.
 """
 
 import os
+os.environ.setdefault("VELORONA_USA_PACK", "off")       # USA data is on by default (online); these suites are offline and about other things
 import sys
 
 PROFILE = os.environ.get("VELORONA_TEST_PROFILE", os.path.expanduser(
