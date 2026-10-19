@@ -13,6 +13,7 @@ from qgis.core import (
     QgsFontMarkerSymbolLayer,
     QgsGeometry,
     QgsLineSymbol,
+    QgsMapLayer,
     QgsMarkerSymbol,
     QgsPointClusterRenderer,
     QgsPointXY,
@@ -449,6 +450,7 @@ SOURCE_FIXED_SITES = "fixed_sites"
 SOURCE_FIXED_LINKS = "fixed_links"
 SOURCE_US_SITES = "us_fixed_sites"       # USA (FCC ULS) layers are separate from Canada's and loaded per extent from a pack
 SOURCE_US_LINKS = "us_fixed_links"
+SOURCE_US_OVERVIEW = "us_overview"       # presence counts for the zoomed-out United States (Velorona Map's "US overview"): not records, not selectable
 SOURCE_TOWERS = "towers"
 SOURCE_CELLULAR = "cellular"
 SOURCE_SATELLITES = "satellites"
@@ -654,6 +656,47 @@ def cluster_symbol(color_hex: str, dark: bool = True) -> QgsMarkerSymbol:
     symbol.changeSymbolLayer(0, disc)
     symbol.appendSymbolLayer(count)
     return symbol
+
+
+def overview_symbol(color_hex: str, dark: bool = True) -> QgsMarkerSymbol:
+    """The US-overview bubble: the cluster bubble (same restrained disc, same ink, same count text) with its size and its text taken from the bin's own count
+    ('n' and 'label') instead of from how many features were grouped. Quieter than Canada's by construction: it reuses the cluster alpha."""
+    symbol = cluster_symbol(color_hex, dark)
+    disc, count = symbol.symbolLayer(0), symbol.symbolLayer(1)
+    disc.setDataDefinedProperty(QgsSymbolLayer.Property.Size, QgsProperty.fromExpression(
+        'CASE WHEN "n" < 500 THEN 26 WHEN "n" < 5000 THEN 32 ELSE 38 END'))
+    count.setDataDefinedProperty(QgsSymbolLayer.Property.Character, QgsProperty.fromExpression('"label"'))
+    return symbol
+
+
+def build_overview_layer(name: str, color_hex: str, dark: bool = True, abstract: str = None) -> QgsVectorLayer:
+    """An empty memory point layer for the US overview bubbles. Not a record layer: it is excluded from identify, never wired to the inspector and never
+    listed in Records."""
+    layer = QgsVectorLayer("Point?crs=EPSG:4326", name, "memory")
+    layer.dataProvider().addAttributes([QgsField("n", QMetaType.Type.Int), QgsField("ns", QMetaType.Type.Int), QgsField("nl", QMetaType.Type.Int),
+                                        QgsField("label", QMetaType.Type.QString)])
+    layer.updateFields()
+    layer.setRenderer(QgsSingleSymbolRenderer(overview_symbol(color_hex, dark)))
+    flag = QgsMapLayer.LayerFlag
+    layer.setFlags(flag(layer.flags().value & ~flag.Identifiable.value))      # not identifiable: the overview is presence, not records
+    layer.setCustomProperty(VELORONA_KIND_PROPERTY, "us-overview")
+    if abstract:
+        set_abstract(layer, abstract)
+    return layer
+
+
+def fill_overview_layer(layer: QgsVectorLayer, bins) -> None:
+    """Replaces the overview bubbles (a few dozen features; no selection exists on this layer)."""
+    layer.dataProvider().truncate()
+    features = []
+    for b in bins:
+        feature = QgsFeature(layer.fields())
+        feature.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(b["longitude"], b["latitude"])))
+        feature.setAttributes([b["n"], b["ns"], b["nl"], b["label"]])
+        features.append(feature)
+    layer.dataProvider().addFeatures(features)
+    layer.updateExtents()
+    layer.triggerRepaint()
 
 
 def _clustered_renderer(color_hex: str, dark: bool = True) -> QgsPointClusterRenderer:

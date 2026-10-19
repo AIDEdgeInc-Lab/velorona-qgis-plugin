@@ -6,6 +6,7 @@ Run with the QGIS Python (see tests/run_qgis_tests.sh for the environment) from 
 
     $QGISPY tests/qgis_usa_e2e.py
 """
+import json
 import os
 import sys
 import tempfile
@@ -14,7 +15,7 @@ PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(PLUGIN_DIR))
 sys.path.insert(0, os.path.join(PLUGIN_DIR, "tests"))
 
-from qgis.core import QgsApplication, QgsProject, QgsRectangle, QgsCoordinateReferenceSystem  # noqa: E402
+from qgis.core import QgsApplication, QgsMapLayer, QgsProject, QgsRectangle, QgsCoordinateReferenceSystem  # noqa: E402
 from qgis.gui import QgsMapCanvas, QgsMessageBar  # noqa: E402
 from qgis.PyQt.QtWidgets import QApplication, QMainWindow  # noqa: E402
 
@@ -90,7 +91,21 @@ def set_view(west, south, east, north):
 
 
 try:
-    pack_dir = write_pack(tempfile.mkdtemp(prefix="velorona-us-pack-"))
+    _root = tempfile.mkdtemp(prefix="velorona-us-pack-")
+    pack_dir = write_pack(os.path.join(_root, "us"))
+    with open(os.path.join(_root, "us-overview.json"), "w") as _fh:           # SYNTHETIC overview, the sibling of the pack folder (as on the Map's server)
+        json.dump({"schema": "velorona.us-overview/1", "cell_degrees": 2, "cells": [[40.5, -105.4, 3, 2], [41.2, -105.1, 400, 700], [10.5, 10.5, 2, 1]]}, _fh)
+    # USA data is ON by default (Velorona's online pack): the suite is offline, so the online address is answered by the synthetic pack and its sibling overview.
+    from velorona.core.countries import usa as _usa_mod, usa_overview as _ov_mod
+    from velorona.core.countries.usa_setup import VELORONA_ONLINE_PACK as _ONLINE
+    _real_make, _real_overview = _usa_mod.make_provider, _ov_mod.load_overview
+
+    def _make(source, *a, **k):
+        provider = _real_make(pack_dir if source == _ONLINE else source, *a, **k)
+        provider.source = source
+        return provider
+    _usa_mod.make_provider = _make
+    _ov_mod.load_overview = lambda source, get=None: _real_overview(pack_dir if source == _ONLINE else source, get)
     plugin.initGui()
 
     print("\n== USA actions exist, Canada layers untouched ==")
@@ -242,24 +257,27 @@ try:
             if SpyDialog.script == "remove":
                 self.remove_requested = True
                 return self.DialogCode.Accepted
+            if SpyDialog.script == "off":
+                self.off_requested = True
+                return self.DialogCode.Accepted
             return self.DialogCode.Rejected
     plugin_mod.UsaSetupDialog = SpyDialog
     plugin2 = VeloronaPlugin(iface)
     plugin2._warn = lambda m: SHOWN.append(m)
     plugin2._error = lambda m: SHOWN.append(m)
-    set_source("")
+    set_source("off")                                      # "off" = USA data turned off: an explicit load then asks via the guided setup
     os.environ.pop(USA_PACK_ENV, None)
     plugin2.initGui()
     check("normal plugin start opens NO USA dialog and asks for no path", opened == [])
     check("a Canada engine runs with no USA data configured",
-          len(CanadaProvider().load_all().links) == 16956 and plugin2._configured_usa_source() == "")
+          len(CanadaProvider().load_all().links) == 16956 and plugin2._effective_usa_source() == "")
     _reset_messages()
     before_links = links.featureCount()
     SpyDialog.script = "cancel"
     plugin2.load_usa_view()
-    check("Load USA Links with nothing set up opens the GUIDED dialog (with the explanation), once", len(opened) == 1 and opened[0]["intro"] is True, str(opened))
+    check("Load USA Links with USA data turned off opens the GUIDED dialog (with the explanation), once", len(opened) == 1 and opened[0]["intro"] is True, str(opened))
     check("Cancel: no layers, nothing saved, no error box, a calm note that Canada is unaffected",
-          links.featureCount() == before_links and plugin2._configured_usa_source() == "" and not SHOWN
+          links.featureCount() == before_links and plugin2._configured_usa_source() == "off" and not SHOWN
           and any("Canada works as usual" in m for m in messages()), str(messages()))
     plugin2.set_usa_pack_source()
     check("USA Data Setup (menu) opens without the first-use intro", len(opened) == 2 and opened[1]["intro"] is False)
@@ -269,6 +287,11 @@ try:
     SpyDialog.script = "remove"
     plugin2.set_usa_pack_source()
     check("'Forget the saved setting' clears it and leaves Canada alone", plugin2._configured_usa_source() == "")
+    check("... and the default is Velorona's online USA data (no setup needed)", plugin2._effective_usa_source() == _ONLINE)
+    SpyDialog.script = "off"
+    plugin2.set_usa_pack_source()
+    check("'Turn USA data off' saves the off setting: nothing is loaded automatically any more", plugin2._configured_usa_source() == "off" and plugin2._effective_usa_source() == "")
+    SpyDialog.script = "cancel"
     SpyDialog.script = "cancel"
     set_source(pack_dir)
     plugin2.set_usa_pack_source()
@@ -426,13 +449,13 @@ try:
     print("\n== the refresh never asks, never fetches for a user who did not set USA up ==")
     _usa.UsaPackProvider.load_bbox = _real_load
     calls.clear()
-    set_source("")
+    set_source("off")
     plugin._usa_loaded_window = None
     plugin._usa_provider = None
     _usa.UsaPackProvider.load_bbox = lambda self, bbox: (calls.append(bbox), _real_load(self, bbox))[1]
     set_view(-106.0, 40.0, -105.0, 40.9)
     plugin._refresh_usa_view()
-    check("no pack source configured: nothing is read and no dialog opens", not calls)
+    check("USA data turned off: nothing is read and no dialog opens", not calls)
     set_source(pack_dir)
     plugin._usa_loaded_window = None
     root_node = QgsProject.instance().layerTreeRoot()
@@ -464,13 +487,52 @@ try:
     set_source("")
     set_view(-106.0, 40.0, -105.0, 40.9)
     plugin3._refresh_usa_view()
-    check("no USA setting: nothing read, nothing created", not reads and find(layer_helpers.SOURCE_US_SITES) is None)
+    check("an unrelated QGIS project (no Velorona layers yet): nothing is read, even with the default source", not reads and find(layer_helpers.SOURCE_US_SITES) is None)
+    plugin3.action_load_public.trigger()                       # the project becomes a Velorona project the normal way
+    for _ in range(20):
+        QApplication.processEvents()
+    plugin3._usa_loaded_window = None
+    reads.clear()
+    _reset_messages()
+    set_source("off")
+    set_view(-106.0, 40.0, -105.0, 40.9)
+    plugin3._refresh_usa_view()
+    check("USA data turned off: nothing read, nothing created", not reads and find(layer_helpers.SOURCE_US_SITES) is None)
+    set_source("")                                           # no setting at all = the default: Velorona's online USA data, no setup needed
+    plugin3._usa_provider = None
+    set_view(-80.0, 43.0, -79.0, 44.0)
+    plugin3._refresh_usa_view()
+    check("DEFAULT (no setting): a Canadian view consults the pack, creates nothing and shows no message", len(reads) == 1
+          and find(layer_helpers.SOURCE_US_SITES) is None and not messages(), str(messages()))
+    plugin3._usa_loaded_window = None
+    reads.clear()
+    set_view(-106.0, 40.0, -105.0, 40.9)
+    plugin3._refresh_usa_view()
+    check("DEFAULT (no setting): the first US view creates the USA layers by itself, no setup, no button",
+          find(layer_helpers.SOURCE_US_SITES) is not None and find(layer_helpers.SOURCE_US_LINKS).featureCount() == 2)
+    check("... with ONE calm notice that Velorona's online USA data is used and how to change or turn it off",
+          sum("online USA data" in m for m in messages()) == 1 and any("Explore: USA Data Setup" in m for m in messages()), str(messages()))
+    plugin3._usa_loaded_window = None
+    set_view(-106.0, 40.0, -105.0, 40.9)
+    plugin3._refresh_usa_view()
+    check("... and the notice is not repeated on the next load", sum("online USA data" in m for m in messages()) == 1)
+    if plugin3._viewport_timer is not None:
+        plugin3._viewport_timer.stop()                         # a pending (debounced) map-movement refresh must not recreate the layers mid-test
+    for _k in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS, layer_helpers.SOURCE_US_OVERVIEW):
+        _lyr = find(_k)
+        if _lyr is not None:
+            QgsProject.instance().removeMapLayer(_lyr.id())
+    plugin3._usa_loaded_window = None
+    plugin3._usa_provider = None
+    plugin3._usa_overview_source = None
+    _reset_messages()
+    reads.clear()
     set_source(pack_dir)
     plugin3._usa_provider = None
     set_view(-80.0, 43.0, -79.0, 44.0)
     plugin3._refresh_usa_view()
     check("a Canadian view with USA set up: the pack is consulted, nothing is created, no message", len(reads) == 1
-          and find(layer_helpers.SOURCE_US_SITES) is None and not messages(), str(messages()))
+          and find(layer_helpers.SOURCE_US_SITES) is None and not messages(), f"{len(reads)} {find(layer_helpers.SOURCE_US_SITES)} {messages()}")
     plugin3._refresh_usa_view()
     check("... and the empty answer is remembered (no second read for the same view)", len(reads) == 1)
     set_view(-106.0, 40.0, -105.0, 40.9)
@@ -493,6 +555,32 @@ try:
     plugin3._refresh_usa_view()
     check("a broken pack is a quiet note, not a pop-up, and is not retried on every pan", not [m for m in messages() if "does not exist" in m]
           and "could not be refreshed" in plugin3._dataset_notes.get(layer_helpers.SOURCE_US_SITES, "") and plugin3._usa_retry_after > 0)
+
+    print("\n== a view too large for detailed records shows the US OVERVIEW (counts, not records), like Velorona Map ==")
+    set_source(pack_dir)
+    plugin3._usa_provider = _usa.UsaPackProvider(pack_dir, max_links=1)
+    plugin3._usa_loaded_window = None
+    plugin3._usa_retry_after = 0.0
+    plugin3._usa_overview_source = None
+    set_view(-110.0, 38.0, -100.0, 44.0)
+    plugin3._refresh_usa_view()
+    overview = find(layer_helpers.SOURCE_US_OVERVIEW)
+    check("an overview layer exists and holds a few count bubbles", overview is not None and overview.featureCount() >= 1, str(overview and overview.featureCount()))
+    labels = sorted(f["label"] for f in overview.getFeatures())
+    check("the bubbles carry the pack's own counts (compact: 400 sites in one 2-degree cell -> '403' with its neighbour or '400')",
+          any(l in ("400", "403") for l in labels), str(labels))
+    check("the overview is NOT identifiable and NOT a record dataset (presence, not records)",
+          not (overview.flags() & QgsMapLayer.LayerFlag.Identifiable) and overview.id() not in plugin3._wired_layers
+          and plugin3.dock.records.dataset_combo.findData(layer_helpers.SOURCE_US_OVERVIEW) < 0)
+    check("it is drawn as the same subtle bubble (cluster ink, quiet alpha)", overview.renderer().symbol().symbolLayerCount() == 2)
+    check("the Records note says the circles are counts, not records", "counts, not records" in plugin3._dataset_notes.get(layer_helpers.SOURCE_US_SITES, ""),
+          str(plugin3._dataset_notes.get(layer_helpers.SOURCE_US_SITES)))
+    plugin3._usa_provider = None
+    plugin3._usa_loaded_window = None
+    set_view(-106.0, 40.0, -105.0, 40.9)
+    plugin3._refresh_usa_view()
+    check("zooming in to a drawable view replaces the overview with the detailed records", overview.featureCount() == 0
+          and find(layer_helpers.SOURCE_US_LINKS).featureCount() == 2)
     _usa.UsaPackProvider.load_bbox = _orig
     plugin3.unload()
 finally:

@@ -6,6 +6,7 @@ Offline on purpose (basemap, live providers and the per-link weather lookup are 
 selection handlers missing (or doubled) after a plugin reload, a crash when a layer was removed from the project, a Records row left highlighted
 after the map selection moved on."""
 import os
+os.environ.setdefault("VELORONA_USA_PACK", "off")       # USA data is on by default (online); these suites are offline and about other things
 import sys
 
 PLUGIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

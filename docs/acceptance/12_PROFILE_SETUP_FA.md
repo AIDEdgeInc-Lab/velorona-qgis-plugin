@@ -31,3 +31,6 @@
 - پیام «افزونه ... نسخه تکراری»: یعنی QGIS معمولی را باز کرده‌اید؛ دستور بالا را اجرا کنید و مطمئن شوید پنجرهٔ QGIS تست باز شده (پوشهٔ پروفایل: Settings ▸ User Profiles ▸ Open Active Profile Folder باید داخل `velorona-acceptance/qgis-profiles` باشد).
 - پیام کتابخانهٔ قدیمی (library out of date): QGIS را با دستور بالا (با `--env PYTHONPATH`) راه‌اندازی نکرده‌اید.
 - با اجرای این روش هیچ‌چیز commit، push، tag یا منتشر نشده است.
+
+## داده‌های آمریکا (بدون تنظیم)
+نیازی به USA Data Setup نیست: پس از Explore ▸ Load Public Data، روی نقشه به آمریکا بروید. با زوم کم، دایره‌های کم‌رنگ شمارش (USA overview) دیده می‌شوند؛ با زوم روی یک ایالت، لینک‌ها و کلاسترهای آمریکا خودکار و بدون هیچ دکمه‌ای بارگذاری می‌شوند. داده از سرور آنلاین Velorona (همان داده Velorona Map) فقط برای ناحیه‌ای که می‌بینید خوانده می‌شود. برای خاموش‌کردن: Explore ▸ USA Data Setup ▸ Turn USA data off.

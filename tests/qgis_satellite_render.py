@@ -4,6 +4,7 @@ Input: ORBIT_CACHE_DIR (a cache filled from the real source by tools/live_orbit_
 here. What is verified: every drawn satellite has a valid latitude/longitude and a GEO-class altitude, the layer CRS maps correctly into the map CRS, selecting a
 satellite in Records selects that very feature, the map shows it, and the details panel names it. Light and Dark screenshots at world, Americas and selected scales."""
 import os
+os.environ.setdefault("VELORONA_USA_PACK", "off")       # USA data is on by default (online); these suites are offline and about other things
 import sys
 import time
 

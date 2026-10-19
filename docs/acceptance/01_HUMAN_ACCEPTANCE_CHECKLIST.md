@@ -197,7 +197,7 @@ Inputs: candidate links in `02_*` §3. Output layer name "Terrain clearance (bat
 
 ### REG-01 USA setup path
 - **Steps:** Explore: USA Data Setup… ▸ choose "Velorona's online USA data" ▸ check ▸ Use this data; zoom to the Dallas area ▸ Explore: Load USA Links in View. Also: Cancel the first-time window once and confirm Canada is unaffected.
-- **USA clusters (product requirement):** after the load, pan to another US area without pressing the action again — USA clusters appear automatically, drawn like Canada's (pale discs with counts, same size/alpha at the same zoom); the Records table shows the USA links after the explicit load; a too-large view keeps the loaded records and says so. Headless evidence: `tests/qgis_usa_e2e.py` (pixel-identical cluster image) and images in `~/velorona-acceptance/2026-10-19/usa-clusters/`.
+- **USA like the Map (product requirement):** with NO USA setting, after Load Public Data: whole-US view ⇒ pale count bubbles (overview layer, not selectable); zoom/pan into a state-sized view without any USA action ⇒ USA links and pale clusters appear by themselves (one message about the online data), follow the pan to another state, Records lists the USA datasets; "Turn USA data off" in the setup window stops it. Headless evidence: `tests/qgis_usa_e2e.py` and images in `~/velorona-acceptance/2026-10-19/usa-default/`.
 - **Expect:** window shows Ready with link count and source date, or Problem with a reason; the message bar reports links/sites loaded and attribution; layers *Fixed Service links/sites (USA)*; the setting is stored in the project (not global settings); Operator filter does **not** filter USA layers (stated). **Severity:** S2.
 
 ### REG-02 USA link analysis provenance

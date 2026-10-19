@@ -31,6 +31,7 @@ from .core import network_context
 from .core import overlays
 from .core.colors import COLORS, layer_color
 from .core.countries import usa as usa_pack
+from .core.countries import usa_overview, usa_setup
 from .core.countries.base import PackError, ViewTooLargeError
 from .core.countries.canada import CanadaProvider
 from .core.countries.usa_fields import US_LINK_FIELDS, US_SITE_FIELDS
@@ -53,6 +54,8 @@ MENU_NAME = "&Velorona"
 # fallback when the project has none.
 USA_PACK_SCOPE, USA_PACK_KEY = "Velorona", "usa_pack_source"
 USA_PACK_ENV = "VELORONA_USA_PACK"
+USA_OFF_VALUES = ("off", "none", "disabled")    # a saved/environment source of "off" turns the automatic USA data off
+NAME_US_OVERVIEW = "USA overview (counts, not records)"
 WGS84 = QgsCoordinateReferenceSystem("EPSG:4326")
 
 # Basemap -- native QGIS vector tile layer, CARTO Dark Matter, styled from
@@ -262,6 +265,10 @@ class VeloronaPlugin:
         self._viewport_timer = None
         self._usa_loaded_window = None         # (west, south, east, north) of the 1-degree tiles the USA layers currently hold
         self._usa_auto_loading = False
+        self._usa_overview_cells = None        # the pack's 2-degree overview cells (read once per source)
+        self._usa_overview_source = None
+        self._usa_overview_failed = False
+        self._usa_default_noted = False        # the one-time notice that Velorona's online USA data is read by default
         self._usa_retry_after = 0.0            # monotonic time before which a failed automatic USA refresh is not retried
         self._last_viewport_bbox = {}
         self._basemap_renderers = {}
@@ -358,6 +365,7 @@ class VeloronaPlugin:
         # Velorona layers already in the project (the plugin was reloaded, or the project was reopened) get their one selection handler now,
         # not only when Load Public Data next creates them; layers leaving the project are forgotten before QGIS deletes them.
         self._adopt_existing_layers()
+        self._connect_viewport_signals()          # USA data follows the map in any Velorona project (guarded: nothing happens in other projects)
         QgsProject.instance().layersWillBeRemoved.connect(self._on_layers_will_be_removed)
         QgsProject.instance().layersAdded.connect(self._on_layers_added)
         self._project_wiring_connected = True
@@ -864,7 +872,6 @@ class VeloronaPlugin:
         canvas.refresh()
 
     def load_public_data(self):
-        project = QgsProject.instance()
         # See PROJECT_CRS's comment above -- measured ~2.4x full-redraw speedup
         # (real numbers) from avoiding on-the-fly raster reprojection of the
         # XYZ basemap tiles. Set explicitly on both project and canvas rather
@@ -1609,14 +1616,28 @@ class VeloronaPlugin:
     def set_usa_pack_source(self, intro: bool = False):
         """The guided USA data setup (ui/usa_setup_dialog.py): folder picker, Velorona's online data, or a web address; a source is kept only after a real
         check (index.json + one tile). Cancel changes nothing. Returns True when a source was chosen and saved."""
-        dialog = UsaSetupDialog(self.iface.mainWindow(), self._configured_usa_source(), intro=intro)
+        explicit = self._configured_usa_source()
+        dialog = UsaSetupDialog(self.iface.mainWindow(), "" if explicit.lower() in USA_OFF_VALUES else explicit, intro=intro,
+                                is_off=explicit.lower() in USA_OFF_VALUES)
         if dialog.exec() != dialog.DialogCode.Accepted:
+            return False
+        if getattr(dialog, "off_requested", False):
+            QgsProject.instance().writeEntry(USA_PACK_SCOPE, USA_PACK_KEY, USA_OFF_VALUES[0])
+            self._usa_provider = None
+            self._usa_loaded_window = None
+            self._set_usa_overview_visible(False)
+            self.iface.messageBar().pushInfo("Velorona", "USA data is turned off for this project: no USA records are loaded as you move the map. "
+                                                         "Canada is unaffected. Turn it back on from Explore: USA Data Setup.")
             return False
         if dialog.remove_requested:
             QgsProject.instance().writeEntry(USA_PACK_SCOPE, USA_PACK_KEY, "")
             self._usa_provider = None
             self._usa_loaded_window = None
-            self.iface.messageBar().pushInfo("Velorona", "The saved USA data setting was removed. Canada is unaffected.")
+            self._usa_retry_after = 0.0
+            self.iface.messageBar().pushInfo("Velorona", "The saved USA data setting was removed: Velorona's online USA data is used again (the default). "
+                                                         "Canada is unaffected.")
+            self._connect_viewport_signals()
+            self._refresh_usa_view()
             return False
         QgsProject.instance().writeEntry(USA_PACK_SCOPE, USA_PACK_KEY, dialog.chosen_source)
         self._usa_provider = None                 # rebuilt from the saved source on the next load
@@ -1625,24 +1646,38 @@ class VeloronaPlugin:
         self.iface.messageBar().pushSuccess(
             "Velorona", "USA data is ready. Zoom to the United States: USA links and sites appear and follow the map as you pan and zoom "
                         "(Explore: Load USA Links in View loads the current view on demand).")
+        self._usa_default_noted = True
         self._connect_viewport_signals()
         self._refresh_usa_view()                  # a view that already shows the US is loaded now
         return True
 
     @staticmethod
     def _configured_usa_source() -> str:
-        """The pack source: this project's entry, else the environment variable, else empty."""
+        """The source the USER set: this project's entry, else the environment variable, else empty (empty means the default, see _effective_usa_source)."""
         value, _ = QgsProject.instance().readEntry(USA_PACK_SCOPE, USA_PACK_KEY, "")
         return str(value or os.environ.get(USA_PACK_ENV, "") or "").strip()
 
+    @classmethod
+    def _usa_is_off(cls) -> bool:
+        return cls._configured_usa_source().lower() in USA_OFF_VALUES
+
+    @classmethod
+    def _effective_usa_source(cls) -> str:
+        """Where USA data comes from. Like Velorona Map, USA data is on by default and needs no setup: with no setting, Velorona's own online pack
+        (the one the Map serves) is read, and only the 1-degree tiles of the view you look at. A saved or environment source overrides it; "off" disables it."""
+        explicit = cls._configured_usa_source()
+        if explicit.lower() in USA_OFF_VALUES:
+            return ""
+        return explicit or usa_setup.VELORONA_ONLINE_PACK
+
     def _usa_pack_provider(self):
-        source = self._configured_usa_source()
-        if not source:
-            if not self.set_usa_pack_source(intro=True):       # first use: explain, offer the easy options; Cancel just returns (Canada is unaffected)
-                self.iface.messageBar().pushInfo("Velorona", "USA data is not set up, so no US links were loaded. Canada works as usual. "
-                                                 "Set it up any time from Explore: USA Data Setup.")
+        source = self._effective_usa_source()
+        if not source:                                          # USA data was turned off: an explicit request re-opens the setup (Cancel just returns)
+            if not self.set_usa_pack_source(intro=True):
+                self.iface.messageBar().pushInfo("Velorona", "USA data is turned off, so no US links were loaded. Canada works as usual. "
+                                                 "Turn it back on from Explore: USA Data Setup.")
                 return None
-            source = self._configured_usa_source()
+            source = self._effective_usa_source()
         if self._usa_provider is None or self._usa_provider.source != source:
             self._usa_provider = usa_pack.make_provider(source)     # PackError (e.g. folder gone) is handled by the caller
         return self._usa_provider
@@ -1725,9 +1760,12 @@ class VeloronaPlugin:
         only the pack's small index and creates nothing. A view the pack refuses as too large leaves what is loaded in place and says so in the
         Records note; other pack problems are reported there too (not as a pop-up on every pan) and are retried after a minute. If the user switched
         every USA layer off, nothing is loaded."""
-        if self._usa_auto_loading or not self._configured_usa_source() or time.monotonic() < self._usa_retry_after:
+        source = self._effective_usa_source()
+        if self._usa_auto_loading or not source or time.monotonic() < self._usa_retry_after:
             return
         project = QgsProject.instance()
+        if not any(layer_helpers.is_velorona_owned(layer) for layer in project.mapLayers().values()):
+            return                                   # not a Velorona project yet (Explore: Load Public Data was never run): never fetch for an unrelated QGIS project
         sites = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_US_SITES)
         links = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_US_LINKS)
         if sites is not None and links is not None:
@@ -1745,9 +1783,11 @@ class VeloronaPlugin:
             try:
                 loaded = self._usa_pack_provider().load_bbox(bbox)
             except ViewTooLargeError:
+                self._show_usa_overview(source, bbox)           # Velorona Map's design: below the detailed zoom, quiet counts instead of records
                 if have_layers:
-                    note = ("USA records: this view is too large to draw, so the USA layers keep what was loaded for the last view that fitted. "
-                            "Zoom in to load the USA links and sites for the area you are looking at.")
+                    note = ("USA records: this view is too large to draw, so the USA layers keep what was loaded for the last view that fitted "
+                            "and the circles in the overview layer are counts, not records. Zoom in to load the USA links and sites for the area you are "
+                            "looking at.")
                     for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
                         self._set_note(key, note)
                 return
@@ -1763,6 +1803,7 @@ class VeloronaPlugin:
             QApplication.restoreOverrideCursor()
             self._usa_auto_loading = False
         self._usa_loaded_window = self._tile_window(bbox)
+        self._set_usa_overview_visible(False)                  # detailed records replace the overview, as in the Map
         if not loaded.links:
             if have_layers:
                 for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
@@ -1770,6 +1811,11 @@ class VeloronaPlugin:
             return
         self._apply_usa_records(loaded, self.map_is_dark())
         self._connect_viewport_signals()
+        if not self._usa_default_noted and not self._configured_usa_source():
+            self._usa_default_noted = True
+            self.iface.messageBar().pushInfo(
+                "Velorona", "USA links and sites are shown for the area you look at, read from Velorona's online USA data (FCC licence records, "
+                            "map.velorona.ai) - the same data Velorona Map shows. Change the source or turn it off: Explore: USA Data Setup.")
         for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
             self._dataset_notes.pop(key, None)
             if self.dock is not None:
@@ -1778,6 +1824,45 @@ class VeloronaPlugin:
             self._populate_records()                  # the USA datasets now exist: list them in the Records picker
         elif self.dock is not None and self.dock.records.current_source_key() in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
             self.dock.records.refresh_current()
+
+    def _show_usa_overview(self, source: str, bbox) -> None:
+        """Draws the US overview (counts of unique sites in 2-degree cells, grouped to screen-sized bubbles) for a view too large for the detailed tiles.
+        Presence, not records: nothing here is selectable or listed in Records. The file is read once per source; if the source has no overview
+        or it cannot be read, nothing is drawn and nothing is reported on every pan (the Records note already says the view is too large)."""
+        if self._usa_overview_source != source:
+            self._usa_overview_cells, self._usa_overview_source, self._usa_overview_failed = None, source, False
+        if self._usa_overview_cells is None and not self._usa_overview_failed:
+            try:
+                self._usa_overview_cells = usa_overview.load_overview(source)
+            except PackError as exc:
+                self._usa_overview_failed = True
+                QgsMessageLog.logMessage(f"The USA overview is not available from {source}: {exc}", "Velorona", Qgis.MessageLevel.Info)
+        if not self._usa_overview_cells:
+            return
+        canvas = self.iface.mapCanvas()
+        resolution = canvas.mapSettings().mapUnitsPerPixel()
+        crs = canvas.mapSettings().destinationCrs()
+        if crs == WGS84:
+            zoom = math.log2(360.0 / 256.0 / resolution)
+        else:
+            zoom = math.log2(156543.03392804097 / resolution)
+        project = QgsProject.instance()
+        layer = layer_helpers.find_owned_layer(project, layer_helpers.SOURCE_US_OVERVIEW)
+        if layer is None:
+            dark = self.map_is_dark()
+            infra_group = self._ensure_velorona_groups()[1]["Infrastructure"]
+            layer = layer_helpers.build_overview_layer(
+                NAME_US_OVERVIEW, layer_color("fixed-sites", dark), dark,
+                abstract="United States overview: approximate counts of FCC ULS microwave sites in 2-degree areas (Velorona Map's overview). Not individual "
+                         "records and not selectable; zoom in for the detailed records. " + PUBLIC_RECORDS_DISCLOSURE.capitalize() + ".")
+            layer_helpers.add_to_group(project, layer, infra_group, visible=True, source_key=layer_helpers.SOURCE_US_OVERVIEW)
+        layer_helpers.fill_overview_layer(layer, usa_overview.bin_cells(self._usa_overview_cells, zoom, bbox))     # visibility stays the user's choice
+
+    def _set_usa_overview_visible(self, visible: bool) -> None:
+        """Hides the overview (detailed records are loaded, or USA data was turned off) by emptying it: it holds no records, so nothing is lost."""
+        layer = layer_helpers.find_owned_layer(QgsProject.instance(), layer_helpers.SOURCE_US_OVERVIEW)
+        if layer is not None and not visible and layer.featureCount():
+            layer_helpers.fill_overview_layer(layer, [])
 
     def run_microwave(self):
         entries = self._selected_by_kind("site")

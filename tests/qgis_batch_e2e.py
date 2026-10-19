@@ -7,6 +7,7 @@ table, the optional CSV, empty input) and that each output row equals the single
 
 import csv
 import os
+os.environ.setdefault("VELORONA_USA_PACK", "off")       # USA data is on by default (online); these suites are offline and about other things
 import sys
 import tempfile
 

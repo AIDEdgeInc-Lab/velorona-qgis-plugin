@@ -12,6 +12,7 @@ import json
 import math
 import threading
 import os
+os.environ.setdefault("VELORONA_USA_PACK", "off")       # USA data is on by default (online); these suites are offline and about other things
 import shutil
 import sys
 import tempfile
