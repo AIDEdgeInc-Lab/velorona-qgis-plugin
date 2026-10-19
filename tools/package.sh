@@ -39,6 +39,8 @@ tar -C "$PLUGIN" -cf - \
     --exclude='tests' \
     --exclude='examples' \
     --exclude='docs/acceptance' \
+    --exclude='docs/FINALIZATION_STATUS.md' \
+    --exclude='docs/UI_INTEGRATION_AUDIT.md' \
     --exclude='tools' \
     --exclude='parity' \
     --exclude='SESSION_HANDOFF.md' \

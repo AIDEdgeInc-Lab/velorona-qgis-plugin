@@ -2,6 +2,9 @@
 
 Status: **first release; not validated.** Parity with Velorona Map is demonstrated on 20 frozen US fixtures (decision statuses, evidence, provenance, NO DATA), which shows the two products decide the same way from the same input. It is not a validation of the physics, of the FCC data, or of any operational outcome, and no severity rate is claimed for US links.
 
+## What you see on the map
+The base map and the optional USGS aerial imagery / topographic layers are basemap imagery: pictures of the ground, not Velorona data. The USA **infrastructure** is separate Velorona layers: *Fixed Service sites (USA)* (drawn as subtle clusters like Canada's), *Fixed Service links (USA)*, and, when the view is too large for records, *USA overview (counts, not records)* — count bubbles that are not individual records and cannot be selected.
+
 ## Source
 U.S. Federal Communications Commission, Universal Licensing System (ULS) public access database, microwave services (`l_micro`). The data is a public record; it is **licensee-reported record data, not a field measurement**. Attribution used on the layer and in exports (from the pack's own metadata): *"Source: U.S. Federal Communications Commission, Universal Licensing System (ULS) public access database, microwave services (l_micro). Data as published; not endorsed by the FCC."* The source-file date and the pack-build date are shown with it.
 

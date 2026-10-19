@@ -1,5 +1,7 @@
 # UI, selection and filter integration audit
 
+> Historical engineering note written while 1.1.10 was being prepared; the selection and wording fixes it describes are part of 1.1.10 (see `CHANGELOG.md`). Branch and git-state statements describe that moment.
+
 Written on branch `feat/ui-selection-integration` (from `origin/main` 905d9e4, plugin 1.1.9; uncommitted). Carried into `integration/qgis-finalization`, where it was extended: see "Finalization update" at the end, and `FINALIZATION_STATUS.md`. Nothing pushed, merged, tagged or released.
 
 ## Root causes found (each reproduced in real QGIS before the fix)
