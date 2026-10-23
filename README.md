@@ -12,6 +12,13 @@ Velorona puts public fixed-service telecom infrastructure (Canada and the United
 4. **Evidence** — See what is observed, what is calculated, and what is inferred.
 5. **Export** — Take the evidence with you as a structured CSV result or an Excel (.xlsx) workbook.
 
+## Where this fits
+
+Link analysis in QGIS answers *where* and *under what conditions*. In Velorona, that context sits next to live
+telemetry so operations teams can understand *why* a link degrades. Velorona for QGIS and
+[Velorona Map](https://map.velorona.ai/) are the context layer; [Velorona.ai](https://velorona.ai/) is the
+decision layer.
+
 ## What this is
 
 A local QGIS plugin that runs Velorona's existing, unmodified engineering
