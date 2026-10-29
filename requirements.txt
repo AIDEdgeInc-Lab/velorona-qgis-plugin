@@ -4,3 +4,5 @@ aei-link-clearance>=0.2.0,<0.3
 aei-microwave-link-exposure>=0.2.0,<0.3
 aei-geo-features
 skyfield
+# optional: local history only (see README)
+aei-history-contract>=0.1.0,<0.2

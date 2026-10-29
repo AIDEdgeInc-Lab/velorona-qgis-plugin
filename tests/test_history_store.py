@@ -4,6 +4,7 @@ import io
 import os
 import sqlite3
 
+import aei_history_contract as contract
 import pytest
 
 from core import history_store as H
@@ -67,10 +68,11 @@ def test_row_cap_drops_the_oldest_first(tmp_path):
     assert len(rows) == 5 and sorted(r.value for r in rows) == [0.0, 1.0, 2.0, 3.0, 4.0]    # i/10 h ago: larger i = older = dropped
 
 
-def test_byte_cap_shrinks_the_file(tmp_path):
+def test_byte_cap_is_the_contracts_counted_size_and_bounds_the_file(tmp_path):
     s = HistoryStore(str(tmp_path / "h.sqlite"), clock=lambda: NOW, max_bytes=64 * 1024)
     s.add_many([rec(i / 1000, value=float(i), source="x" * 100 + str(i)) for i in range(2000)])
-    assert os.path.getsize(s.path) <= 64 * 1024 + 8192 and 0 < s.stats().rows < 2000
+    # The cap is the contract's measure (UTF-8 length of each row's canonical text); the SQLite file carries index/page overhead on top (about 2.5x here).
+    assert s.stats().bytes <= 64 * 1024 and 0 < s.stats().rows < 2000 and os.path.getsize(s.path) <= 4 * 64 * 1024
 
 
 def test_invalid_records_are_counted_not_stored(store):
@@ -165,7 +167,7 @@ def test_csv_has_the_contract_columns_utc_rfc4180_and_a_formula_guard(store):
     name, text = store.export_csv("s1")
     assert name.startswith("velorona-history-s1-") and name.endswith("Z.csv") and "\r" not in text
     rows = list(csv.reader(io.StringIO(text)))
-    assert rows[0] == list(H.COLUMNS)
+    assert rows[0] == list(contract.CSV_COLUMNS)
     body = {r[5]: r for r in rows[1:]}
     assert body["temperature"][2].startswith("'=") and body["temperature"][6] == "-3.5"      # injected source neutralised, negative number kept
     assert body["rain_rate"][6] == "" and body["rain_rate"][11] == 'no "data", sorry'         # NO DATA is empty, never 0
@@ -194,3 +196,44 @@ def test_an_unwritable_profile_folder_is_a_reported_error_not_an_exception(tmp_p
     (tmp_path / "file").write_text("x")
     rep = HistoryStore(str(tmp_path / "file" / "sub" / "h.sqlite"), clock=lambda: NOW).add_many([rec()])
     assert rep.error == "disk_full" and "cannot be created or written" in rep.message
+
+
+# --- names kept on this computer; the shared contract is required ---------------------------------------------------------------------------
+
+def test_display_names_are_kept_locally_next_to_the_hashed_id_and_cleared_with_it(store):
+    hashed = store.entity_hash("my-site")
+    store.add_many([rec(entity=hashed, entity_type="site"), rec(entity="public-1")])
+    store.set_labels({hashed: "Hilltop North", "public-1": "FCC 1"})
+    assert store.labels() == {hashed: "Hilltop North", "public-1": "FCC 1"} and hashed not in "Hilltop North"
+    store.set_labels({hashed: "Hilltop N."})                               # a rename replaces, not duplicates
+    assert store.labels()[hashed] == "Hilltop N."
+    store.clear_entity(hashed)
+    assert hashed not in store.labels() and "public-1" in store.labels()
+    store.set_labels({})                                                   # nothing to do, no error
+
+
+def test_labels_of_pruned_entities_are_dropped_with_their_rows(tmp_path):
+    s = HistoryStore(str(tmp_path / "h.sqlite"), clock=lambda: NOW)
+    s.add_many([rec(23, entity="old"), rec(0, entity="new")])
+    s.set_labels({"old": "Old site", "new": "New site"})
+    s.set_retention_hours(12)                                              # prunes "old"
+    assert s.labels() == {"new": "New site"}
+
+
+def test_a_name_is_capped_and_a_file_without_labels_table_gets_one(tmp_path):
+    path = str(tmp_path / "h.sqlite")
+    s = HistoryStore(path, clock=lambda: NOW)
+    s.add_many([rec()])
+    con = sqlite3.connect(path); con.execute("DROP TABLE entity_labels"); con.commit(); con.close()    # a file from before names were stored
+    s.set_labels({"s1": "x" * 500})
+    assert len(s.labels()["s1"]) == 200
+
+
+def test_without_the_shared_contract_history_is_off_with_a_plain_instruction_and_nothing_raises(tmp_path, monkeypatch):
+    def missing():
+        raise H.HistoryUnavailable()
+    monkeypatch.setattr(H, "_contract", missing)
+    s = HistoryStore(str(tmp_path / "h.sqlite"), clock=lambda: NOW)
+    report = s.add_many([rec()])
+    assert report.error == "unavailable" and report.written == 0 and "aei-history-contract" in report.user_text() and "Python Console" in report.user_text()
+    assert not H.contract_available()

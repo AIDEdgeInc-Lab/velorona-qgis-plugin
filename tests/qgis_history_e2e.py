@@ -51,6 +51,10 @@ check("observed/model are separate sections", "Model-derived" in dlg.view.toPlai
 check("every row carries unit, source and 'As of'", all(w in dlg.view.toPlainText() for w in ("Unit", "Source", "As of", "When")))
 check("'N hours ago' is shown", "5.0 h ago" in dlg.view.toPlainText() or "h ago" in dlg.view.toPlainText())
 check("the user's own entity shows its in-session name, not the stored code", "Site A" in dlg.view.toPlainText() and "h:" not in dlg.view.toPlainText().split("When")[0])
+store.set_labels(labels)
+dlg_reopened = HistoryDialog(None, store, store.labels(), link_id, dark=True, clock=lambda: NOW)       # a new session: only the names stored on this computer
+check("a later session still shows the user's own names (stored locally next to the code)",
+      "Site A" in dlg_reopened.view.toPlainText() and "h:" not in dlg_reopened.view.toPlainText().split("When")[0])
 dlg.entity_combo.setCurrentIndex(0)
 check("'All' view shows the local-only statement", "Nothing is uploaded" in dlg.view.toPlainText() or "Nothing is uploaded" in dlg.stats_label.text())
 check("stats show rows, size and retention", "values" in dlg.stats_label.text() and "Kept 24 h" in dlg.stats_label.text())

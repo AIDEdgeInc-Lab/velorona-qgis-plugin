@@ -22,7 +22,7 @@ def _esc(v) -> str:
 
 
 def label_for(entity_id: str, known: Optional[Dict[str, str]] = None) -> str:
-    """A readable name: the one known in this session, else 'Your site/link (h:ab12)' for a hashed entity, else the public id."""
+    """A readable name: the one stored on this computer, else 'Your site/link (h:ab12)' for a hashed entity, else the public id."""
     if known and entity_id in known:
         return known[entity_id]
     if entity_id.startswith("h:"):
@@ -35,7 +35,7 @@ def _value_text(r: HistoryRecord) -> str:
         return f"NO DATA" + (f" ({_esc(r.nodata_reason)})" if r.nodata_reason else "")
     if isinstance(r.value, str):
         return _esc(r.value)
-    return _esc(f"{r.value:.{C.PRECISION.get(r.metric, 1)}f}")
+    return _esc(f"{r.value:.{C.contract().PRECISION.get(r.metric, 1)}f}")
 
 
 def timeline_html(records: Iterable[HistoryRecord], now: float, known: Optional[Dict[str, str]] = None) -> str:
@@ -52,7 +52,7 @@ def timeline_html(records: Iterable[HistoryRecord], now: float, known: Optional[
         for r in rows:
             derived = " <span class='note'>(calculated from the values above)</span>" if r.derived else ""
             body.append(
-                f"<tr><td>{_esc(label_for(r.entity_id, known))}: {_esc(C.LABELS.get(r.metric, r.metric))}{derived}</td><td><b>{_value_text(r)}</b></td>"
+                f"<tr><td>{_esc(label_for(r.entity_id, known))}: {_esc(C.contract().LABELS.get(r.metric, r.metric))}{derived}</td><td><b>{_value_text(r)}</b></td>"
                 f"<td>{_esc(r.unit)}</td><td>{_esc(r.source)}</td><td>{_esc(r.ts.replace('T', ' ').replace('Z', ' UTC'))}</td>"
                 f"<td>{_esc(C.age_text(now, r.ts))}</td></tr>")
         parts.append(f"<div class='sec'>{_esc(title)}</div><table class='grid'><tr><th>Item</th><th>Value</th><th>Unit</th><th>Source</th><th>As of</th>"
@@ -85,7 +85,7 @@ def changes_html(records: Iterable[HistoryRecord], entity_labels: Dict[str, str]
             summary = C.compute_changes(records, entity_id, now, n, entity_label=name)
             for change, text in zip(summary["changes"], C.sentences(summary)):
                 if change["result"] == "insufficient_history":
-                    spans.append(change.get("history_span_h", 0))
+                    spans.append(change.get("available_hours", 0))
                 else:
                     found.append(text)
         if found:

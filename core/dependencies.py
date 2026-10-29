@@ -16,6 +16,11 @@ REQUIREMENTS = [
     ("aei_geo_features", "aei-geo-features"),
     ("skyfield", "skyfield"),
 ]
+# Needed only for the local history window and the "What changed" block. Without it history is switched off with a plain instruction
+# (core/history_store.HistoryUnavailable); everything else, including the weather analysis itself, works.
+OPTIONAL_REQUIREMENTS = [
+    ("aei_history_contract", "aei-history-contract>=0.1.0,<0.2"),
+]
 
 
 def _is_installed(import_name: str) -> bool:

@@ -38,7 +38,8 @@ def test_requirements_txt_matches_requirements_list():
     path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "requirements.txt")
     with open(path) as f:
         declared = [l.strip() for l in f if l.strip() and not l.startswith("#")]
-    assert declared == [pip for _, pip in dependencies.REQUIREMENTS]
+    assert declared == [pip for _, pip in dependencies.REQUIREMENTS + dependencies.OPTIONAL_REQUIREMENTS]
+    assert not set(dependencies.OPTIONAL_REQUIREMENTS) & set(dependencies.REQUIREMENTS)     # an optional package never blocks the plugin from loading
 
 
 def test_link_clearance_requires_the_corrected_release_line():

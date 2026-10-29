@@ -17,8 +17,6 @@ Failure modes (each returns a ``WriteReport``/raises ``HistoryError`` with a pla
 
 from __future__ import annotations
 
-import csv
-import io
 import os
 import re
 import secrets
@@ -28,14 +26,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from . import csvsafe
 
 SCHEMA_VERSION = 1
-KINDS = ("observed", "forecast", "model")
-METRICS = ("rain_rate", "temperature", "wind_speed", "snowfall", "weather_code", "rain_attenuation_estimate", "exposure_ratio", "status",
-           "clearance_ratio")
-COLUMNS = ("ts", "fetched_ts", "source", "entity_id", "entity_type", "metric", "value", "unit", "kind", "derived", "data_version", "nodata_reason")
-
 DEFAULT_RETENTION_HOURS = 24
 MIN_RETENTION_HOURS, MAX_RETENTION_HOURS = 1, 24 * 7
 DEFAULT_MAX_ROWS = 20_000
@@ -47,11 +39,36 @@ _TS = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 
 
 class HistoryError(Exception):
-    """A history operation could not be done; ``code`` is locked | disk_full | corrupt | invalid | other. The message is for the user."""
+    """A history operation could not be done; ``code`` is locked | disk_full | corrupt | invalid | unavailable | other. The message is for the user."""
 
     def __init__(self, message: str, code: str = "other"):
         super().__init__(message)
         self.code = code
+
+
+class HistoryUnavailable(HistoryError):
+    """The shared ``aei-history-contract`` package is not installed, so history is switched off (analyses are not affected)."""
+
+    def __init__(self):
+        super().__init__("Local history needs the Python package aei-history-contract. In QGIS: Plugins > Python Console, run:  from pip._internal.cli.main "
+                         "import main; main(['install', '-U', 'aei-history-contract>=0.1.0,<0.2'])  then restart QGIS. Your analyses are not affected.",
+                         "unavailable")
+
+
+def _contract():
+    try:
+        import aei_history_contract
+    except ImportError as exc:
+        raise HistoryUnavailable() from exc
+    return aei_history_contract
+
+
+def contract_available() -> bool:
+    try:
+        _contract()
+        return True
+    except HistoryUnavailable:
+        return False
 
 
 def utc_text(epoch_s: float) -> str:
@@ -85,25 +102,23 @@ class HistoryRecord:
     derived: bool = False
     nodata_reason: Optional[str] = None
 
+    def to_dict(self) -> dict:
+        """The contract's plain-dict form of a HistoryRecord (optional fields only when set)."""
+        d = {"ts": self.ts, "source": self.source, "entity_id": self.entity_id, "entity_type": self.entity_type, "metric": self.metric,
+             "value": self.value, "unit": self.unit, "kind": self.kind, "derived": bool(self.derived), "data_version": self.data_version}
+        if self.fetched_ts is not None:
+            d["fetched_ts"] = self.fetched_ts
+        if self.nodata_reason is not None:
+            d["nodata_reason"] = self.nodata_reason
+        return d
+
     def check(self) -> None:
-        if not _TS.match(self.ts or ""):
-            raise ValueError(f"ts must be UTC like 2026-10-29T14:00:00Z, got {self.ts!r}")
-        if self.fetched_ts is not None and not _TS.match(self.fetched_ts):
-            raise ValueError(f"fetched_ts must be UTC, got {self.fetched_ts!r}")
-        if self.metric not in METRICS:
-            raise ValueError(f"unknown metric {self.metric!r}")
-        if self.kind not in KINDS:
-            raise ValueError(f"unknown kind {self.kind!r}")
-        if self.entity_type not in ("link", "site"):
-            raise ValueError(f"unknown entity_type {self.entity_type!r}")
-        if not (self.source and len(self.source) <= 120) or not (self.entity_id and len(self.entity_id) <= 200) or not self.unit:
-            raise ValueError("source (<=120), entity_id (<=200) and unit are required")
-        if isinstance(self.value, bool) or not (self.value is None or isinstance(self.value, (int, float, str))):
-            raise ValueError(f"value must be a number, a string or None, got {type(self.value).__name__}")
+        """Validated by the shared contract (``validate_record``), the same rules the Map applies."""
         if isinstance(self.value, float) and self.value != self.value:
             raise ValueError("NaN is not a value; use None for NO DATA")
-        if self.nodata_reason is not None and len(self.nodata_reason) > 200:
-            raise ValueError("nodata_reason is at most 200 characters")
+        problems = _contract().validate_record(self.to_dict())
+        if problems:
+            raise ValueError("; ".join(problems))
 
 
 @dataclass
@@ -153,6 +168,7 @@ CREATE TABLE IF NOT EXISTS history (
     PRIMARY KEY (entity_id, metric, kind, source, ts)
 );
 CREATE INDEX IF NOT EXISTS history_ts ON history (ts);
+CREATE TABLE IF NOT EXISTS entity_labels (entity_id TEXT PRIMARY KEY, label TEXT NOT NULL, updated_ts TEXT NOT NULL);
 """
 
 
@@ -238,6 +254,11 @@ class HistoryStore:
 
     def add_many(self, records: Iterable[HistoryRecord]) -> WriteReport:
         report = WriteReport()
+        try:
+            _contract()
+        except HistoryUnavailable as exc:
+            report.error, report.message = exc.code, str(exc)
+            return report
         now = self._clock()
         good: List[HistoryRecord] = []
         for r in records:
@@ -303,26 +324,18 @@ class HistoryStore:
         return now
 
     def _prune(self, con, report: WriteReport) -> None:
+        """Retention and the row/size caps are the contract's ``prune`` (one definition, shared with the Map); this only applies its answer to SQLite.
+        The size cap is the contract's: the UTF-8 length of each row's canonical text, not the SQLite file size (the file is a few times larger)."""
         retention = con.execute("SELECT value FROM meta WHERE key='retention_hours'").fetchone()
         hours = int(retention[0]) if retention else DEFAULT_RETENTION_HOURS
-        cutoff = utc_text(self._reference_time(con) - hours * 3600)
-        report.pruned += con.execute("DELETE FROM history WHERE ts < ? AND kind != 'forecast'", (cutoff,)).rowcount
-        rows = con.execute("SELECT COUNT(*) FROM history").fetchone()[0]
-        if rows > self.max_rows:
-            report.pruned += con.execute(
-                "DELETE FROM history WHERE rowid IN (SELECT rowid FROM history ORDER BY ts ASC LIMIT ?)", (rows - self.max_rows,)).rowcount
-        con.commit()
-        # Size cap: drop the oldest rows in proportion to how far over the file is, then VACUUM (the file only shrinks after it); repeat if needed.
-        for _ in range(8):
-            size = self._file_bytes(con)
-            if size <= self.max_bytes:
-                break
-            n = con.execute("SELECT COUNT(*) FROM history").fetchone()[0]
-            if n == 0:
-                break
-            drop = max(1, n - int(n * self.max_bytes / size * 0.8))
-            report.pruned += con.execute(
-                "DELETE FROM history WHERE rowid IN (SELECT rowid FROM history ORDER BY ts ASC LIMIT ?)", (drop,)).rowcount
+        rows = self._rows(con)
+        kept, dropped = _contract().prune([r.to_dict() for r in rows], utc_text(self._reference_time(con)), hours, self.max_rows, self.max_bytes)
+        if dropped:
+            keep = {(k["entity_id"], k["metric"], k["kind"], k["source"], k["ts"]) for k in kept}
+            gone = [(r.entity_id, r.metric, r.kind, r.source, r.ts) for r in rows if (r.entity_id, r.metric, r.kind, r.source, r.ts) not in keep]
+            con.executemany("DELETE FROM history WHERE entity_id=? AND metric=? AND kind=? AND source=? AND ts=?", gone)
+            report.pruned += len(gone)
+            con.execute("DELETE FROM entity_labels WHERE entity_id NOT IN (SELECT DISTINCT entity_id FROM history)")
             con.commit()
             con.execute("VACUUM")
 
@@ -330,9 +343,26 @@ class HistoryStore:
     def _file_bytes(con) -> int:
         return con.execute("PRAGMA page_count").fetchone()[0] * con.execute("PRAGMA page_size").fetchone()[0]
 
+    # -- display names (local only) -----------------------------------------------------------------------------------------------------
+
+    def set_labels(self, labels: Dict[str, str]) -> None:
+        """Remember the names the user sees for their own sites and links (the stored id is a salted hash). They stay in this file, on this computer."""
+        clean = {k: str(v)[:200] for k, v in (labels or {}).items() if k and v}
+        if not clean:
+            return
+        now = utc_text(self._clock())
+        with self._open() as con:
+            con.executemany("INSERT OR REPLACE INTO entity_labels VALUES (?,?,?)", [(k, v, now) for k, v in clean.items()])
+            con.commit()
+
+    def labels(self) -> Dict[str, str]:
+        with self._open() as con:
+            return dict(con.execute("SELECT entity_id, label FROM entity_labels").fetchall())
+
     # -- reading ------------------------------------------------------------------------------------------------------------------------
 
-    def records(self, entity_id: Optional[str] = None, since_ts: Optional[str] = None) -> List[HistoryRecord]:
+    @staticmethod
+    def _rows(con, entity_id: Optional[str] = None, since_ts: Optional[str] = None) -> List[HistoryRecord]:
         sql = ("SELECT ts, fetched_ts, source, entity_id, entity_type, metric, value_num, value_text, unit, kind, derived, data_version, nodata_reason "
                "FROM history")
         where, args = [], []
@@ -343,11 +373,13 @@ class HistoryStore:
         if where:
             sql += " WHERE " + " AND ".join(where)
         sql += " ORDER BY ts ASC, entity_id, metric, kind, source"
-        with self._open() as con:
-            rows = con.execute(sql, args).fetchall()
         return [HistoryRecord(ts=r[0], fetched_ts=r[1], source=r[2], entity_id=r[3], entity_type=r[4], metric=r[5],
                               value=(r[6] if r[6] is not None else r[7]), unit=r[8], kind=r[9], derived=bool(r[10]), data_version=r[11],
-                              nodata_reason=r[12]) for r in rows]
+                              nodata_reason=r[12]) for r in con.execute(sql, args).fetchall()]
+
+    def records(self, entity_id: Optional[str] = None, since_ts: Optional[str] = None) -> List[HistoryRecord]:
+        with self._open() as con:
+            return self._rows(con, entity_id, since_ts)
 
     def entities(self) -> List[Tuple[str, str, int, str]]:
         """[(entity_id, entity_type, rows, newest ts)], most recently updated first."""
@@ -357,7 +389,7 @@ class HistoryStore:
     def stats(self) -> Stats:
         with self._open() as con:
             rows, oldest, newest = con.execute("SELECT COUNT(*), MIN(ts), MAX(ts) FROM history").fetchone()
-            size = self._file_bytes(con)
+            size = sum(_contract().approx_bytes(r.to_dict()) for r in self._rows(con)) if rows else 0   # the contract's size measure, as used by the cap
         return Stats(rows, size, oldest, newest, self.retention_hours(), self.max_rows, self.max_bytes)
 
     # -- clearing -----------------------------------------------------------------------------------------------------------------------
@@ -365,6 +397,7 @@ class HistoryStore:
     def clear_entity(self, entity_id: str) -> int:
         with self._open() as con:
             n = con.execute("DELETE FROM history WHERE entity_id = ?", (entity_id,)).rowcount
+            con.execute("DELETE FROM entity_labels WHERE entity_id = ?", (entity_id,))
             con.commit()
         return n
 
@@ -383,19 +416,11 @@ class HistoryStore:
     # -- export -------------------------------------------------------------------------------------------------------------------------
 
     def export_csv(self, entity_id: Optional[str] = None) -> Tuple[str, str]:
-        """(file name, CSV text): CONTRACT columns in schema order, UTC, RFC 4180 quoting, ``\\n``, formula-injection guard. Local file only."""
-        return export_csv(self.records(entity_id), entity_id, self._clock())
-
-
-def export_csv(records: Sequence[HistoryRecord], entity_id: Optional[str], now: float) -> Tuple[str, str]:
-    buf = io.StringIO()
-    writer = csvsafe.writer(buf, lineterminator="\n")
-    writer.writerow(COLUMNS)
-    for r in records:
-        writer.writerow([r.ts, r.fetched_ts or "", r.source, r.entity_id, r.entity_type, r.metric, "" if r.value is None else r.value, r.unit, r.kind,
-                         "true" if r.derived else "false", r.data_version, r.nodata_reason or ""])
-    safe = re.sub(r"[^A-Za-z0-9_-]+", "_", entity_id or "all")[:60]
-    return f"velorona-history-{safe}-{datetime.fromtimestamp(now, timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.csv", buf.getvalue()
+        """(file name, CSV text) from the contract's ``to_csv`` / ``csv_filename``: schema-order columns, UTC, RFC 4180 quoting, formula-injection guard.
+        A local file only."""
+        c = _contract()
+        text = c.to_csv([r.to_dict() for r in self.records(entity_id)])
+        return c.csv_filename(entity_id or "all", utc_text(self._clock())), text
 
 
 def default_path(profile_dir: str) -> str:
