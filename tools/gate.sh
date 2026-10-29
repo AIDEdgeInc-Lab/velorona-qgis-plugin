@@ -15,13 +15,16 @@ cd "$ROOT" || exit 2
 if [ "${1:-}" = "--install-hook" ]; then
     HOOKS="$(git rev-parse --git-common-dir)/hooks"
     mkdir -p "$HOOKS"
-    cat > "$HOOKS/pre-push" <<HOOK
+    cat > "$HOOKS/pre-push" <<'HOOK'
 #!/bin/sh
-# Installed by tools/gate.sh --install-hook. Bypass only deliberately: git push --no-verify
-exec "$ROOT/tools/gate.sh"
+# Installed by tools/gate.sh --install-hook. Runs the gate of the worktree being pushed from.
+# Bypass only deliberately: git push --no-verify
+TOP="$(git rev-parse --show-toplevel)"
+if [ -x "$TOP/tools/gate.sh" ]; then exec "$TOP/tools/gate.sh"; fi
+echo "pre-push: no tools/gate.sh in $TOP, gate not run" >&2
 HOOK
     chmod +x "$HOOKS/pre-push"
-    echo "pre-push hook installed at $HOOKS/pre-push (runs $ROOT/tools/gate.sh)"
+    echo "pre-push hook installed at $HOOKS/pre-push"
     exit 0
 fi
 
