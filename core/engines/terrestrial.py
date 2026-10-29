@@ -120,24 +120,33 @@ def analyze_endpoints(lat_a, lon_a, lat_b, lon_b, params: dict, link_id: str, el
         raise NoDataError("terrain", [f"elevation data unavailable (T1/R5): {failure.reason(exc)}"], transient=failure.transient) from exc
 
 
-def analyze(entries, params: dict, elevation_provider=None) -> TerrestrialAnalysisResult:
+def prepare(entries) -> dict:
+    """Everything the two-site analysis needs from QGIS objects, read in the GUI thread: plain values only, so the analysis itself can run in a worker."""
     (layer_a, feat_a), (layer_b, feat_b) = entries
     lat_a, lon_a = feature_to_latlon(layer_a, feat_a)
     lat_b, lon_b = feature_to_latlon(layer_b, feat_b)
     id_a, name_a = feature_id_name(feat_a, "Selected site A")
     id_b, name_b = feature_id_name(feat_b, "Selected site B")
-    source_a = feature_attr(feat_a, "source", "Selected QGIS feature")
-    source_b = feature_attr(feat_b, "source", "Selected QGIS feature")
+    return {"a": (lat_a, lon_a), "b": (lat_b, lon_b), "id_a": id_a, "id_b": id_b, "name_a": name_a, "name_b": name_b,
+            "source_a": feature_attr(feat_a, "source", "Selected QGIS feature"), "source_b": feature_attr(feat_b, "source", "Selected QGIS feature"),
+            "height_from_feature_a": feature_attr(feat_a, "height_above_ground_m") is not None,
+            "height_from_feature_b": feature_attr(feat_b, "height_above_ground_m") is not None}
 
-    result = analyze_endpoints(lat_a, lon_a, lat_b, lon_b, params, f"{id_a}__{id_b}", elevation_provider)
+
+def analyze_prepared(prep: dict, params: dict, elevation_provider=None) -> TerrestrialAnalysisResult:
+    """The two-site analysis on plain values (no QGIS objects): safe to run in a worker thread."""
+    result = analyze_endpoints(*prep["a"], *prep["b"], params, f"{prep['id_a']}__{prep['id_b']}", elevation_provider)
     return TerrestrialAnalysisResult(
-        kind="terrestrial", site_a_name=name_a, site_b_name=name_b,
-        site_a_source=source_a, site_b_source=source_b,
+        kind="terrestrial", site_a_name=prep["name_a"], site_b_name=prep["name_b"],
+        site_a_source=prep["source_a"], site_b_source=prep["source_b"],
         site_a_height_m=params["site_a_height_m"], site_b_height_m=params["site_b_height_m"],
-        site_a_height_from_feature=feature_attr(feat_a, "height_above_ground_m") is not None,
-        site_b_height_from_feature=feature_attr(feat_b, "height_above_ground_m") is not None,
+        site_a_height_from_feature=prep["height_from_feature_a"], site_b_height_from_feature=prep["height_from_feature_b"],
         result=result, explanation=explain(result),
     )
+
+
+def analyze(entries, params: dict, elevation_provider=None) -> TerrestrialAnalysisResult:
+    return analyze_prepared(prepare(entries), params, elevation_provider)
 
 
 def record_heights(link_attrs: dict) -> Tuple[Optional[float], Optional[float], str]:

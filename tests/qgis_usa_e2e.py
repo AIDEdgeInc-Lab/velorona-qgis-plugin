@@ -32,7 +32,7 @@ def wait_for_terrain_task(timeout_s=60):
     end = time.monotonic() + timeout_s
     while time.monotonic() < end:
         _A.processEvents()
-        if getattr(plugin, "_terrain_task", None) is None:
+        if getattr(plugin, "_analysis_task", None) is None:
             return
         time.sleep(0.02)
     raise AssertionError("terrain task did not finish")

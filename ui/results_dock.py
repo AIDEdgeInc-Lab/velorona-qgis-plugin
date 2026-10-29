@@ -72,6 +72,8 @@ class VeloronaResultsDock(QDockWidget):
         self._dark = True
         self.elevation_profile_requested = None  # callable, set by plugin.py
         self.map_appearance_changed = None       # callable, set by plugin.py
+        self.history_requested = None            # callable(), set by plugin.py: opens the History window
+        self.history_block = None                # callable(result) -> html, set by plugin.py: the 'What changed' block for a weather result
 
         evidence = QWidget(self)
         layout = QVBoxLayout(evidence)
@@ -87,9 +89,14 @@ class VeloronaResultsDock(QDockWidget):
         self.elevation_button = QPushButton("Open Elevation Profile", evidence)
         self.elevation_button.clicked.connect(self._on_elevation_clicked)
         self.elevation_button.hide()
+        self.history_button = QPushButton("History...", evidence)
+        self.history_button.setToolTip("Values this computer has stored from your weather analyses: timeline, what changed, CSV, clear. Nothing is uploaded.")
+        self.history_button.clicked.connect(lambda: self.history_requested() if self.history_requested else None)
+        self.history_button.hide()
         button_row.addWidget(self.excel_button)
         button_row.addWidget(self.export_button)
         button_row.addWidget(self.elevation_button)
+        button_row.addWidget(self.history_button)
 
         # One result, three depths: Summary (seconds), Details (planner), Evidence
         # (the full Observed / Calculated / Inferred record, unchanged).
@@ -202,6 +209,8 @@ class VeloronaResultsDock(QDockWidget):
         brief = (ctx.terrain or ctx.weather)
         render = operational_view.render_summary if view == "summary" else operational_view.render_details
         body, names = render(brief)
+        if self.history_block is not None and ctx.weather is not None:
+            body += self.history_block(self._result)       # UI_AUDIT order: What changed follows the values, before the evidence
         document = self.browser.document()
         for name, image in charts.images_for(names, brief, self._dark).items():
             document.addResource(QTextDocument.ResourceType.ImageResource,
@@ -231,6 +240,7 @@ class VeloronaResultsDock(QDockWidget):
             self.ask_input.setCompleter(completer)
         kind = getattr(self._result, "kind", None)
         self.excel_button.setVisible(has_brief)
+        self.history_button.setVisible(kind in ("microwave-exposure", "link-investigation"))
         self.export_button.setVisible(kind not in (None, "satellite-earth-space"))
 
     def show_result(self, result) -> None:
@@ -251,6 +261,7 @@ class VeloronaResultsDock(QDockWidget):
         self.export_button.hide()
         self.excel_button.hide()
         self.elevation_button.hide()
+        self.history_button.hide()
 
     def _on_ask(self) -> None:
         ctx = self._context()

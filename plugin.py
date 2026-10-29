@@ -40,7 +40,7 @@ from .core import dependencies, inspector
 from .core.inspector import feature_to_entry
 from .core.layers import LIFECYCLE_EVIDENCE, PUBLIC_RECORDS_DISCLOSURE
 from .core.sources import satellite_feed, space_public, terrestrial_public
-from .core import elevation_source, local_dem
+from .core import elevation_source, history_capture, history_store, history_view, local_dem
 from .core.validation import NoDataError
 from .core.viewport_cache import FAILED, MISS, ViewportCache
 from .ui import records_table
@@ -292,7 +292,9 @@ class VeloronaPlugin:
         self._dataset_notes = {}               # source key -> provenance/status line shown in Records (replayed when the dock is created)
         self._viewport_status = {}             # source key -> what the live viewport layers are showing (see _set_viewport_status)
         self._satellites_task = None           # the running QgsTask that loads satellite data (None when idle)
-        self._terrain_task = None              # the running QgsTask of a terrain analysis (None when idle); progress shows in the QGIS task manager
+        self._history = None                   # HistoryStore, created on first use (history is local to this computer)
+        self._history_labels = {}              # {entity id: name} for this session only; the file never stores the user's own names
+        self._analysis_task = None             # the running QgsTask of a terrain or weather analysis (None when idle); progress shows in the QGIS task manager
         self._endpoint_index = {}
         self._usa_provider = None
         self.network_context_layer = None
@@ -1587,7 +1589,12 @@ class VeloronaPlugin:
         provider = self._elevation_provider_from(dialog)
         if provider is False:
             return
-        self._run_terrain_in_background(lambda: terrestrial.analyze(entries, values, provider))
+        try:
+            prep = terrestrial.prepare(entries)         # QGIS objects are read here, in the GUI thread
+        except Exception as exc:
+            self._error(f"Analysis failed:\n{exc}")
+            return
+        self._run_in_background("terrain clearance", lambda: terrestrial.analyze_prepared(prep, values, provider), self._on_terrain_done)
 
     def _run_terrestrial_for_link(self, layer, feature):
         """Terrain clearance for ONE selected Fixed Service link (Canada or USA): the record's own endpoints, and its highest published
@@ -1608,7 +1615,7 @@ class VeloronaPlugin:
         if provider is False:
             return
         data, point_a, point_b = entry.data, entry.site_a_point, entry.site_b_point
-        self._run_terrain_in_background(lambda: terrestrial.analyze_link_record(data, point_a, point_b, values, provider))
+        self._run_in_background("terrain clearance", lambda: terrestrial.analyze_link_record(data, point_a, point_b, values, provider), self._on_terrain_done)
 
     def _terrain_dialog(self, title: str, defaults: dict):
         """The terrain parameter dialog with the elevation-source choice: online by default, or any single-band raster of the project (needs the
@@ -1629,28 +1636,31 @@ class VeloronaPlugin:
             self._error(f"The chosen elevation raster cannot be used. Nothing was computed.\n\n{exc}")
             return False
 
-    def _run_terrain_in_background(self, compute) -> None:
-        """Runs a terrain analysis in a QgsTask worker, so the (possibly retried) elevation request never blocks the interface. Everything that
-        touches QGIS (the dialog, the raster clone, the layers, the result panel) happens in the GUI thread, before the task starts or after it
-        finishes. One terrain analysis at a time."""
-        if self._terrain_task is not None:
-            self._warn("A terrain analysis is already running. Wait for it to finish.")
+    def _on_terrain_done(self, result) -> None:
+        self._update_terrain_layer(result)
+        self._show_result(result)
+
+    def _run_in_background(self, what: str, compute, on_result) -> None:
+        """Runs an analysis in a QgsTask worker, so a (possibly retried) network request never blocks the interface. Everything that touches
+        QGIS (dialogs, the raster clone, layers, the result panel) happens in the GUI thread: before the task starts, or in ``on_result`` /
+        the error report after it finishes. One analysis of this kind at a time; progress shows in the QGIS task manager."""
+        if self._analysis_task is not None:
+            self._warn("An analysis is already running. Wait for it to finish.")
             return
 
         def work(task):
             return compute()
 
         def finished(exception, result=None):
-            self._terrain_task = None
+            self._analysis_task = None
             if exception is not None:
                 kind = "NO DATA" if isinstance(exception, NoDataError) else "Analysis failed"
                 self._error(f"{kind}:\n{exception}")
                 return
-            self._update_terrain_layer(result)
-            self._show_result(result)
+            on_result(result)
 
-        task = QgsTask.fromFunction("Velorona: terrain clearance", work, on_finished=finished)
-        self._terrain_task = task
+        task = QgsTask.fromFunction(f"Velorona: {what}", work, on_finished=finished)
+        self._analysis_task = task
         QgsApplication.taskManager().addTask(task)
 
     # -- USA (FCC ULS) data pack ----------------------------------------------------------------------------------------
@@ -1918,13 +1928,19 @@ class VeloronaPlugin:
         dialog = ParamDialog(self.iface.mainWindow(), "Velorona -- Microwave Weather Exposure", microwave_exposure.PARAM_SPEC, defaults)
         if dialog.exec() != dialog.DialogCode.Accepted:
             return
+        values = dialog.values()
+
+        def done(result):
+            self._update_weather_evidence_layers(result)
+            self._show_result(result)
+
         try:
-            result = microwave_exposure.analyze(entries, dialog.values())
+            site_a, site_b = microwave_exposure.prepare(entries, values)     # QGIS objects are read here, in the GUI thread
         except Exception as exc:
-            self._error(f"Analysis failed:\n{exc}")
+            kind = "NO DATA" if isinstance(exc, NoDataError) else "Analysis failed"
+            self._error(f"{kind}:\n{exc}")
             return
-        self._update_weather_evidence_layers(result)
-        self._show_result(result)
+        self._run_in_background("microwave weather exposure", lambda: microwave_exposure.analyze_sites(site_a, site_b, values), done)
 
     def run_satellite(self):
         ground_stations = self._selected_by_kind("ground-station")
@@ -1947,6 +1963,8 @@ class VeloronaPlugin:
             self.dock = VeloronaResultsDock(self.iface.mainWindow())
             self.dock.elevation_profile_requested = self._open_elevation_profile
             self.dock.map_appearance_changed = self.set_map_appearance
+            self.dock.history_requested = self._open_history
+            self.dock.history_block = self._history_block_for
             self.dock.set_map_appearance(self._map_appearance)
             for key, text in self._dataset_notes.items():       # statuses recorded before the dock existed
                 self.dock.records.set_dataset_note(key, text)
@@ -2068,8 +2086,64 @@ class VeloronaPlugin:
         })
         dock.records.populate_licensees(self._operator_counts())
 
+    # -- Local history (customer-owned, this computer only) -----------------------------------------------------------------------------
+
+    def _history_store(self):
+        if getattr(self, "_history", None) is None:
+            self._history = history_store.HistoryStore(history_store.default_path(QgsApplication.qgisSettingsDirPath()))
+        return self._history
+
+    def _capture_history(self, result) -> None:
+        """Keeps the values a weather analysis fetched, so 'what changed' can compare them later. Never makes the analysis fail: a problem
+        (database busy, disk full, clock) is stated in the message bar and the analysis result is shown as usual."""
+        if getattr(result, "kind", "") not in ("microwave-exposure", "link-investigation") or history_capture.exposure_of(result) is None:
+            return
+        report = history_capture.capture(result, self._history_store(), time.time())
+        self._remember_history_labels(result)
+        text = report.user_text()
+        if text:
+            self.iface.messageBar().pushWarning("Velorona", text)
+
+    def _remember_history_labels(self, result) -> None:
+        """Names for this session's entities, kept in memory only (the file holds the code, not the name, for the user's own sites)."""
+        mw = history_capture.exposure_of(result)
+        if mw is None:
+            return
+        store = self._history_store()
+        link_id, site_ids = history_capture.entity_ids(result, store)
+        labels = self._history_labels
+        link = mw.exposure.link
+        labels[link_id] = f"{link.site_a.name} \u2194 {link.site_b.name}"
+        for sid, rep in mw.representativeness.items():
+            labels[site_ids[sid]] = rep.site.name
+
+    def _history_block_for(self, result) -> str:
+        try:
+            mw = history_capture.exposure_of(result)
+            if mw is None:
+                return ""
+            store = self._history_store()
+            link_id, site_ids = history_capture.entity_ids(result, store)
+            wanted = {link_id: self._history_labels.get(link_id, "this link"), **{eid: self._history_labels.get(eid, eid) for eid in site_ids.values()}}
+            records = [r for r in store.records() if r.entity_id in wanted]
+            return history_view.changes_html(records, wanted, time.time())
+        except history_store.HistoryError as exc:
+            return history_view.error_html(str(exc))
+
+    def _open_history(self) -> None:
+        from .ui.history_dialog import HistoryDialog
+        entity = None
+        if self.dock is not None and self.dock._result is not None:
+            try:
+                entity = history_capture.entity_ids(self.dock._result, self._history_store())[0]
+            except Exception:
+                entity = None
+        dialog = HistoryDialog(self.iface.mainWindow(), self._history_store(), dict(self._history_labels), entity, dark=self._map_appearance == "dark")
+        dialog.exec()
+
     def _show_result(self, result):
         self._ensure_dock()
+        self._capture_history(result)
         self.dock.show_result(result)
         self.dock.show()
         self.dock.raise_()

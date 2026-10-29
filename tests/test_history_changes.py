@@ -28,7 +28,7 @@ def one(records, n=5, metric="rain_rate", **kw):
 def test_increase_with_delta_and_sentence():
     c, s = one([rec(5, 0.0), rec(0, 1.2)])
     assert (c["result"], c["then"], c["now"], c["delta"]) == ("increased", 0.0, 1.2, 1.2)
-    assert C.sentences(s, "Site A")[0] == "Rain rate at Site A: 1.2 mm/h now, 0.0 mm/h 5 h ago (model-derived, open-meteo, " + ts(5)[11:16] + " UTC → " + ts(0)[11:16] + " UTC)"
+    assert C.sentences(s, "Site A")[0] == "Rain rate at Site A: 1.2 mm/h now, 0.0 mm/h 5 h earlier (model-derived, open-meteo, " + ts(5)[11:16] + " UTC → " + ts(0)[11:16] + " UTC)"
 
 
 def test_decrease():
@@ -55,7 +55,7 @@ def test_tolerance_is_30_minutes_or_a_quarter_of_the_window():
 def test_insufficient_history_states_how_much_there_is():
     c, s = one([rec(2, 1.0), rec(0, 2.0)], n=5)
     assert c["result"] == "insufficient_history" and c["history_span_h"] == 2.0
-    assert "not enough stored history" in C.sentences(s, "Site A")[0] and "2 h" in C.sentences(s, "Site A")[0]
+    assert "no stored value close enough to 5 h ago" in C.sentences(s, "Site A")[0] and "stored over 2 h" in C.sentences(s, "Site A")[0]
 
 
 def test_a_single_row_is_insufficient_history_not_a_comparison_with_itself():
@@ -82,7 +82,7 @@ def test_missing_value_is_no_data_never_zero():
 def test_status_changes_report_both_words():
     c, s = one([rec(5, "CLEAR", metric="status", unit="enum"), rec(0, "WATCH", metric="status", unit="enum")], metric="status")
     assert c["result"] == "status_changed"
-    assert C.sentences(s, "the link")[0].startswith("Status at the link: WATCH now, CLEAR 5 h ago")
+    assert C.sentences(s, "the link")[0].startswith("Status at the link: WATCH now, CLEAR 5 h earlier")
     assert one([rec(5, "CLEAR", metric="status", unit="enum"), rec(0, "CLEAR", metric="status", unit="enum")], metric="status")[0]["result"] == "unchanged"
 
 

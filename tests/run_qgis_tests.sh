@@ -68,6 +68,10 @@ echo
 echo "== QGIS local DEM as elevation source (needs aei-link-clearance >= 0.3; no network) =="
 "$QGISPY" "$HERE/qgis_local_dem_e2e.py" || [ $? -eq 3 ]    # exit 3 = skipped because the installed library predates the seam
 
+echo
+echo "== QGIS local history window and 'What changed' (no network) =="
+"$QGISPY" "$HERE/qgis_history_e2e.py"
+
 if [ "$1" = "--bench" ]; then
     echo
     echo "== performance benchmark =="

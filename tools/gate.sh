@@ -70,7 +70,7 @@ QGIS_APP="${QGIS_APP:-/Applications/QGIS-final-4_2_2.app}"
 qgis_check() {
     link="$TMP/gate-qgis-link"; rm -rf "$link"; mkdir -p "$link"; ln -s "$ROOT" "$link/velorona"
     RES="$QGIS_APP/Contents/Resources"; rc=0
-    for t in qgis_ui_polish_e2e qgis_workflow_e2e qgis_batch_e2e qgis_usa_e2e qgis_selection_sync_e2e qgis_local_dem_e2e; do
+    for t in qgis_ui_polish_e2e qgis_workflow_e2e qgis_batch_e2e qgis_usa_e2e qgis_selection_sync_e2e qgis_local_dem_e2e qgis_history_e2e; do
         QGIS_PREFIX_PATH="$QGIS_APP/Contents/MacOS" DYLD_FRAMEWORK_PATH="$QGIS_APP/Contents/Frameworks" PROJ_DATA="$RES/qgis/proj" PROJ_LIB="$RES/qgis/proj" \
         QT_QPA_PLATFORM=offscreen PYTHONPATH="${GATE_LIB_SRC:-$HOME/velorona-repos/_worktrees/lc-seam/src}:$RES/python3.12:$RES/python3.12/lib-dynload:$RES/python3.12/site-packages" \
         "$QGIS_APP/Contents/MacOS/python3.12" "$link/velorona/tests/$t.py" >"$TMP/gate-$t.log" 2>&1 && echo "   $t ok" || { echo "   $t FAILED (see $TMP/gate-$t.log)"; rc=1; }

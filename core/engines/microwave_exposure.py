@@ -170,6 +170,13 @@ def analyze_sites(site_a: MicrowaveSite, site_b: MicrowaveSite, params: dict,
     )
 
 
+def prepare(entries, params: dict):
+    """(site_a, site_b) built from the two selected features, validated; reads QGIS objects, so call it in the GUI thread. The returned sites are plain."""
+    (layer_a, feat_a), (layer_b, feat_b) = entries
+    _validate_endpoints(feature_to_latlon(layer_a, feat_a), feature_to_latlon(layer_b, feat_b), params)
+    return _build_site(layer_a, feat_a, "Selected site A"), _build_site(layer_b, feat_b, "Selected site B")
+
+
 def analyze(entries, params: dict) -> MicrowaveAnalysisResult:
     """Two selected point features as the link's endpoints -- unchanged
     behaviour for the 'Analyze: Microwave Weather Exposure' action."""

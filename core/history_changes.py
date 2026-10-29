@@ -35,8 +35,12 @@ def _hhmm(ts: str) -> str:
     return ts[11:16] + " UTC"
 
 
-def _ago(n_hours: float) -> str:
-    return f"{n_hours:g} h ago"
+def _gap_text(change: dict) -> str:
+    """How much earlier the compared value is, from the two stored times (not the requested window): the stored value nearest to the window is
+    used, so the text states the real gap and never claims a window it did not use."""
+    from .history_store import parse_utc as _p
+    hours = (_p(change["now_ts_actual"]) - _p(change["then_ts_actual"])) / 3600
+    return f"{hours:.1f} h earlier".replace(".0 h", " h")
 
 
 def _fmt(metric: str, unit: str, value) -> str:
@@ -98,17 +102,17 @@ def sentence(change: dict, n_hours: float, label: str) -> str:
     kind = KIND_WORDS.get(change["kind"], change["kind"])
     head = f"{name} at {label}"
     if change["result"] == "insufficient_history":
-        return (f"{head}: not enough stored history to compare with {_ago(n_hours)} "
-                f"(stored span {change.get('history_span_h', 0):g} h; {kind}, {change['source']})")
+        return (f"{head}: no stored value close enough to {n_hours:g} h ago to compare "
+                f"(values stored over {change.get('history_span_h', 0):g} h; {kind}, {change['source']})")
     now_text, then_text = _fmt(change["metric"], change["unit"], change["now"]), _fmt(change["metric"], change["unit"], change["then"])
     tail = f"({kind}, {change['source']}, {_hhmm(change['then_ts_actual'])} → {_hhmm(change['now_ts_actual'])})"
     if change["result"] == "no_data":
-        return f"{head}: {now_text} now, {then_text} {_ago(n_hours)}; no comparison, a value is missing and is not read as zero {tail}"
+        return f"{head}: {now_text} now, {then_text} {_gap_text(change)}; no comparison, a value is missing and is not read as zero {tail}"
     if change["result"] == "unchanged":
-        return f"{head}: {now_text} now, unchanged from {_ago(n_hours)} at the displayed precision {tail}"
+        return f"{head}: {now_text} now, unchanged from {_gap_text(change)} at the displayed precision {tail}"
     if change["result"] == "status_changed":
-        return f"{head}: {now_text} now, {then_text} {_ago(n_hours)} {tail}"
-    return f"{head}: {now_text} now, {then_text} {_ago(n_hours)} {tail}"
+        return f"{head}: {now_text} now, {then_text} {_gap_text(change)} {tail}"
+    return f"{head}: {now_text} now, {then_text} {_gap_text(change)} {tail}"
 
 
 def sentences(summary: dict, label: Optional[str] = None) -> List[str]:
