@@ -28,6 +28,7 @@ changelog=1.1.10 - Batch terrain clearance, USA data like Velorona Map, selectio
     - QGIS 4.0-4.99; aei-link-clearance 0.2.x, aei-microwave-link-exposure 0.2.x, aei-geo-features and skyfield must be installed in QGIS's own Python (see README).
     - USA data and the other live sources need internet access.
     - Satellite live-data behaviour could not be re-tested for this release (the orbital data service was unreachable); it is unchanged from 1.1.9.
+    UNRELEASED, NOT PART OF 1.1.10 (next version, pending owner approval): elevation source choice (online or a local raster), local history with "What changed" (stored only on this computer), analyses run in the background, "predicted rain fade" reworded to "estimated rain fade from the current rain rate", source/time/unit on every model weather row. See CHANGELOG.md.
     Earlier versions: see CHANGELOG.md in the repository (https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/blob/main/CHANGELOG.md).
 tracker=https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/issues
 repository=https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin

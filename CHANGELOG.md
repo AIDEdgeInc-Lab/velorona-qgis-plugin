@@ -3,6 +3,25 @@
 Canonical human-readable version history. (The plugin manager shows the shorter `changelog=` text in `metadata.txt`; this file is the detailed record.)
 Compare any two releases: https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/compare/v1.1.4...v1.1.5
 
+## Unreleased (feat/qgis-p0-20261029, local only; no version bump until the owner approves)
+
+Why it matters: heights can come from a raster you hold (offline, no rate limit), a weather analysis now leaves a record on your computer that "What changed" compares against, and rain-fade wording no longer claims a prediction.
+
+### Added
+- **Elevation source choice** in the terrain dialog: online (Open-Meteo, as before) or any single-band raster layer of the project. A raster that does not cover the whole path, has nodata cells on it, or has no coordinate system makes the analysis NO DATA with the reason; nothing is substituted and 0 m is never used. Needs aei-link-clearance 0.3 (unreleased); with the released 0.2.x the choice is shown disabled with the reason.
+- **Local history** (this computer only, nothing is uploaded): weather values and the three numbers derived from them are kept in `<QGIS profile>/velorona/history.sqlite` for 24 h (1 h to 7 d), at most 5 MB / 20,000 values. A History window (timeline with "N hours ago", observed and model-derived apart, CSV export, retention, clear this link / clear all) and a "What changed" block in the weather result (deterministic rules, like with like, no adjectives).
+- Caching of elevation values and bounded backoff on HTTP 429 now come from the library; the plugin's own backoff remains only as the fallback for the released 0.2.x library.
+- `tools/gate.sh`: local release gate and pre-push hook (replaces GitHub Actions while they are unavailable).
+
+### Changed
+- **Terrain and weather analyses run in a background task** (QGIS task manager) instead of freezing the interface during the network request. Fixed Service link investigation on selection still fetches weather on the interface thread (unchanged).
+- **"Predicted rain fade" is now "Estimated rain fade", derived from the current rain rate**; status definitions say so. Library field names are unchanged.
+- Every model weather row (exports and the weather panel) states source, kind, time and unit. Open-Meteo's time is the site's local time and is labelled so, never as UTC.
+- Evidence, summary, workbook, layer text and the dock name the elevation source actually used instead of always the 90 m surface model.
+
+### Tests
+- New: `test_elevation_seam.py`, `test_history_store.py`, `test_history_changes.py` (+ golden file), `test_history_capture.py`, `test_history_view.py`, `test_freshness.py`, `test_no_predicted_wording.py`, real-QGIS `qgis_local_dem_e2e.py` and `qgis_history_e2e.py`.
+
 ## 1.1.10 — 2026-10-19 (compared with 1.1.9)
 
 Why it matters: terrain clearance can now be run for many links at once with the same result as the single-link analysis; a selected record can no longer be left selected, or shown, against a different record after a layer reloads, a layer is removed or the plugin is reloaded; and exported CSV files can no longer run formulas in a spreadsheet. No terrain, weather, status or threshold calculation changed.
