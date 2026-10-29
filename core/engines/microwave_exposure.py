@@ -53,6 +53,8 @@ class MicrowaveAnalysisResult:
     history: Dict[str, weather_history.WeatherHistory] = field(default_factory=dict)
     # How each site's precipitation was split into liquid rain and the rest.
     precipitation: Dict[str, precip.Precipitation] = field(default_factory=dict)
+    # Seconds east of UTC for each site's model observation time (Open-Meteo reports site-local time); used only to store values with a UTC time.
+    utc_offsets: Dict[str, int] = field(default_factory=dict)
 
 
 def build_params(entries) -> dict:
@@ -164,6 +166,7 @@ def analyze_sites(site_a: MicrowaveSite, site_b: MicrowaveSite, params: dict,
         kind="microwave-exposure", exposure=exposure,
         representativeness=representativeness, weather_errors=weather_errors, history=histories,
         precipitation=dict(getattr(provider, "precipitation", {})),
+        utc_offsets=dict(getattr(provider, "utc_offsets", {})),
     )
 
 
