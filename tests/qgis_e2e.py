@@ -621,6 +621,17 @@ qgs.processEvents()
 print("\n== 15. Fixed Service link -> weather evidence ==")
 
 
+
+def settle_link_weather(limit=60.0):
+    """Link weather is fetched in a background task: wait for it before reading the investigation."""
+    import time as _t
+    end = _t.time() + limit
+    while _t.time() < end and (plugin._link_weather_task is not None or plugin._link_weather_wanted is not None):
+        qgs.processEvents()
+        _t.sleep(0.05)
+    qgs.processEvents()
+
+
 def _link_ghz(fid):
     ghz, _ = microwave_exposure.frequency_ghz_from_record(link_layer.getFeature(fid)["frequencies_mhz"])
     return ghz
@@ -631,6 +642,7 @@ def _link_ghz(fid):
 weather_fid = next(f for f in sorted(link_layer.allFeatureIds()) if (_link_ghz(f) or 0) >= 1.0 and _link_ghz(f) <= 100.0)
 link_layer.selectByIds([weather_fid])
 qgs.processEvents()
+settle_link_weather()
 investigation = plugin.dock._result
 check("link selection produces a link investigation",
       getattr(investigation, "kind", None) == "link-investigation")
@@ -702,6 +714,7 @@ for attempt in (1, 2):                                   # the second selection 
     qgs.processEvents()
     link_layer.selectByIds([subghz_fid])
     qgs.processEvents()
+    settle_link_weather()
     inv = plugin.dock._result
     messages.append(getattr(inv, "weather_error", None) or "")
 check("a sub-1 GHz link has no weather evidence (NO DATA, nothing substituted)", inv.exposure is None)
@@ -714,6 +727,7 @@ link_layer.removeSelection()
 qgs.processEvents()
 link_layer.selectByIds([weather_fid])
 qgs.processEvents()
+settle_link_weather()
 plugin.dock.view_combo.setCurrentIndex(plugin.dock.view_combo.findData("evidence"))
 qgs.processEvents()
 

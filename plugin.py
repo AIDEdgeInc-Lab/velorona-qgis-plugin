@@ -293,7 +293,9 @@ class VeloronaPlugin:
         self._viewport_status = {}             # source key -> what the live viewport layers are showing (see _set_viewport_status)
         self._satellites_task = None           # the running QgsTask that loads satellite data (None when idle)
         self._history = None                   # HistoryStore, created on first use (history is local to this computer)
-        self._history_labels = {}              # {entity id: name} for this session only; the file never stores the user's own names
+        self._link_weather_task = None          # the one running link-selection weather request (QgsTask) ...
+        self._link_weather_wanted = None        # ... and the newest selection waiting for it
+        self._history_labels = {}              # {entity id: name}, this session; the names are also kept in the history file on this computer
         self._analysis_task = None             # the running QgsTask of a terrain or weather analysis (None when idle); progress shows in the QGIS task manager
         self._endpoint_index = {}
         self._usa_provider = None
@@ -428,6 +430,9 @@ class VeloronaPlugin:
         return action
 
     def unload(self):
+        self._link_weather_wanted = None
+        if self._link_weather_task is not None:
+            self._link_weather_task.cancel()
         if self.processing_provider is not None:
             QgsApplication.processingRegistry().removeProvider(self.processing_provider)
             self.processing_provider = None
@@ -1505,7 +1510,10 @@ class VeloronaPlugin:
         engine against the two endpoints the link record itself carries, so the
         investigation the user needs arrives with the selection instead of
         requiring a separate action. Pairing still comes from the shared
-        authorization in ISED's extract -- never from proximity."""
+        authorization in ISED's extract -- never from proximity.
+
+        The record is shown at once. A weather request that is not already cached runs in a background task (never on the interface thread) and
+        the panel is refreshed when it finishes, if that link is still the one selected."""
         if entry.site_a_point is None or entry.site_b_point is None:
             return inspector.LinkInvestigation(
                 entry=entry, weather_error="This link record has no usable endpoint geometry.")
@@ -1523,26 +1531,63 @@ class VeloronaPlugin:
                 entry=entry, param_origins=origins,
                 weather_error="Live weather was unavailable for this link a moment ago; not retried yet.")
 
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        QApplication.processEvents()  # paint the busy state before the blocking fetch
-        try:
-            exposure = microwave_exposure.analyze_link_record(
-                entry.site_a_point, entry.site_b_point, entry.data, params)
-        except NoDataError as exc:
-            if not exc.transient:
-                # Deterministic input validation (e.g. a frequency below the rain model's range): say why, every time. It is not an
-                # outage and must not be remembered as one ("unavailable a moment ago").
-                return inspector.LinkInvestigation(entry=entry, param_origins=origins, weather_error=str(exc))
-            self._link_weather_cache.put_failure(cache_key, bbox)
-            return inspector.LinkInvestigation(entry=entry, param_origins=origins, weather_error=str(exc))
-        except Exception as exc:  # live public weather services -- degrade, don't crash
-            self._link_weather_cache.put_failure(cache_key, bbox)
-            return inspector.LinkInvestigation(entry=entry, param_origins=origins, weather_error=str(exc))
-        finally:
-            QApplication.restoreOverrideCursor()
+        investigation = inspector.LinkInvestigation(
+            entry=entry, param_origins=origins, weather_pending=True,
+            weather_error="Weather is still loading for this link; open or export it again once it has loaded.")
+        self._request_link_weather(investigation, params, cache_key, bbox)
+        return investigation
 
-        self._link_weather_cache.put(cache_key, bbox, exposure)
-        return inspector.LinkInvestigation(entry=entry, exposure=exposure, param_origins=origins)
+    def _request_link_weather(self, investigation, params, cache_key, bbox) -> None:
+        """Starts (or queues) the background weather request for a selected link. One request runs at a time; if the user keeps selecting, only the
+        newest link waits, so a quick run through many links cannot flood the weather service."""
+        self._link_weather_wanted = (investigation, params, cache_key, bbox)         # the newest selection wins
+        if self._link_weather_task is None:
+            self._start_link_weather()
+
+    def _start_link_weather(self) -> None:
+        wanted, self._link_weather_wanted = self._link_weather_wanted, None
+        if wanted is None:
+            return
+        investigation, params, cache_key, bbox = wanted
+        entry = investigation.entry
+
+        def work(task):
+            # Returns the outcome instead of raising, so the GUI thread never depends on how the task machinery hands an exception back.
+            try:
+                return ("ok", microwave_exposure.analyze_link_record(entry.site_a_point, entry.site_b_point, entry.data, params))
+            except NoDataError as exc:
+                return ("nodata", exc)
+            except Exception as exc:                     # live public weather services -- degrade, don't crash
+                return ("error", exc)
+
+        def finished(exception, result=None):
+            self._link_weather_task = None
+            if exception is not None:
+                result = ("error", exception)
+            if result is not None:
+                self._finish_link_weather(investigation, cache_key, bbox, *result)
+            self._start_link_weather()                   # a newer selection may be waiting
+
+        task = QgsTask.fromFunction("Velorona: link weather", work, on_finished=finished)
+        self._link_weather_task = task
+        QgsApplication.taskManager().addTask(task)
+
+    def _finish_link_weather(self, investigation, cache_key, bbox, outcome, value) -> None:
+        """GUI thread. Stores the outcome (so selecting the link again is instant) and refreshes the panel only if this link is still the selected one."""
+        if outcome == "ok":
+            self._link_weather_cache.put(cache_key, bbox, value)
+            investigation.exposure = value
+        else:
+            if outcome == "error" or getattr(value, "transient", True):
+                self._link_weather_cache.put_failure(cache_key, bbox)
+            # A deterministic input problem (e.g. a frequency below the rain model's range) is stated every time and is never remembered as an outage.
+            investigation.weather_error = str(value)
+        investigation.weather_pending = False
+        if self._shown_result() is investigation:
+            self._show_result(investigation)
+
+    def _shown_result(self):
+        return getattr(self.dock, "_result", None) if self.dock is not None else None
 
     def _open_elevation_profile(self):
         for action in self.iface.mainWindow().findChildren(QAction):
@@ -2105,7 +2150,8 @@ class VeloronaPlugin:
             self.iface.messageBar().pushWarning("Velorona", text)
 
     def _remember_history_labels(self, result) -> None:
-        """Names for this session's entities, kept in memory only (the file holds the code, not the name, for the user's own sites)."""
+        """Names of the entities just captured, kept in this session and in the history file on this computer (the rows hold only the code; the name
+        is the user's own and never leaves the machine)."""
         mw = history_capture.exposure_of(result)
         if mw is None:
             return
@@ -2116,6 +2162,10 @@ class VeloronaPlugin:
         labels[link_id] = f"{link.site_a.name} \u2194 {link.site_b.name}"
         for sid, rep in mw.representativeness.items():
             labels[site_ids[sid]] = rep.site.name
+        try:
+            store.set_labels({k: v for k, v in labels.items() if k in {link_id, *site_ids.values()}})
+        except history_store.HistoryError:
+            pass                                       # the names are a convenience; the capture's own report already says what went wrong
 
     def _history_block_for(self, result) -> str:
         try:
@@ -2124,7 +2174,8 @@ class VeloronaPlugin:
                 return ""
             store = self._history_store()
             link_id, site_ids = history_capture.entity_ids(result, store)
-            wanted = {link_id: self._history_labels.get(link_id, "this link"), **{eid: self._history_labels.get(eid, eid) for eid in site_ids.values()}}
+            known = {**store.labels(), **self._history_labels}
+            wanted = {link_id: known.get(link_id, "this link"), **{eid: known.get(eid, eid) for eid in site_ids.values()}}
             records = [r for r in store.records() if r.entity_id in wanted]
             return history_view.changes_html(records, wanted, time.time())
         except history_store.HistoryError as exc:
@@ -2138,7 +2189,11 @@ class VeloronaPlugin:
                 entity = history_capture.entity_ids(self.dock._result, self._history_store())[0]
             except Exception:
                 entity = None
-        dialog = HistoryDialog(self.iface.mainWindow(), self._history_store(), dict(self._history_labels), entity, dark=self._map_appearance == "dark")
+        try:
+            known = {**self._history_store().labels(), **self._history_labels}
+        except history_store.HistoryError:
+            known = dict(self._history_labels)
+        dialog = HistoryDialog(self.iface.mainWindow(), self._history_store(), known, entity, dark=self._map_appearance == "dark")
         dialog.exec()
 
     def _show_result(self, result):

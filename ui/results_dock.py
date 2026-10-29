@@ -203,7 +203,8 @@ class VeloronaResultsDock(QDockWidget):
             return
         ctx = self._context()
         view = self.view_combo.currentData() if ctx is not None else "evidence"
-        if ctx is None or view == "evidence":
+        if ctx is None or view == "evidence" or getattr(self._result, "weather_pending", False):
+            # A link whose weather is still loading shows its record with a 'Loading weather' note; Summary/Details would otherwise call it NO DATA.
             self.browser.setHtml(_render_html(self._result, self._dark))
             return
         brief = (ctx.terrain or ctx.weather)
@@ -775,7 +776,10 @@ def _render_link_investigation(result) -> str:
         "<div class='sec'>Weather evidence</div>",
     ]
 
-    if exposure is None:
+    if exposure is None and getattr(result, "weather_pending", False):
+        parts.append("<p><b>Loading weather&hellip;</b> The weather for both endpoints is being fetched; this panel updates by itself when it arrives. "
+                     "The rest of the record above is complete.</p>")
+    elif exposure is None:
         parts.append(f"<p>{NOT_DETERMINED} &mdash; live weather evidence could not be retrieved for this link.</p>"
                      f"<p class='caveat'>{_esc(result.weather_error or 'Weather provider unavailable.')}</p>")
     else:

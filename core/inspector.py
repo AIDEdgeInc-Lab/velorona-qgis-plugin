@@ -33,6 +33,7 @@ class LinkInvestigation:
     exposure: Any = None
     param_origins: Dict[str, Any] = field(default_factory=dict)
     weather_error: Optional[str] = None
+    weather_pending: bool = False       # the weather request is running in the background; ``weather_error`` then says so (never read as an outage)
     connected_site_a: int = 0
     connected_site_b: int = 0
     kind: str = "link-investigation"
