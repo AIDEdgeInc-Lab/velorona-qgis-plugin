@@ -539,8 +539,9 @@ def _render_terrestrial(result) -> str:
     observed = (
         _field_row("Distance (km)", f"{r.distance_km:.2f}") + _field_row("Bearing", f"{r.bearing_deg:.1f}°")
         + _field_row("Frequency (GHz)", exact(r.frequency_ghz))
-        + _field_row("Elevation samples", f"{len(r.profile)} points along path ({'Open-Meteo Elevation API, Copernicus DEM GLO-90' if elevation_source.is_online(result) else elevation_source.source_of(result)})")
     )
+    # Elevation is a reference dataset (the online Copernicus DEM or the raster the user chose), never typed Observed.
+    reference = _field_row("Elevation samples", f"{len(r.profile)} points along path ({'Open-Meteo Elevation API, Copernicus DEM GLO-90' if elevation_source.is_online(result) else elevation_source.source_of(result)})")
     calculated = (
         _field_row("First Fresnel radius (critical point)", f"{r.first_fresnel_radius_m:.1f} m")
         + _field_row("Required clearance", f"{r.required_clearance_m:.1f} m")
@@ -555,6 +556,7 @@ def _render_terrestrial(result) -> str:
         f"<h3>{_esc(r.link_id)} {badge}</h3>"
         + source_note
         + _section_html("Observed", observed)
+        + _section_html("Reference data (DEM)", reference)
         + _section_html("Calculated", calculated)
         + _section_html("Inferred", inferred)
         + "<p class='caveat'>Calculated via aei_link_clearance (ITU-R P.530 Fresnel-zone / earth-curvature terrain "

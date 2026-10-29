@@ -1,6 +1,6 @@
 """Evidence export -- canonical long-format table (one row per evidence
 item): Evidence | Type | Source | Observation-Input | Calculated result |
-Interpretation, Type in {Observed, Model-derived, Calculated, Inferred}. Observed is
+Interpretation, Type in {Observed, Model-derived, Calculated, Inferred, Assumed, Reference data (DEM)}. Elevation is Reference data (DEM), never Observed. Observed is
 a measurement (station, radar-as-estimated is typed Observed with its estimate
 note); Model-derived is a weather-model value such as Open-Meteo. Every value
 comes from the existing engine result objects (aei_link_clearance /
@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from . import csvsafe, elevation_source
 from .evidence_record import identity_lines, source_lines
 from .presentation import freshness
+from .presentation.registry import REFERENCE as REFERENCE_DEM
 from .record_source import record_labels
 from .presentation.terrain import ratio_meaning, ratio_value, terrain_explanation, terrain_status
 from .presentation.weather import weather_status
@@ -340,7 +341,7 @@ def _terrestrial_to_csv(result) -> str:
         _terrain_height_row(result, "a", "Site A antenna height", result.site_a_height_m, result.site_a_height_from_feature),
         _terrain_height_row(result, "b", "Site B antenna height", result.site_b_height_m, result.site_b_height_from_feature),
         _terrain_frequency_row(result, r),
-        _evidence_row("Ground elevation profile", "Observed", _elevation_source_text(result),
+        _evidence_row("Ground elevation profile", REFERENCE_DEM, _elevation_source_text(result),
                       observation_input=f"{len(r.profile)} samples along path"),
         _evidence_row("Path distance", "Calculated", "aei_link_clearance (haversine)",
                       calculated_result=f"{r.distance_km:.3f} km"),

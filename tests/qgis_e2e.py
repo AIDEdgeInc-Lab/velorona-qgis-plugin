@@ -692,8 +692,8 @@ else:
     check("export uses the canonical evidence header", rows[0] == export.EVIDENCE_HEADER)
     vocab = sorted({r[1] for r in rows[1:] if len(r) > 1})
     # Five-class vocabulary (1.1.5): engine defaults and user-entered values are Assumed, never Observed.
-    check("export Type vocabulary is Observed/Model-derived/Calculated/Inferred/Assumed",
-          vocab == ["Assumed", "Calculated", "Inferred", "Model-derived", "Observed"], str(vocab))
+    check("export Type vocabulary is Observed/Model-derived/Calculated/Inferred/Assumed (+ Reference data (DEM) on terrain exports)",
+          set(vocab) <= {"Assumed", "Calculated", "Inferred", "Model-derived", "Observed", "Reference data (DEM)"} and "Observed" in vocab, str(vocab))
     check("no Open-Meteo weather-model row is typed Observed",
           not [r for r in rows[1:] if len(r) > 2 and r[1] == "Observed" and "Open-Meteo" in r[2]
                and "Elevation" not in r[2]], "")

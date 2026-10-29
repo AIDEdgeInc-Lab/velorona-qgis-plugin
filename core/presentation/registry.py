@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from typing import Dict, List
 
 OBSERVED, MODEL, CALCULATED, INPUT, INFERRED = "Observed", "Model-derived", "Calculated", "Input", "Inferred"
+# Elevation (the online Copernicus DEM or a raster the user chose) is a reference dataset, not a measurement of this path: never typed Observed.
+REFERENCE = "Reference data (DEM)"
 
 
 @dataclass(frozen=True)
@@ -121,7 +123,7 @@ _FIELD_LIST = [
     Field("near_threshold", "Near threshold", "flag", INFERRED, "aei_link_clearance", "terrain.near_threshold", "Result could change with another elevation source"),
     Field("explanation", "Plain comparison", "text", INFERRED, "Velorona presentation of the library result", "status.terrain", "Available vs required clearance in metres, ratio as a multiple"),
     Field("library_explanation", "Library explain() text", "text", INFERRED, "aei_link_clearance.explain", "", "The library's own one-line wording, kept for audit; it expresses the margin as a percentage"),
-    Field("samples", "Elevation samples", "count", OBSERVED, "Open-Meteo Elevation API (Copernicus DEM GLO-90)", "", "Points sampled along the path"),
+    Field("samples", "Elevation samples", "count", REFERENCE, "Elevation source named in Details: Open-Meteo Elevation API (Copernicus DEM GLO-90) or the raster you chose", "", "Points sampled along the path"),
     Field("critical_distance_from_a_km", "Critical point, distance from Site A", "km", CALCULATED, "aei_link_clearance", "terrain.critical_point", "Where clearance is lowest"),
     Field("critical_latitude", "Critical point latitude", "degrees", CALCULATED, "aei_link_clearance", "terrain.critical_point", "WGS84"),
     Field("critical_longitude", "Critical point longitude", "degrees", CALCULATED, "aei_link_clearance", "terrain.critical_point", "WGS84"),
