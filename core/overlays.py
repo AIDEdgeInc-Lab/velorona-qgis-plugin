@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from qgis.PyQt.QtCore import QVariant
 
+from . import elevation_source
 from .colors import COLORS
 from .layers import build_link_layer, build_point_layer
 
@@ -91,6 +92,6 @@ def build_terrain_layer(terrestrial_result):
     return build_point_layer(
         "Terrain / Elevation", records, TERRAIN_FIELDS, COLORS["terrain"],
         kind="terrain",
-        abstract="Elevation profile sampled along the analyzed path (Open-Meteo Elevation API, Copernicus DEM GLO-90), "
+        abstract=f"Elevation profile sampled along the analyzed path ({'Open-Meteo Elevation API, Copernicus DEM GLO-90' if elevation_source.is_online(terrestrial_result) else elevation_source.source_of(terrestrial_result)}), "
                   "from aei_link_clearance's own terrain-clearance calculation.",
     )

@@ -17,6 +17,7 @@ import xml.etree.ElementTree as ET
 ALLOWED = {
     "tests.test_usa_provider::test_real_pack_dedup_matches_the_index",
     "tests.test_usa_provider::test_real_extract_loads_whole_with_contract_counts",
+    "::tests.test_elevation_seam",              # needs aei-link-clearance >= 0.3 (unreleased); tools/gate.sh runs it against the local library
     "::tests.test_workflow_core_semantics",     # module-level importorskip("aei_workflow"): reported by pytest without a test name
 }
 

@@ -21,7 +21,7 @@ from __future__ import annotations
 import io
 from datetime import datetime, timezone
 
-from . import csvsafe
+from . import csvsafe, elevation_source
 from .evidence_record import identity_lines, source_lines
 from .record_source import record_labels
 from .presentation.terrain import ratio_meaning, ratio_value, terrain_explanation, terrain_status
@@ -35,6 +35,13 @@ NOT_DETERMINED = "Not determined"
 class NotExportable(Exception):
     pass
 
+
+
+def _elevation_source_text(result) -> str:
+    """The evidence source for the ground-elevation row: the online wording (unchanged) or the raster the user chose."""
+    if elevation_source.is_online(result):
+        return "aei_link_clearance (Open-Meteo Elevation API, Copernicus DEM GLO-90, 90m surface model)"
+    return f"aei_link_clearance ({elevation_source.source_of(result)}; values taken as metres; surface/bare-earth model and vertical datum not known to Velorona)"
 
 def _preamble(lines: list[str]) -> str:
     return "".join(f"# {line}\n" for line in lines) + "#\n"
@@ -332,7 +339,7 @@ def _terrestrial_to_csv(result) -> str:
         _terrain_height_row(result, "a", "Site A antenna height", result.site_a_height_m, result.site_a_height_from_feature),
         _terrain_height_row(result, "b", "Site B antenna height", result.site_b_height_m, result.site_b_height_from_feature),
         _terrain_frequency_row(result, r),
-        _evidence_row("Ground elevation profile", "Observed", "aei_link_clearance (Open-Meteo Elevation API, Copernicus DEM GLO-90, 90m surface model)",
+        _evidence_row("Ground elevation profile", "Observed", _elevation_source_text(result),
                       observation_input=f"{len(r.profile)} samples along path"),
         _evidence_row("Path distance", "Calculated", "aei_link_clearance (haversine)",
                       calculated_result=f"{r.distance_km:.3f} km"),

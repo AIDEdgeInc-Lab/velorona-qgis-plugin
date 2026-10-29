@@ -51,7 +51,15 @@ def source_of(result) -> str:
 
 
 def is_online(result) -> bool:
-    return source_of(result) == ONLINE_SOURCE_TEXT
+    """True for the online default. Everything that is not is a user-chosen raster, whose own description must replace the online wording."""
+    text = source_of(result)
+    if text == ONLINE_SOURCE_TEXT:
+        return True
+    try:
+        from aei_link_clearance.elevation import SOURCE
+    except ImportError:
+        return False
+    return text == SOURCE
 
 
 def failure_reason(exc: BaseException) -> Optional[tuple]:

@@ -36,6 +36,7 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
+from ..core import elevation_source
 from ..core.export import NotExportable, result_to_csv, result_to_xlsx
 from ..core.presentation import ask as ask_module
 from ..core.export import _precip_note
@@ -525,7 +526,7 @@ def _render_terrestrial(result) -> str:
     observed = (
         _field_row("Distance (km)", f"{r.distance_km:.2f}") + _field_row("Bearing", f"{r.bearing_deg:.1f}°")
         + _field_row("Frequency (GHz)", exact(r.frequency_ghz))
-        + _field_row("Elevation samples", f"{len(r.profile)} points along path (Open-Meteo Elevation API, Copernicus DEM GLO-90)")
+        + _field_row("Elevation samples", f"{len(r.profile)} points along path ({'Open-Meteo Elevation API, Copernicus DEM GLO-90' if elevation_source.is_online(result) else elevation_source.source_of(result)})")
     )
     calculated = (
         _field_row("First Fresnel radius (critical point)", f"{r.first_fresnel_radius_m:.1f} m")

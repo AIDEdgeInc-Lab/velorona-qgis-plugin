@@ -168,6 +168,8 @@ def _link_analysis(ctx: AskContext) -> Sheet:
             ["Status", _status_cell(t.status), "", "", t.reason]]
     for label, key, unit, numfmt, compared, meaning in _TERRAIN_ROWS:
         value = t.data.get(key)
+        if key == "samples" and t.data.get("elevation_source") and "Open-Meteo" not in t.data["elevation_source"]:
+            meaning = t.data["elevation_source"]        # a raster the user chose: say so instead of the online wording
         rows.append([label, Cell(value, fmt=numfmt) if value is not None else NOT_DETERMINED, unit, compared, meaning])
     return Sheet("LINK ANALYSIS", rows, widths=[28, 16, 11, 46, 52], freeze=1)
 
