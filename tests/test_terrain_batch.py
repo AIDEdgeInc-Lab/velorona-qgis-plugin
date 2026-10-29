@@ -13,6 +13,7 @@ import sys
 import types
 
 import pytest
+from core import elevation_source
 
 try:
     import qgis.core  # noqa: F401
@@ -94,6 +95,7 @@ def elevation_service(monkeypatch):
 
 def tracked(attrs, a, b, params):
     CURRENT[0] = attrs["id"]
+    elevation_source.reset_online_provider()     # fixtures share endpoints but have different synthetic terrain: no cache across them
     return tr.analyze_link_record(attrs, a, b, params)
 
 
