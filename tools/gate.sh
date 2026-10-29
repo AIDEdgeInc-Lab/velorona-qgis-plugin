@@ -48,7 +48,27 @@ VERSION="$(sed -n 's/^version=//p' metadata.txt | tr -d '[:space:]')"
 package_check() { ./tools/package.sh >/dev/null && "$PY" tools/verify_package.py "dist/velorona-$VERSION.zip" "$VERSION"; }
 parity_check() {
     QGIS_REPO="$ROOT" OUT="$TMP/gate-parity" PATH="$(dirname "$PY"):$PATH" sh "$MAP_REPO/parity/run_all.sh" || return 1
-    ! grep -q DIVERGE "$TMP/gate-parity/PARITY_REPORT.md"
+    # Any DIVERGE fails the gate unless it is exactly one of the owner-decided entries of parity/KNOWN_DIVERGENCES.json (printed every time).
+    "$PY" - "$TMP/gate-parity/PARITY_REPORT.json" parity/KNOWN_DIVERGENCES.json <<'PYEOF'
+import json, sys
+report, known = json.load(open(sys.argv[1])), json.load(open(sys.argv[2]))
+allowed = {(k["stage"], k["detail"]): k for k in known}
+unexpected, tolerated = [], {}
+for fixture, parts in report["fixtures"].items():
+    for section, rows in parts.items():
+        for row in rows if isinstance(rows, list) else []:
+            if isinstance(row, dict) and row.get("result") == "DIVERGE":
+                key = (row.get("stage"), row.get("b"))
+                if key in allowed:
+                    tolerated.setdefault(key, []).append(fixture)
+                else:
+                    unexpected.append((fixture, section, row.get("stage"), row.get("a"), row.get("b")))
+for key, fixtures in tolerated.items():
+    print(f"   KNOWN DIVERGENCE ({len(fixtures)} fixtures, owner-decided {allowed[key]['decided']}): {key[0]}: {key[1]}")
+for item in unexpected[:10]:
+    print("   UNEXPECTED DIVERGENCE:", *item)
+sys.exit(1 if unexpected else 0)
+PYEOF
 }
 
 # Seam lane: the same suite against the UNRELEASED library (aei-link-clearance 0.3, local checkout installed editable in a second venv),
