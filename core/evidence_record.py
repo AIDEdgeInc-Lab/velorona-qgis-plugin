@@ -21,7 +21,7 @@ CURVATURE_CONVENTION = ("bulge-added-to-terrain: the effective-earth bulge (k = 
 # It is a notice on weather results, not a claim that the table is wrong in any specific band; remove it only with the library release that
 # resolves owner decision D-4.
 RAIN_TABLE_CAVEAT = ("Open issue: the rain-attenuation coefficient table in aei-microwave-link-exposure has NOT been verified against "
-                     "ITU-R P.838-3; an independent check (2026-10-08) found rows that differ, which can understate predicted attenuation, "
+                     "ITU-R P.838-3; an independent check (2026-10-08) found rows that differ, which can understate estimated attenuation, "
                      "mostly at 6-10 GHz. 'P.838-3' in this export names the method, not a verified table.")
 RAIN_MODEL_CHECKED = ("Rain model: the installed rain-coefficient model reproduced Recommendation ITU-R P.838-3 Table 5 at 6, 10 and 38 GHz "
                       "(both polarizations, "

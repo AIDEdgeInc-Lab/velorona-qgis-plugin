@@ -36,7 +36,7 @@ Ratio, LOS Status, Near Threshold, Obstruction Distance, Explanation`.
 
 **`_microwave_to_csv`** — main row: `Link ID, Site A, Site B, Length,
 Frequency, Polarization, Fade Margin, Rain Rate Used, Rain Rate Source
-Site, Predicted Attenuation, Exposure Ratio, Severity, Provenance`.
+Site, Estimated Attenuation, Exposure Ratio, Severity, Provenance`.
 - Has a provenance value and a "source site" identifier, but **not**
   `attenuation.method` / `attenuation.assumption` — both of which the dock
   *does* now show (added in the previous pass) and the export does not.

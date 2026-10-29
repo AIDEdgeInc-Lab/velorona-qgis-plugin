@@ -118,7 +118,7 @@ def _summary(result, ctx: AskContext, generated: str) -> Sheet:
         if w.key_facts:
             rows += [
                 ["Rain rate used", w.key_facts[0].value, w.key_facts[0].comparison],
-                ["Predicted rain fade", w.key_facts[1].value, w.key_facts[1].comparison],
+                ["Estimated rain fade", w.key_facts[1].value, w.key_facts[1].comparison],
                 ["Fade margin remaining", w.key_facts[2].value, w.key_facts[2].meaning],
             ]
         for s in w.sites:

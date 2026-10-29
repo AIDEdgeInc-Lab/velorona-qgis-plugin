@@ -26,7 +26,7 @@ DATA DICTIONARY sheet). Summary:
 | Weather | Rain rate used | max(site A, site B) model rain rate | mm/h | none | aei_mw_exposure |
 | Weather | Specific attenuation | γ = k·R^α (ITU-R P.838-3) | dB/km | 1–100 GHz | aei_mw_exposure |
 | Weather | Effective path | d / (1 + d/d0), d0 = 35·e^(−0.015R) (ITU-R P.530) | km | R capped at 100 | aei_mw_exposure |
-| Weather | Predicted rain fade | γ · d_eff | dB | none | aei_mw_exposure |
+| Weather | Estimated rain fade | γ · d_eff | dB | none | aei_mw_exposure |
 | Weather | Exposure ratio / severity | fade / fade margin; moderate ≥ 0.3, high ≥ 0.7 | ratio | library conventions, "not a validated risk model" | aei_mw_exposure |
 | Weather | Station distance, representativeness | haversine; 50 km, 2.0 mm/h conventions | km | stated conventions | aei_mw_exposure |
 | Satellite | Look angles | SGP4, topocentric alt/az/range; visible if elevation ≥ 10° | deg, km | 10° mask | skyfield |
@@ -83,7 +83,7 @@ unchanged apart from the display fixes above). Excel carries the analyst view.
 
 | Terrain (library result) | Status | | Weather (library result) | Status |
 |---|---|---|---|---|
-| obstructed | CRITICAL | | predicted fade ≥ fade margin | CRITICAL |
+| obstructed | CRITICAL | | estimated fade ≥ fade margin | CRITICAL |
 | marginal | AT RISK | | severity high | AT RISK |
 | clear and (near_threshold or ratio < 1.3) | WATCH | | severity moderate | WATCH |
 | clear | CLEAR | | severity low | CLEAR |

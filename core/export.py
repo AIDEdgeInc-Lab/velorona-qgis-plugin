@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 
 from . import csvsafe, elevation_source
 from .evidence_record import identity_lines, source_lines
+from .presentation import freshness
 from .record_source import record_labels
 from .presentation.terrain import ratio_meaning, ratio_value, terrain_explanation, terrain_status
 from .presentation.weather import weather_status
@@ -389,21 +390,22 @@ def _microwave_to_csv(result) -> str:
 
     rows = [
         _evidence_row("Rain rate used", "Model-derived", f"Open-Meteo weather model ({e.source_site_id})",
-                      observation_input=f"{e.rain_rate_mm_h:.1f} mm/h", interpretation=_rain_note(e, getattr(result, "precipitation", {}))),
+                      observation_input=f"{e.rain_rate_mm_h:.1f} mm/h ({_rain_freshness(result, e)})",
+                      interpretation=_rain_note(e, getattr(result, "precipitation", {}))),
         *_precip_rows((getattr(result, "precipitation", None) or {}).get(e.source_site_id)),
         _evidence_row("Fade margin (link spec)", "Assumed", "User, via analysis dialog (not sourced from license data)",
                       observation_input=f"{_exact(link.fade_margin_db)} dB", interpretation="Assumed / user-provided: supplied by the user, not observed from a source."),
         _evidence_row("Frequency / polarization", "Assumed", "User, via analysis dialog (not sourced from license data)",
                       observation_input=f"{_exact(link.frequency_ghz)} GHz, {link.polarization}", interpretation="Assumed / user-provided: supplied by the user, not observed from a source."),
-        _evidence_row("Predicted rain attenuation", "Calculated", f"aei_mw_exposure ({att.method})",
+        _evidence_row("Estimated rain attenuation", "Calculated", f"aei_mw_exposure ({att.method})",
                       observation_input=f"{e.rain_rate_mm_h:.1f} mm/h, {_exact(link.frequency_ghz)} GHz, {link.polarization}, {link.length_km:.2f} km",
                       calculated_result=f"{att.predicted_attenuation_db:.2f} dB", interpretation=att.assumption),
-        _evidence_row("Exposure ratio", "Calculated", "aei_mw_exposure (predicted attenuation / fade margin)",
+        _evidence_row("Exposure ratio", "Calculated", "aei_mw_exposure (estimated attenuation / fade margin)",
                       calculated_result=_exposure_text(e)),  # 0.1%: at :.0f,
                       # 99.6% and 100.4% both printed 100%, erasing which side of
                       # the fade margin the link sits on -- the one thing this row says
         _evidence_row("Severity", "Inferred", "aei_mw_exposure", interpretation=f"{e.severity.upper()} -- {e.operational_note}"),
-        _evidence_row("Weather status", "Inferred", "Canonical status model (CRITICAL when predicted attenuation >= fade margin)",
+        _evidence_row("Weather status", "Inferred", "Canonical status model (CRITICAL when estimated attenuation >= fade margin)",
                       interpretation=(lambda s: f"{s[0]} -- {s[1]}")(weather_status(e))),
         _evidence_row("Hardware condition", "Inferred", "", interpretation=f"{NOT_DETERMINED} -- no hardware telemetry input to this analysis."),
     ]
@@ -414,6 +416,14 @@ def _microwave_to_csv(result) -> str:
         writer.writerow(row)
     return buf.getvalue()
 
+
+
+def _rain_freshness(result, e) -> str:
+    """The freshness line for the model rain rate behind exposure ``e``; ``result`` is a microwave result or a link investigation wrapping one."""
+    rep = getattr(result, "representativeness", None)
+    if rep is None:
+        rep = getattr(getattr(result, "exposure", None), "representativeness", None)
+    return freshness.for_site(rep, e.source_site_id)
 
 def _precip_note(p) -> str:
     """What the model precipitation value is, and what was left out of it."""
@@ -477,7 +487,7 @@ def _representativeness_rows(representativeness, precipitation=None) -> list:
         if rep.model_observation is not None:
             rows.append(_evidence_row(f"Model precipitation ({site_label})", "Model-derived",
                                        f"{rep.model_observation.source} (weather model, not a station measurement)",
-                                       observation_input=f"{rep.model_observation.rain_rate_mm_h:.1f} mm/h at {rep.model_observation.timestamp}",
+                                       observation_input=f"{rep.model_observation.rain_rate_mm_h:.1f} mm/h ({freshness.model_line(rep.model_observation)})",
                                        interpretation=_precip_note((precipitation or {}).get(rep.site.id))))
         else:
             rows.append(_evidence_row(f"Model precipitation ({site_label})", "Model-derived", "Open-Meteo weather model",
@@ -559,7 +569,8 @@ def _link_investigation_to_csv(result) -> str:
         fade_kind, fade_note = origins.get("fade_margin_db", ("Assumed", ""))
         rows += [
             _evidence_row("Rain rate used", "Model-derived", f"Open-Meteo weather model ({e.source_site_id})",
-                          observation_input=f"{e.rain_rate_mm_h:.1f} mm/h", interpretation=_rain_note(e, getattr(result.exposure, "precipitation", {}))),
+                          observation_input=f"{e.rain_rate_mm_h:.1f} mm/h ({_rain_freshness(result, e)})",
+                          interpretation=_rain_note(e, getattr(result.exposure, "precipitation", {}))),
             *_precip_rows((getattr(result.exposure, "precipitation", None) or {}).get(e.source_site_id)),
             # Type stays in the canonical Observed/Calculated/Inferred vocabulary;
             # whether a parameter came from the public record (Observed) or is an
@@ -578,16 +589,16 @@ def _link_investigation_to_csv(result) -> str:
                           observation_input=f"{_exact(link.fade_margin_db)} dB", interpretation=fade_note),
             _evidence_row("Path length", "Calculated", "aei_mw_exposure (haversine)",
                           calculated_result=f"{att.path_length_km:.2f} km"),
-            _evidence_row("Predicted rain attenuation", "Calculated", f"aei_mw_exposure ({att.method})",
+            _evidence_row("Estimated rain attenuation", "Calculated", f"aei_mw_exposure ({att.method})",
                           observation_input=f"{e.rain_rate_mm_h:.1f} mm/h, {_exact(link.frequency_ghz)} GHz, {link.polarization}, {att.path_length_km:.2f} km",
                           calculated_result=f"{att.predicted_attenuation_db:.2f} dB", interpretation=att.assumption),
-            _evidence_row("Exposure ratio", "Calculated", "aei_mw_exposure (predicted attenuation / fade margin)",
+            _evidence_row("Exposure ratio", "Calculated", "aei_mw_exposure (estimated attenuation / fade margin)",
                           calculated_result=_exposure_text(e)),  # 0.1%: at :.0f,
                       # 99.6% and 100.4% both printed 100%, erasing which side of
                       # the fade margin the link sits on -- the one thing this row says
             _evidence_row("Severity", "Inferred", "aei_mw_exposure",
                           interpretation=f"{e.severity.upper()} -- {e.operational_note}"),
-            _evidence_row("Weather status", "Inferred", "Canonical status model (CRITICAL when predicted attenuation >= fade margin)",
+            _evidence_row("Weather status", "Inferred", "Canonical status model (CRITICAL when estimated attenuation >= fade margin)",
                           interpretation=(lambda s: f"{s[0]} -- {s[1]}")(weather_status(e))),
             _evidence_row("Hardware condition", "Inferred", "",
                           interpretation=f"{NOT_DETERMINED} -- no hardware telemetry input to this analysis."),

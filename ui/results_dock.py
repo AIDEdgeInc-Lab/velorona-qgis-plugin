@@ -42,6 +42,7 @@ from ..core.presentation import ask as ask_module
 from ..core.export import _precip_note
 from ..core.presentation.model import exact
 from ..core.record_source import is_fcc
+from ..core.presentation import freshness
 from ..core.presentation.terrain import ratio_meaning, ratio_value, terrain_explanation
 from ..core.presentation.workbook import context_for
 from . import charts, operational_view, theme
@@ -781,7 +782,7 @@ def _render_link_investigation(result) -> str:
             + _field_row("Fade margin", f"{exp.link.fade_margin_db:.0f} dB", note_for("fade_margin_db"))
             + _field_row("Path length", f"{att.path_length_km:.2f} km")
             + _field_row("Specific attenuation", f"{att.specific_attenuation_db_km:.4f} dB/km")
-            + _field_row("Predicted rain attenuation", f"{att.predicted_attenuation_db:.2f} dB")
+            + _field_row("Estimated rain attenuation", f"{att.predicted_attenuation_db:.2f} dB")
             + _field_row("Exposure ratio", f"{exp.exposure_ratio * 100:.1f}% of the fade margin")
             + _field_row("Method", att.method)
         )
@@ -843,14 +844,15 @@ def _render_microwave(result) -> str:
 
     observed = (
         f"<p>{_esc(exp.rain_rate_assumption)}</p>"
-        f"<p>Rain rate used: <b>{exp.rain_rate_mm_h:.1f} mm/h</b> (model-derived)</p>"
+        f"<p>Rain rate used: <b>{exp.rain_rate_mm_h:.1f} mm/h</b></p>"
+        f"<p class='note'>{_esc(freshness.for_site(result.representativeness, exp.source_site_id))}</p>"
         + (f"<p class='note'>{_esc(_precip_note(result.precipitation.get(exp.source_site_id)))}</p>"
            if result.precipitation.get(exp.source_site_id) else "")
     )
     calculated = (
         f"<p>Method: {_esc(exp.attenuation.method)}</p>"
         f"<pre class='assumption'>{_esc(exp.attenuation.assumption)}</pre>"
-        f"<p>Predicted attenuation: <b>{exp.attenuation.predicted_attenuation_db:.2f} dB</b></p>"
+        f"<p>Estimated rain attenuation: <b>{exp.attenuation.predicted_attenuation_db:.2f} dB</b></p>"
         f"<p>Fade margin (link spec): {link.fade_margin_db:.0f} dB</p>"
         f"<p>Exposure ratio: {exp.exposure_ratio * 100:.1f}% of the fade margin</p>"
     )
