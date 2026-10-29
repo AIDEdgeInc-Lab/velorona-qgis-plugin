@@ -25,6 +25,19 @@ qgs.initQgis()
 RESULTS = []
 
 
+def wait_for_terrain_task(timeout_s=60):
+    """Waits for the plugin's terrain QgsTask and delivers its finished-callback in this (GUI) thread."""
+    import time
+    from qgis.core import QgsApplication as _A
+    end = time.monotonic() + timeout_s
+    while time.monotonic() < end:
+        _A.processEvents()
+        if getattr(plugin, "_terrain_task", None) is None:
+            return
+        time.sleep(0.02)
+    raise AssertionError("terrain task did not finish")
+
+
 def check(name, ok, detail=""):
     RESULTS.append((name, bool(ok), detail))
     print(f"  [{'PASS' if ok else 'FAIL'}] {name}" + (f"  -- {detail}" if detail and not ok else ""))
@@ -193,15 +206,17 @@ try:
             DialogCode = ParamDialog.DialogCode
             captured = None
 
-            def __init__(self, parent, title, spec, defaults):
+            def __init__(self, parent, title, spec, defaults, elevation_layers=None, elevation_note=""):
                 StubDialog.captured = (title, dict(defaults))
                 self._d = defaults
 
             def exec(self): return ParamDialog.DialogCode.Accepted
             def values(self): return dict(self._d)
+            def elevation_layer(self): return None
         plugin_module.ParamDialog = StubDialog
         links.selectByIds([feat.id()])
         plugin.run_terrestrial()
+        wait_for_terrain_task()          # the analysis runs in a QgsTask worker; its result is shown when the task finishes (GUI thread)
         check("run_terrestrial accepts exactly one selected link", StubDialog.captured is not None, str(messages()))
         check("dialog is pre-filled with the record's highest frequency", abs(StubDialog.captured[1]["frequency_ghz"] - record_ghz) < 1e-12)
         shown = plugin.dock._result
@@ -210,6 +225,7 @@ try:
         links.removeSelection()
         _reset_messages()
         plugin.run_terrestrial()
+        wait_for_terrain_task()
         check("nothing selected -> a clear instruction, no analysis", any("exactly one Fixed Service link" in m for m in messages()), str(messages()))
     finally:
         requests.get = orig_get

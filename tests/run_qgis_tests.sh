@@ -64,6 +64,10 @@ echo
 echo "== QGIS batch terrain-clearance Processing test (no network) =="
 "$QGISPY" "$HERE/qgis_batch_e2e.py"
 
+echo
+echo "== QGIS local DEM as elevation source (needs aei-link-clearance >= 0.3; no network) =="
+"$QGISPY" "$HERE/qgis_local_dem_e2e.py" || [ $? -eq 3 ]    # exit 3 = skipped because the installed library predates the seam
+
 if [ "$1" = "--bench" ]; then
     echo
     echo "== performance benchmark =="

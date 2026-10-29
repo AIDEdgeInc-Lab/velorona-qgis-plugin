@@ -40,6 +40,7 @@ from .core import dependencies, inspector
 from .core.inspector import feature_to_entry
 from .core.layers import LIFECYCLE_EVIDENCE, PUBLIC_RECORDS_DISCLOSURE
 from .core.sources import satellite_feed, space_public, terrestrial_public
+from .core import elevation_source, local_dem
 from .core.validation import NoDataError
 from .core.viewport_cache import FAILED, MISS, ViewportCache
 from .ui import records_table
@@ -291,6 +292,7 @@ class VeloronaPlugin:
         self._dataset_notes = {}               # source key -> provenance/status line shown in Records (replayed when the dock is created)
         self._viewport_status = {}             # source key -> what the live viewport layers are showing (see _set_viewport_status)
         self._satellites_task = None           # the running QgsTask that loads satellite data (None when idle)
+        self._terrain_task = None              # the running QgsTask of a terrain analysis (None when idle); progress shows in the QGIS task manager
         self._endpoint_index = {}
         self._usa_provider = None
         self.network_context_layer = None
@@ -1578,16 +1580,14 @@ class VeloronaPlugin:
             )
             return
         defaults = terrestrial.build_params(entries)
-        dialog = ParamDialog(self.iface.mainWindow(), "Velorona -- Terrestrial Path Clearance", terrestrial.PARAM_SPEC, defaults)
+        dialog = self._terrain_dialog("Velorona -- Terrestrial Path Clearance", defaults)
         if dialog.exec() != dialog.DialogCode.Accepted:
             return
-        try:
-            result = terrestrial.analyze(entries, dialog.values())
-        except Exception as exc:
-            self._error(f"Analysis failed:\n{exc}")
+        values = dialog.values()
+        provider = self._elevation_provider_from(dialog)
+        if provider is False:
             return
-        self._update_terrain_layer(result)
-        self._show_result(result)
+        self._run_terrain_in_background(lambda: terrestrial.analyze(entries, values, provider))
 
     def _run_terrestrial_for_link(self, layer, feature):
         """Terrain clearance for ONE selected Fixed Service link (Canada or USA): the record's own endpoints, and its highest published
@@ -1600,16 +1600,58 @@ class VeloronaPlugin:
         defaults, record_ghz, note = terrestrial.build_link_params(entry.data)
         title = ("Velorona -- Terrestrial Path Clearance (link record: frequency pre-filled from the record)" if record_ghz is not None
                  else "Velorona -- Terrestrial Path Clearance (the record publishes no usable frequency)")
-        dialog = ParamDialog(self.iface.mainWindow(), title, terrestrial.PARAM_SPEC, defaults)
+        dialog = self._terrain_dialog(title, defaults)
         if dialog.exec() != dialog.DialogCode.Accepted:
             return
-        try:
-            result = terrestrial.analyze_link_record(entry.data, entry.site_a_point, entry.site_b_point, dialog.values())
-        except Exception as exc:
-            self._error(f"Analysis failed:\n{exc}")
+        values = dialog.values()
+        provider = self._elevation_provider_from(dialog)
+        if provider is False:
             return
-        self._update_terrain_layer(result)
-        self._show_result(result)
+        data, point_a, point_b = entry.data, entry.site_a_point, entry.site_b_point
+        self._run_terrain_in_background(lambda: terrestrial.analyze_link_record(data, point_a, point_b, values, provider))
+
+    def _terrain_dialog(self, title: str, defaults: dict):
+        """The terrain parameter dialog with the elevation-source choice: online by default, or any single-band raster of the project (needs the
+        library's elevation-provider seam; with an older library the choice is shown disabled, with the reason)."""
+        supported = elevation_source.providers_supported()
+        note = "" if supported else "A local elevation raster needs aei-link-clearance 0.3 or newer. Online elevation is used."
+        return ParamDialog(self.iface.mainWindow(), title, terrestrial.PARAM_SPEC, defaults,
+                           elevation_layers=local_dem.candidate_layers() if supported else [], elevation_note=note)
+
+    def _elevation_provider_from(self, dialog):
+        """None = online default; a provider = the chosen raster; False = the raster cannot be used (the user was told, nothing runs)."""
+        layer = dialog.elevation_layer()
+        if layer is None:
+            return None
+        try:
+            return local_dem.make_provider(layer)
+        except Exception as exc:
+            self._error(f"The chosen elevation raster cannot be used. Nothing was computed.\n\n{exc}")
+            return False
+
+    def _run_terrain_in_background(self, compute) -> None:
+        """Runs a terrain analysis in a QgsTask worker, so the (possibly retried) elevation request never blocks the interface. Everything that
+        touches QGIS (the dialog, the raster clone, the layers, the result panel) happens in the GUI thread, before the task starts or after it
+        finishes. One terrain analysis at a time."""
+        if self._terrain_task is not None:
+            self._warn("A terrain analysis is already running. Wait for it to finish.")
+            return
+
+        def work(task):
+            return compute()
+
+        def finished(exception, result=None):
+            self._terrain_task = None
+            if exception is not None:
+                kind = "NO DATA" if isinstance(exception, NoDataError) else "Analysis failed"
+                self._error(f"{kind}:\n{exception}")
+                return
+            self._update_terrain_layer(result)
+            self._show_result(result)
+
+        task = QgsTask.fromFunction("Velorona: terrain clearance", work, on_finished=finished)
+        self._terrain_task = task
+        QgsApplication.taskManager().addTask(task)
 
     # -- USA (FCC ULS) data pack ----------------------------------------------------------------------------------------
 
