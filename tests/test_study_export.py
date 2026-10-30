@@ -20,10 +20,11 @@ from core.export import EVIDENCE_HEADER, NotExportable  # noqa: E402
 NAMES = ("Tower North 12", "=Hilltop Repeater")
 
 
-def terrain(names=NAMES, source="Selected QGIS feature"):
+def terrain(names=NAMES, source="Selected QGIS feature", public=False):
     r = F.terrain_result()
     r.site_a_name, r.site_b_name = names
     r.site_a_source = r.site_b_source = source
+    r.site_a_public = r.site_b_public = public
     return r
 
 
@@ -80,7 +81,7 @@ def test_own_names_are_left_out_by_default_and_included_when_ticked():
 
 
 def test_public_register_names_are_kept():
-    text = S.study_to_csv([terrain(names=("TORONTO CN TOWER", "MISSISSAUGA"), source="ISED Fixed Service (TAFL)")])
+    text = S.study_to_csv([terrain(names=("TORONTO CN TOWER", "MISSISSAUGA"), source="ISED Fixed Service (TAFL)", public=True)])
     assert "TORONTO CN TOWER" in text
 
 

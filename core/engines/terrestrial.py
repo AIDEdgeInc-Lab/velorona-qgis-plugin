@@ -10,7 +10,7 @@ from typing import Optional, Tuple
 from aei_link_clearance import LinkClearanceResult, analyze_link, explain
 from aei_link_clearance import terrain as _library_terrain
 
-from .. import elevation_source
+from .. import elevation_source, public_sources
 from ..provider_retry import call_with_backoff, classify
 from ..record_source import (frequency_ghz_from_record, frequency_origin, height_origin, record_labels)
 from ..validation import NoDataError, require_corrected_clearance, terrain_input_reasons
@@ -64,6 +64,9 @@ class TerrestrialAnalysisResult:
     height_origins: Optional[dict] = None
     # The selected link record (id, source, attribution) when the analysis was started from one; None for two free sites.
     record: Optional[dict] = None
+    # Whether each site's name is public register data (kept in exports) or the user's own (left out unless ticked); core/names.py.
+    site_a_public: bool = False
+    site_b_public: bool = False
 
 
 def build_params(entries) -> dict:
@@ -131,6 +134,9 @@ def prepare(entries) -> dict:
     id_b, name_b = feature_id_name(feat_b, "Selected site B")
     return {"a": (lat_a, lon_a), "b": (lat_b, lon_b), "id_a": id_a, "id_b": id_b, "name_a": name_a, "name_b": name_b,
             "source_a": feature_attr(feat_a, "source", "Selected QGIS feature"), "source_b": feature_attr(feat_b, "source", "Selected QGIS feature"),
+            # Public register or the user's own: decided from the LAYER (a user's "source" column is not trusted), see core/public_sources.py.
+            "public_a": public_sources.is_public(public_sources.feature_source(layer_a, feat_a)),
+            "public_b": public_sources.is_public(public_sources.feature_source(layer_b, feat_b)),
             "height_from_feature_a": feature_attr(feat_a, "height_above_ground_m") is not None,
             "height_from_feature_b": feature_attr(feat_b, "height_above_ground_m") is not None}
 
@@ -141,6 +147,7 @@ def analyze_prepared(prep: dict, params: dict, elevation_provider=None) -> Terre
     return TerrestrialAnalysisResult(
         kind="terrestrial", site_a_name=prep["name_a"], site_b_name=prep["name_b"],
         site_a_source=prep["source_a"], site_b_source=prep["source_b"],
+        site_a_public=prep.get("public_a", False), site_b_public=prep.get("public_b", False),
         site_a_height_m=params["site_a_height_m"], site_b_height_m=params["site_b_height_m"],
         site_a_height_from_feature=prep["height_from_feature_a"], site_b_height_from_feature=prep["height_from_feature_b"],
         result=result, explanation=explain(result),
@@ -198,7 +205,7 @@ def analyze_link_record(link_attrs: dict, site_a_point, site_b_point, params: di
     result = analyze_endpoints(site_a_point[0], site_a_point[1], site_b_point[0], site_b_point[1], params, authorization, elevation_provider)
     return TerrestrialAnalysisResult(
         kind="terrestrial", site_a_name=f"Site A of {authorization}", site_b_name=f"Site B of {authorization}",
-        site_a_source=source, site_b_source=source,
+        site_a_source=source, site_b_source=source, site_a_public=True, site_b_public=True,       # a Fixed Service record is public
         site_a_height_m=params["site_a_height_m"], site_b_height_m=params["site_b_height_m"],
         site_a_height_from_feature=False, site_b_height_from_feature=False,
         result=result, explanation=explain(result), frequency_origin=origin, height_origins=height_origins,

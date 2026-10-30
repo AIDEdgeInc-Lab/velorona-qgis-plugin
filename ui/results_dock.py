@@ -37,8 +37,8 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
-from ..core import elevation_source, messages, study_export
-from ..core.export import NotExportable, result_to_csv, result_to_xlsx
+from ..core import elevation_source, messages, names, study_export
+from ..core.export import NotExportable, export_csv, result_to_xlsx
 from ..core.presentation import ask as ask_module
 from ..core.export import _precip_note
 from ..core.presentation.model import exact
@@ -305,11 +305,20 @@ class VeloronaResultsDock(QDockWidget):
             f.write(text)
         QMessageBox.information(self, "Velorona", messages.text("I-EXPORT-DONE", file=os.path.basename(path)))
 
+    def _ask_names(self, title: str):
+        """True / False / None (cancelled). Asked only when the result holds names of the user's own sites; public register names always stay."""
+        if not names.has_private_names(self._result):
+            return True
+        return ask_include_names(self, title, "Your own sites' names are replaced by Site A / Site B unless you tick the box. Names from public registers stay.")
+
     def _on_excel_clicked(self):
         if self._result is None:
             return
+        include_names = self._ask_names("Export as Excel")
+        if include_names is None:
+            return
         try:
-            data = result_to_xlsx(self._result)
+            data = result_to_xlsx(self._result, include_names=include_names)
         except NotExportable as exc:
             QMessageBox.information(self, "Velorona", str(exc))
             return
@@ -323,8 +332,11 @@ class VeloronaResultsDock(QDockWidget):
     def _on_export_clicked(self):
         if self._result is None:
             return
+        include_names = self._ask_names("Export as CSV")
+        if include_names is None:
+            return
         try:
-            csv_text = result_to_csv(self._result)
+            csv_text = export_csv(self._result, include_names=include_names)
         except NotExportable as exc:
             QMessageBox.information(self, "Velorona", str(exc))
             return

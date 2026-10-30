@@ -21,7 +21,7 @@ from __future__ import annotations
 import io
 from datetime import datetime, timezone
 
-from . import csvsafe, elevation_source
+from . import csvsafe, elevation_source, names
 from .evidence_record import identity_lines, source_lines
 from .presentation import freshness
 from .presentation.registry import REFERENCE as REFERENCE_DEM
@@ -275,7 +275,18 @@ def _exposure_text(e) -> str:
             f"({e.attenuation.predicted_attenuation_db:.2f} dB of {_exact(e.link.fade_margin_db)} dB)")
 
 
-def result_to_xlsx(result) -> bytes:
+def export_csv(result, include_names: bool = False) -> str:
+    """The single-result CSV as the user gets it: the user's own site/link names replaced by Site A / Site B / Link unless ``include_names``
+    (public register names stay; core/names.py). Same rows as result_to_csv otherwise."""
+    pairs = [] if include_names else names.private_names(result)
+    if not pairs:
+        return result_to_csv(result)
+    with csvsafe.disabled():
+        raw = result_to_csv(result)
+    return names.rewrite_csv(raw, pairs)
+
+
+def result_to_xlsx(result, include_names: bool = True) -> bytes:
     """The operational workbook for a terrain / weather / link result. Its
     EVIDENCE sheet is read back from result_to_csv(), so the two exports share
     one source of rows."""
@@ -284,9 +295,12 @@ def result_to_xlsx(result) -> bytes:
         raise NotExportable(
             "An Excel workbook is available for terrain clearance, weather exposure and Fixed Service link "
             "results. Single records and selections export as CSV; satellite geometry is not exported.")
+    pairs = [] if include_names else names.private_names(result)
     with csvsafe.disabled():          # the workbook stores plain strings, never formulas: no apostrophes in its EVIDENCE sheet
         evidence_csv = result_to_csv(result)
-    return build_workbook(result, evidence_csv)
+    if pairs:
+        evidence_csv = "\n".join(names.replace_in(line, pairs) for line in evidence_csv.splitlines()) + "\n"
+    return build_workbook(result, evidence_csv, redact=pairs)
 
 
 def _terrain_height_row(result, which, label, height_m, from_feature) -> list:

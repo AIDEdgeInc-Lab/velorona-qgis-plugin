@@ -13,7 +13,7 @@ from aei_mw_exposure import LinkExposure, MicrowaveLink, MicrowaveSite, Provenan
 from aei_mw_exposure.providers import eccc
 from aei_mw_exposure.representativeness import WeatherRepresentativeness, assess_representativeness
 
-from .. import messages
+from .. import messages, public_sources
 from ..features import feature_id_name, feature_to_latlon
 from ..presentation import history as weather_history
 from ..presentation import precip
@@ -74,7 +74,7 @@ def _build_site(layer, feature, fallback_label: str) -> MicrowaveSite:
     site_id, name = feature_id_name(feature, fallback_label)
     return MicrowaveSite(
         id=site_id, name=name, latitude=lat, longitude=lon,
-        provenance=Provenance.USER_PROVIDED, source="Selected QGIS feature",
+        provenance=Provenance.USER_PROVIDED, source=public_sources.feature_source(layer, feature),   # public layer -> its register text
     )
 
 

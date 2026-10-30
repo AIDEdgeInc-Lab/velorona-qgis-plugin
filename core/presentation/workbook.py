@@ -48,7 +48,7 @@ def context_for(result) -> Optional[AskContext]:
     return None
 
 
-def build_workbook(result, evidence_csv: str, generated_at: Optional[datetime] = None) -> bytes:
+def build_workbook(result, evidence_csv: str, generated_at: Optional[datetime] = None, redact=()) -> bytes:
     ctx = context_for(result)
     if ctx is None:
         raise ValueError(f"No operational workbook for result kind {getattr(result, 'kind', None)!r}")
@@ -64,6 +64,9 @@ def build_workbook(result, evidence_csv: str, generated_at: Optional[datetime] =
         _raw(ctx),
         _dictionary(),
     ]
+    if redact:                              # the user's own names left out (core/names.py); register names stay
+        from ..names import redact_sheets
+        redact_sheets(sheets, redact)
     return write_workbook(sheets)
 
 

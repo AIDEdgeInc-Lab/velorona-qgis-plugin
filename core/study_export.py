@@ -7,8 +7,8 @@ Rules (same as the Map's file):
 * sources, types, times and units come with every row; data limits are stated in the preamble (record nature, pack, pack verification);
 * no stored history: "What changed" and the History store are never read here;
 * the user's own site and link names are left out unless the user ticks "Include my site names": they become "Site A" / "Site B" / "Link".
-  A name from a public register (an ISED/FCC record) is public data and stays. Weather exposure run on two selected sites is treated as the
-  user's own (the same rule the History store applies), because the result does not carry where its sites came from.
+  A name from a public register (any pack in packs.json, or another public dataset the plugin loads) is public data and stays, for terrain
+  and weather alike (core/names.py, core/public_sources.py).
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ import re
 from datetime import datetime, timezone
 from typing import Iterable, List, Optional, Tuple
 
-from . import csvsafe, packs
+from . import csvsafe, names, packs
 from .evidence_record import identity_lines, source_lines
 from .export import EVIDENCE_HEADER, NotExportable, result_to_csv
 
@@ -46,7 +46,6 @@ DATA_LIMITS = [
     "A result is not a survey. It is a planning estimate. It does not replace a field survey or a regulatory filing.",
 ]
 GUIDE_LIMITS_URL = "https://map.velorona.ai/guide#limits"
-PUBLIC_SOURCE_MARKERS = ("ISED", "FCC")       # site sources that are public registers (core/sources, core/countries)
 
 
 def _endpoints(result) -> Optional[Tuple[Tuple[float, float], Tuple[float, float]]]:
@@ -80,29 +79,6 @@ def same_study(results: Iterable, current) -> List:
         if getattr(r, "kind", "") in STUDY_KINDS and study_key(r) == key:
             newest[r.kind] = r
     return sorted(newest.values(), key=lambda r: STUDY_KINDS.index(r.kind))
-
-
-def _private_names(result) -> List[Tuple[str, str]]:
-    """[(name, replacement)] for names the user supplied in this result."""
-    kind = result.kind
-    out = []
-    if kind == "terrestrial":
-        for name, source, label in ((result.site_a_name, result.site_a_source, "Site A"), (result.site_b_name, result.site_b_source, "Site B")):
-            if name and not any(m in str(source or "") for m in PUBLIC_SOURCE_MARKERS):
-                out.append((str(name), label))
-    elif kind == "microwave-exposure":
-        link = result.exposure.link
-        for site, label in ((link.site_a, "Site A"), (link.site_b, "Site B")):
-            for value in (site.name, site.id):
-                if value:
-                    out.append((str(value), label))
-        for sid in (result.representativeness or {}):
-            out.append((str(sid), "Site A" if sid.startswith(str(link.site_a.id)) else "Site B"))
-        for value in (getattr(link, "name", None), getattr(link, "id", None)):
-            if value:
-                out.append((str(value), "Link"))
-    # longest first, so "Tower 12" is replaced before "Tower 1"; one-character values are never replaced (too likely to hit other text)
-    return sorted({(n, r) for n, r in out if len(n) > 1}, key=lambda p: -len(p[0]))
 
 
 def _subject(result) -> str:
@@ -167,7 +143,7 @@ def study_to_csv(results: List, include_names: bool = False, generated: Optional
     results = [r for r in results if getattr(r, "kind", "") in STUDY_KINDS]
     if not results:
         raise NotExportable("Nothing to export for this link yet: run Terrain Clearance or Weather Exposure on it, or select a Fixed Service link.")
-    replace = [] if include_names else [p for r in results for p in _private_names(r)]
+    replace = [] if include_names else sorted({p for r in results for p in names.private_names(r)}, key=lambda p: -len(p[0]))
 
     def clean(text):
         text = "" if text is None else str(text)

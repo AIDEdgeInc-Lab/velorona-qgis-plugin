@@ -319,6 +319,19 @@ check("Records shows the pack badge with a ? to the guide", _rt.pack_badge.text(
 _rt._current_key = L.SOURCE_TOWERS
 _rt._show_pack_badge()
 check("datasets without a pack show no badge", not _rt.pack_badge.isVisibleTo(_rt) and not _rt.pack_badge_help.isVisibleTo(_rt))
+from velorona.core import public_sources as _ps  # noqa: E402
+from velorona.core.sources import terrestrial_public as _tp, space_public as _sp  # noqa: E402
+from velorona.core.countries import usa as _usa  # noqa: E402
+_mine = [s for s in (_tp.SOURCE_ISED_FIXED, _usa.SOURCE_FCC_ULS) if _ps.is_public(s)]
+check("every pack's source text in the plugin is public", len(_mine) == 2 and all(_ps.is_public(s) for s in (_tp.SOURCE_GEOHUB, _tp.SOURCE_ISED_CELLULAR, _sp.SOURCE_SATNOGS, _sp.SOURCE_CELESTRAK)))
+check("each pack in packs.json is matched by one of the plugin's source texts",
+      all(any(m.lower() in s.lower() for s in (_tp.SOURCE_ISED_FIXED, _usa.SOURCE_FCC_ULS) for m in _ps.pack_markers()
+              if m in ((p.get("source") or {}).get("agency", "") + (p.get("source") or {}).get("dataset", ""))) for p in _packs.registry().values()))
+from qgis.core import QgsFeature, QgsField, QgsFields, QgsVectorLayer  # noqa: E402
+_ul = QgsVectorLayer("Point?crs=EPSG:4326&field=source:string", "my survey", "memory")
+_uf = QgsFeature(_ul.fields())
+_uf["source"] = _tp.SOURCE_ISED_FIXED
+check("a user layer whose 'source' column says ISED is still the user's own", _ps.feature_source(_ul, _uf) == _ps.USER_SOURCE)
 _pick = VeloronaPlugin._selection_message
 check("selection messages are registry IDs (Map wording)", [_pick(0, 0), _pick(1, 0), _pick(3, 0), _pick(0, 2), _pick(2, 1)] ==
       ["I-SELECT-NONE", "I-SELECT-ONE-SITE", "I-SELECT-SITES", "I-SELECT-LINK", "I-SELECT-LINK"])
