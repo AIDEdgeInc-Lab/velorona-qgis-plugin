@@ -21,7 +21,7 @@ from __future__ import annotations
 import io
 from datetime import datetime, timezone
 
-from . import attribution, csvsafe, elevation_source, names
+from . import attribution, csvsafe, eccc_coverage, elevation_source, names
 from .evidence_record import identity_lines, source_lines
 from .presentation import freshness
 from .presentation.registry import REFERENCE as REFERENCE_DEM
@@ -519,6 +519,10 @@ def _representativeness_rows(representativeness, precipitation=None) -> list:
         if rep.radar_observation is not None:
             rows.append(_evidence_row(f"Radar precipitation ({site_label})", "Observed", rep.radar_observation.source,
                                        observation_input=f"{rep.radar_observation.rain_rate_mm_h:.1f} mm/h (estimated, {rep.radar_observation.timestamp})"))
+        elif not eccc_coverage.covers(rep.site.latitude, rep.site.longitude):
+            rows.append(_evidence_row(f"Radar precipitation ({site_label})", "Observed", "ECCC Radar (RADAR_1KM_RRAI)",
+                                       observation_input=NOT_DETERMINED,
+                                       interpretation=f"{eccc_coverage.NOT_COVERED[0].upper()}{eccc_coverage.NOT_COVERED[1:]}."))
         elif station is not None:
             rows.append(_evidence_row(f"Radar precipitation ({site_label})", "Observed", "ECCC Radar (RADAR_1KM_RRAI)",
                                        observation_input=NOT_DETERMINED,
