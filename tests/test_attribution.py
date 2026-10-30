@@ -47,4 +47,4 @@ def test_online_elevation_also_carries_the_copernicus_notice_and_weather_alone_d
     assert "Copernicus DEM</a> GLO-90" in h and f"href='{attribution.COPERNICUS_URL}'" in h
     local = F.terrain_result()
     local.result = SimpleNamespace(elevation_source="Local DEM: my.tif")
-    assert "Copernicus" not in export.export_csv(local, include_names=True)
+    assert "Copernicus" not in attribution.text(attribution.open_meteo_parts(local)) and "Copernicus" not in attribution.html(attribution.open_meteo_parts(local))
