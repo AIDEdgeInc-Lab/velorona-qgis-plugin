@@ -19,7 +19,7 @@ import re
 from datetime import datetime, timezone
 from typing import Iterable, List, Optional, Tuple
 
-from . import csvsafe, names, packs
+from . import attribution, csvsafe, names, packs
 from .evidence_record import identity_lines, source_lines
 from .export import EVIDENCE_HEADER, NotExportable, result_to_csv
 
@@ -157,6 +157,7 @@ def study_to_csv(results: List, include_names: bool = False, generated: Optional
              f"Analyses: {len(results)} (one link: {clean(_subject(results[0]))})",
              *identity_lines(decision=terrain, weather=weather),
              *_data_lines(results),
+             *[f"Data credit: {line}" for line in [attribution.text(sorted({p for r in results for p in attribution.open_meteo_parts(r)}, reverse=True))] if line],
              f"Data limits ({GUIDE_LIMITS_URL}):", *[f"  {line}" for line in DATA_LIMITS],
              "Not included: stored history (What changed) and anything not computed in this session.",
              ("Names: your own site and link names are included (you ticked 'Include my site names')." if include_names

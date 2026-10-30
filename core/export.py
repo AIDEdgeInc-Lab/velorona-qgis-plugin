@@ -21,7 +21,7 @@ from __future__ import annotations
 import io
 from datetime import datetime, timezone
 
-from . import csvsafe, elevation_source, names
+from . import attribution, csvsafe, elevation_source, names
 from .evidence_record import identity_lines, source_lines
 from .presentation import freshness
 from .presentation.registry import REFERENCE as REFERENCE_DEM
@@ -44,6 +44,12 @@ def _elevation_source_text(result) -> str:
     if elevation_source.is_online(result):
         return "aei_link_clearance (Open-Meteo Elevation API, Copernicus DEM GLO-90, 90m surface model)"
     return f"aei_link_clearance ({elevation_source.source_of(result)}; values taken as metres; surface/bare-earth model and vertical datum not known to Velorona)"
+
+def _credit(result) -> list:
+    """The Open-Meteo attribution line (core/attribution.py) when the result used its data."""
+    line = attribution.text(attribution.open_meteo_parts(result))
+    return [f"Data credit: {line}"] if line else []
+
 
 def _preamble(lines: list[str]) -> str:
     return "".join(f"# {line}\n" for line in lines) + "#\n"
@@ -340,6 +346,7 @@ def _terrestrial_to_csv(result) -> str:
         "Calculated via aei_link_clearance (ITU-R P.530 Fresnel-zone / earth-curvature terrain clearance), unmodified.",
         *identity_lines(decision=True),
         *source_lines(getattr(result, "record", None)),
+        *_credit(result),
         f"Generated: {datetime.now(timezone.utc).isoformat()}",
     ])
     buf = io.StringIO()
@@ -396,6 +403,7 @@ def _microwave_to_csv(result) -> str:
         f"Link: {link.site_a.name} <-> {link.site_b.name}",
         "Evidence of weather, not a hardware diagnosis or an outage prediction. Calculated via aei_mw_exposure (ITU-R P.530 / P.838-3), unmodified.",
         *identity_lines(decision=False, weather=True),
+        *_credit(result),
         f"Generated: {datetime.now(timezone.utc).isoformat()}",
     ])
     buf = io.StringIO()
@@ -546,6 +554,7 @@ def _link_investigation_to_csv(result) -> str:
         "Evidence of weather, not a hardware diagnosis or an outage prediction.",
         *identity_lines(decision=False, weather=True),
         *source_lines(d),
+        *_credit(result),
         f"Generated: {datetime.now(timezone.utc).isoformat()}",
     ])
     buf = io.StringIO()

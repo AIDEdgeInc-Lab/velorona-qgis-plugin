@@ -138,6 +138,8 @@ plain = dock.browser.toPlainText()
 check("weather Summary has a 'What changed' section", "What changed" in plain, plain[-300:])
 check("it compares like with like and names source and times", "model-derived" in plain and "UTC" in plain)
 check("it states local-only storage", "Nothing is uploaded" in plain)
+check("the results panel credits Open-Meteo with links (CC BY 4.0)", "Weather data by Open-Meteo.com, licensed CC BY 4.0" in plain
+      and "href='https://open-meteo.com/'" in dock.browser.toHtml().replace('"', "'"))
 
 # --- link study export from the dock (same link only, no history, names dialog off by default)
 check("weather result offers 'Export link study'", dock.study_button.isVisibleTo(dock))

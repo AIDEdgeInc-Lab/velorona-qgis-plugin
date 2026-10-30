@@ -47,6 +47,8 @@ Use **Explore: Load Public Data** to start a Velorona project. Each source cover
 
 Import your own point data via QGIS's native Add Layer — it appears on the same map, analyzed the same way as public data.
 
+**Weather and elevation: Open-Meteo.** Weather exposure and online terrain clearance use data by [Open-Meteo.com](https://open-meteo.com/), licensed [CC BY 4.0](https://open-meteo.com/en/license). The credit is shown under every result that used it and written into its exports.
+
 ## Analysis engines (Analyze)
 
 Three, all reused unmodified:

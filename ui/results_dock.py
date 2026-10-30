@@ -37,7 +37,7 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
-from ..core import elevation_source, messages, names, study_export
+from ..core import attribution, elevation_source, messages, names, study_export
 from ..core.export import NotExportable, export_csv, result_to_xlsx
 from ..core.presentation import ask as ask_module
 from ..core.export import _precip_note
@@ -215,7 +215,7 @@ class VeloronaResultsDock(QDockWidget):
         view = self.view_combo.currentData() if ctx is not None else "evidence"
         if ctx is None or view == "evidence" or getattr(self._result, "weather_pending", False):
             # A link whose weather is still loading shows its record with a 'Loading weather' note; Summary/Details would otherwise call it NO DATA.
-            self.browser.setHtml(_render_html(self._result, self._dark))
+            self.browser.setHtml(_render_html(self._result, self._dark) + attribution.html(attribution.open_meteo_parts(self._result)))
             return
         brief = (ctx.terrain or ctx.weather)
         render = operational_view.render_summary if view == "summary" else operational_view.render_details
@@ -231,7 +231,7 @@ class VeloronaResultsDock(QDockWidget):
         avail = self.browser.viewport().width() - 24
         if 120 < avail < charts.WIDTH:
             body = body.replace("<img src=", f"<img width='{avail}' src=")
-        self.browser.setHtml(report_style(self._dark) + body)
+        self.browser.setHtml(report_style(self._dark) + body + attribution.html(attribution.open_meteo_parts(self._result)))
 
     def _rerender(self) -> None:
         self._render_current()
