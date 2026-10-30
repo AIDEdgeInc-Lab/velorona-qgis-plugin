@@ -7,12 +7,13 @@ import os
 import time
 from typing import Dict, Optional
 
-from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton, QSpinBox, QTextBrowser,
+from qgis.PyQt.QtWidgets import (QComboBox, QDialog, QFileDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton, QSpinBox, QTextBrowser,
                                  QVBoxLayout)
 
 from ..core import history_changes, history_view, messages
 from ..core.history_store import HistoryError, HistoryStore
 from . import theme
+from .names_option import ask_include_names
 
 
 class HistoryDialog(QDialog):
@@ -130,22 +131,7 @@ class HistoryDialog(QDialog):
     def _ask_include_names(self) -> Optional[bool]:
         """The export options: False (the default) writes only the private codes; True also writes the names you gave your sites and links.
         None = cancelled. Replaceable in tests."""
-        box = QDialog(self)
-        box.setWindowTitle("Export history as CSV")
-        layout = QVBoxLayout(box)
-        layout.addWidget(QLabel("The file lists the stored values. Your own sites and links appear under their private codes."))
-        include = QCheckBox("Include my site names", box)
-        include.setChecked(False)
-        include.setToolTip("Adds a column with the names you see in the History window. Leave it off if the file will be shared.")
-        layout.addWidget(include)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, box)
-        buttons.accepted.connect(box.accept)
-        buttons.rejected.connect(box.reject)
-        layout.addWidget(buttons)
-        include.setObjectName("veloronaIncludeNames")
-        if box.exec() != QDialog.DialogCode.Accepted:
-            return None
-        return include.isChecked()
+        return ask_include_names(self, "Export history as CSV", "The file lists the stored values. Your own sites and links appear under their private codes.")
 
     def _on_export(self) -> None:
         include_names = self._ask_include_names()

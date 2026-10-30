@@ -37,7 +37,7 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
-from ..core import elevation_source, messages
+from ..core import elevation_source, messages, study_export
 from ..core.export import NotExportable, result_to_csv, result_to_xlsx
 from ..core.presentation import ask as ask_module
 from ..core.export import _precip_note
@@ -47,6 +47,7 @@ from ..core.presentation import freshness
 from ..core.presentation.terrain import ratio_meaning, ratio_value, terrain_explanation
 from ..core.presentation.workbook import context_for
 from . import charts, operational_view, theme
+from .names_option import ask_include_names
 from .records_table import VeloronaRecordsTable
 
 NOT_DETERMINED = "Not determined"
@@ -95,6 +96,13 @@ class VeloronaResultsDock(QDockWidget):
         self.history_button.setToolTip("Values this computer has stored from your weather analyses: timeline, what changed, CSV, clear. Nothing is uploaded.")
         self.history_button.clicked.connect(lambda: self.history_requested() if self.history_requested else None)
         self.history_button.hide()
+        self.study_button = QPushButton("Export link study...", evidence)
+        self.study_button.setToolTip("One CSV with every analysis of this link in this session (terrain, weather, record), laid out like Velorona Map's "
+                                     "evidence file. No stored history. Your own site names only if you tick the box.")
+        self.study_button.clicked.connect(self._on_study_clicked)
+        self.study_button.hide()
+        self.study_results = None                # callable() -> the results of this session, set by plugin.py
+        button_row.addWidget(self.study_button)
         button_row.addWidget(self.excel_button)
         button_row.addWidget(self.export_button)
         button_row.addWidget(self.elevation_button)
@@ -244,6 +252,7 @@ class VeloronaResultsDock(QDockWidget):
         kind = getattr(self._result, "kind", None)
         self.excel_button.setVisible(has_brief)
         self.history_button.setVisible(kind in ("microwave-exposure", "link-investigation"))
+        self.study_button.setVisible(kind in study_export.STUDY_KINDS and study_export.study_key(self._result) is not None)
         self.export_button.setVisible(kind not in (None, "satellite-earth-space"))
 
     def show_result(self, result) -> None:
@@ -265,6 +274,7 @@ class VeloronaResultsDock(QDockWidget):
         self.excel_button.hide()
         self.elevation_button.hide()
         self.history_button.hide()
+        self.study_button.hide()
 
     def _on_ask(self) -> None:
         ctx = self._context()
@@ -274,6 +284,26 @@ class VeloronaResultsDock(QDockWidget):
         self.ask_answer.setHtml(report_style(self._dark) + "<p>"
                                 + operational_view.render_answer(answer.as_text()) + "</p>")
         self.ask_answer.show()
+
+    def _on_study_clicked(self):
+        if self._result is None:
+            return
+        results = study_export.same_study((self.study_results() if self.study_results else []) + [self._result], self._result)
+        include_names = ask_include_names(self, "Export link study",
+                                          f"{len(results)} analysis(es) of this link from this session, in one CSV. Stored history is not included.")
+        if include_names is None:
+            return
+        try:
+            text = study_export.study_to_csv(results, include_names=include_names)
+        except NotExportable as exc:
+            QMessageBox.information(self, "Velorona", str(exc))
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "Export link study", study_export.study_filename(), "CSV files (*.csv)")
+        if not path:
+            return
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            f.write(text)
+        QMessageBox.information(self, "Velorona", messages.text("I-EXPORT-DONE", file=os.path.basename(path)))
 
     def _on_excel_clicked(self):
         if self._result is None:

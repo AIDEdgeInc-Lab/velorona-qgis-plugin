@@ -24,7 +24,7 @@ from qgis.PyQt.QtCore import Qt, QTimer
 from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtWidgets import QAction, QApplication, QMessageBox, QWIDGETSIZE_MAX
 
-from .core import basemap_labels, links, messages, packs
+from .core import basemap_labels, links, messages, packs, study_export
 from .core import imagery
 from .core import layers as layer_helpers
 from .core import network_context
@@ -291,6 +291,7 @@ class VeloronaPlugin:
         self._satellites_fetched_at = None
         self._dataset_notes = {}               # source key -> provenance/status line shown in Records (replayed when the dock is created)
         self._pack_badges = {}                 # source key -> core.packs.Badge (replayed when the dock is created)
+        self._session_results = []             # analyses of this session (newest last, at most 50), for the link-study export
         self._viewport_status = {}             # source key -> what the live viewport layers are showing (see _set_viewport_status)
         self._satellites_task = None           # the running QgsTask that loads satellite data (None when idle)
         self._history = None                   # HistoryStore, created on first use (history is local to this computer)
@@ -2083,6 +2084,7 @@ class VeloronaPlugin:
             self.dock.map_appearance_changed = self.set_map_appearance
             self.dock.history_requested = self._open_history
             self.dock.history_block = self._history_block_for
+            self.dock.study_results = lambda: list(self._session_results)
             self.dock.set_map_appearance(self._map_appearance)
             for key, text in self._dataset_notes.items():       # statuses recorded before the dock existed
                 self.dock.records.set_dataset_note(key, text)
@@ -2274,6 +2276,8 @@ class VeloronaPlugin:
     def _show_result(self, result):
         self._ensure_dock()
         self._capture_history(result)
+        if getattr(result, "kind", "") in study_export.STUDY_KINDS and not getattr(result, "weather_pending", False):
+            self._session_results = (self._session_results + [result])[-50:]    # this session only, for "Export link study"; never written to disk
         self.dock.show_result(result)
         self.dock.show()
         self.dock.raise_()
