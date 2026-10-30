@@ -11,6 +11,8 @@ set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(dirname "$HERE")"
 cd "$ROOT" || exit 2
+# The Velorona Map checkout used by the parity lane and by the registry drift tests (messages, packs, entitlements).
+MAP_REPO="${MAP_REPO:-$HOME/velorona-repos/aei-link-clearance}"; export MAP_REPO
 
 if [ "${1:-}" = "--install-hook" ]; then
     HOOKS="$(git rev-parse --git-common-dir)/hooks"
@@ -112,7 +114,6 @@ step package package_check
 if [ -x "$SEAM_PY" ]; then step seam seam_check; else echo "-- seam: SKIPPED (no $SEAM_PY)"; SKIPPED="$SKIPPED seam"; fi
 if [ -x "$QGIS_APP/Contents/MacOS/python3.12" ]; then step qgis-offline qgis_check; else echo "-- qgis-offline: SKIPPED (no QGIS at $QGIS_APP)"; SKIPPED="$SKIPPED qgis-offline"; fi
 
-MAP_REPO="${MAP_REPO:-$HOME/velorona-repos/aei-link-clearance}"
 if [ -f "$MAP_REPO/parity/run_all.sh" ] && [ -f parity/runner_qgis.py ]; then
     step parity parity_check
 else

@@ -1,13 +1,8 @@
-"""Copies the Map's message registry into the plugin: python tools/sync_messages.py <Map>/web/messages.json  (then run the tests)."""
-import json
+"""Kept for old instructions: same as tools/sync_from_map.py <Map checkout> (accepts the Map's web/messages.json path too)."""
 import os
-import shutil
+import runpy
 import sys
 
-DEST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "core", "messages.json")
-if len(sys.argv) != 2:
-    sys.exit(__doc__)
-data = json.load(open(sys.argv[1], encoding="utf-8"))
-assert data.get("schema") == "velorona.messages/1" and data["messages"], "not a velorona.messages/1 registry"
-shutil.copyfile(sys.argv[1], DEST)
-print(f"copied {len(data['messages'])} messages to {DEST}")
+if len(sys.argv) == 2 and sys.argv[1].endswith("messages.json"):
+    sys.argv[1] = os.path.dirname(os.path.dirname(os.path.abspath(sys.argv[1])))
+runpy.run_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "sync_from_map.py"), run_name="__main__")

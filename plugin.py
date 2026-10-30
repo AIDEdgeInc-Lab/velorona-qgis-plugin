@@ -24,7 +24,7 @@ from qgis.PyQt.QtCore import Qt, QTimer
 from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtWidgets import QAction, QApplication, QMessageBox, QWIDGETSIZE_MAX
 
-from .core import basemap_labels, links, messages
+from .core import basemap_labels, links, messages, packs
 from .core import imagery
 from .core import layers as layer_helpers
 from .core import network_context
@@ -290,6 +290,7 @@ class VeloronaPlugin:
         self.satellites_layer = None
         self._satellites_fetched_at = None
         self._dataset_notes = {}               # source key -> provenance/status line shown in Records (replayed when the dock is created)
+        self._pack_badges = {}                 # source key -> core.packs.Badge (replayed when the dock is created)
         self._viewport_status = {}             # source key -> what the live viewport layers are showing (see _set_viewport_status)
         self._satellites_task = None           # the running QgsTask that loads satellite data (None when idle)
         self._history = None                   # HistoryStore, created on first use (history is local to this computer)
@@ -963,6 +964,8 @@ class VeloronaPlugin:
         try:
             loaded = CanadaProvider().load_all()      # identical to terrestrial_public.load_fixed_service_snapshot()
             sites, links = loaded.sites, loaded.links
+            for key in (layer_helpers.SOURCE_FIXED_SITES, layer_helpers.SOURCE_FIXED_LINKS):
+                self._set_pack_badge(key, loaded.attribution.pack_generated)
             link_fields = terrestrial_public.FIXED_LINK_FIELDS
             sites_layer = self._ensure_public_layer(
                 layer_helpers.SOURCE_FIXED_SITES, infra_group, visible=True, kind="site",
@@ -1182,6 +1185,13 @@ class VeloronaPlugin:
         if skipped:
             text += f"; {skipped} element set(s) could not be propagated and are not shown"
         return text
+
+    def _set_pack_badge(self, source_key: str, loaded_generated_date) -> None:
+        """The data-pack verification badge for a dataset (core/packs.py), kept and replayed like the dataset notes."""
+        badge = packs.badge(packs.SOURCE_TO_PACK[source_key], loaded_generated_date)
+        self._pack_badges[source_key] = badge
+        if self.dock is not None:
+            self.dock.records.set_pack_badge(source_key, badge)
 
     def _set_note(self, source_key: str, text: str) -> None:
         self._dataset_notes[source_key] = text
@@ -1888,6 +1898,8 @@ class VeloronaPlugin:
         self._ensure_basemap()
         infra_group = self._ensure_velorona_groups()[1]["Infrastructure"]
         abstract = f"{loaded.attribution.one_line()} {PUBLIC_RECORDS_DISCLOSURE.capitalize()}."
+        for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
+            self._set_pack_badge(key, loaded.attribution.pack_generated)
         sites_layer = self._ensure_public_layer(
             layer_helpers.SOURCE_US_SITES, infra_group, visible=True, kind="site",
             build=lambda: layer_helpers.build_point_layer(
@@ -2074,6 +2086,8 @@ class VeloronaPlugin:
             self.dock.set_map_appearance(self._map_appearance)
             for key, text in self._dataset_notes.items():       # statuses recorded before the dock existed
                 self.dock.records.set_dataset_note(key, text)
+            for key, badge in self._pack_badges.items():
+                self.dock.records.set_pack_badge(key, badge)
             self.dock.records.featureChosen.connect(self._on_record_chosen)
             self.dock.records.featuresChosen.connect(self._on_records_chosen)
             self.dock.records.licenseeChanged.connect(self.set_licensee_filter)

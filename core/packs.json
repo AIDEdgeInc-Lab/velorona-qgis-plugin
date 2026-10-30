@@ -1,0 +1,70 @@
+{
+ "schema": "velorona.packs/1",
+ "map_version": "1.1.6",
+ "note": "Identifies the public-data packs the Map ships: which source, which dates, which builder and schema. Kept consistent with the pack files by tests/test_packs_registry.py. The Map itself reads each pack's own header (the Canada snapshot, the US index.json).",
+ "packs": [
+  {
+   "id": "ca-ised-fixed",
+   "country": "CA",
+   "title": "Canada: ISED Fixed Service sites and links",
+   "files": [
+    "fixed_service_snapshot.json"
+   ],
+   "source": {
+    "agency": "ISED Canada",
+    "dataset": "SMS Authorization Data Extract, Fixed Service (TAFL_LTAF_Fixe)",
+    "source_file_updated": "2026-09-01"
+   },
+   "generated_date": "2026-09-09",
+   "builder": {
+    "script": "scripts/build_ca_fixed_snapshot.py",
+    "version": "1.1.0"
+   },
+   "schema": "velorona.ca-ised-fixed/1.1",
+   "records": {
+    "sites": 24859,
+    "links": 16956,
+    "unit_sites": "coordinates (5 decimals)",
+    "unit_links": "authorizations with exactly two endpoints",
+    "heights": "per-link endpoint antenna heights (ISED column 29 \"Height above ground level [m]\"), licensee-submitted record values"
+   },
+   "licence": {
+    "name": "Open Government Licence - Canada",
+    "status": "stated on the open.canada.ca catalogue record"
+   },
+   "doc": "docs/CANADA_FIXED_SERVICE_SNAPSHOT.md"
+  },
+  {
+   "id": "us-fcc-uls-micro",
+   "country": "US",
+   "title": "United States: FCC ULS microwave sites and links",
+   "files": [
+    "data/us/index.json",
+    "data/us-overview.json",
+    "data/us/tiles/"
+   ],
+   "source": {
+    "agency": "U.S. Federal Communications Commission",
+    "dataset": "ULS public access database, Microwave (l_micro.zip)",
+    "source_file_updated": "2026-09-27"
+   },
+   "generated_date": "2026-10-03",
+   "builder": {
+    "script": "scripts/build_us_fcc_pack.py",
+    "version": "1.0.0"
+   },
+   "schema": "velorona.us-fcc-uls-micro/1",
+   "records": {
+    "sites": 148278,
+    "links": 250874,
+    "unit_sites": "coordinates (5 decimals)",
+    "unit_links": "licence x unordered endpoint pair"
+   },
+   "licence": {
+    "name": "U.S. Government Works",
+    "status": "public record published for public use (data.gov listing); licensee-reported record data, not field measurement (see data/us/index.json)"
+   },
+   "doc": "docs/USA_FCC_ULS_PACK.md"
+  }
+ ]
+}

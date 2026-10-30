@@ -18,6 +18,7 @@ PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "messages.json")
 
 # QGIS-only situations not (yet) in the Map registry: id -> (level, area, short_text).
 PLUGIN_ONLY: Dict[str, tuple] = {
+    "I-PACK-VERIFICATION": ("info", "Layers", "Each data pack states how its records were checked: source-published, cross-checked or operator-confirmed."),
     "I-TERRAIN-ELEVATION-SOURCE": ("info", "Terrain", "Ground heights: Velorona's online 90 m elevation data, or a raster of yours."),
     "I-USA-DATA-SOURCE": ("info", "Layers", "USA data is Velorona's online data, not included in the plugin. Canada works without it."),
 }

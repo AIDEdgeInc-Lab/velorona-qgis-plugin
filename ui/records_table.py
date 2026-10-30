@@ -37,6 +37,8 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from ..core import layers as layer_helpers
+from ..core import packs
+from .guide_button import guide_button
 
 _GEOM_A, _GEOM_B = "@site_a", "@site_b"
 _GEOM_LAT, _GEOM_LON = "@lat", "@lon"
@@ -293,6 +295,12 @@ class VeloronaRecordsTable(QWidget):
         self.columns_menu = QMenu(self.columns_button)
         self.columns_menu.aboutToShow.connect(self._rebuild_columns_menu)
         self.columns_button.setMenu(self.columns_menu)
+        # Data-pack verification badge (packs.json "verification"), shown for datasets that come from a registered pack; "?" opens the guide.
+        self._pack_badges = {}
+        self.pack_badge = QLabel("", self)
+        self.pack_badge.setObjectName("veloronaPackBadge")
+        self.pack_badge.setStyleSheet("color: palette(mid);")
+        self.pack_badge_help = guide_button(packs.GUIDE_ID, self)
         self.status_label = QLabel("Run Explore: Load Public Data to populate records.", self)
         self.status_label.setObjectName("veloronaRecordsStatus")
         self.status_label.setWordWrap(True)
@@ -337,7 +345,13 @@ class VeloronaRecordsTable(QWidget):
         layout.addLayout(operator_row)
         layout.addWidget(self.operator_hint)
         layout.addWidget(self.view, 1)
+        badge_row = QHBoxLayout()
+        badge_row.addWidget(self.pack_badge)
+        badge_row.addWidget(self.pack_badge_help)
+        badge_row.addStretch(1)
+        layout.addLayout(badge_row)
         layout.addWidget(self.status_label)
+        self._show_pack_badge()
 
         self.dataset_combo.currentIndexChanged.connect(self._on_dataset_changed)
         self.licensee_combo.currentIndexChanged.connect(self._on_licensee_changed)
@@ -410,6 +424,7 @@ class VeloronaRecordsTable(QWidget):
         self._fit_columns()
         self._apply_column_visibility()
         self._update_status()
+        self._show_pack_badge()
         self._mirror_layer_selection()
         layer = self._layers.get(key)
         if layer_alive(layer) and not self._syncing:
@@ -572,6 +587,18 @@ class VeloronaRecordsTable(QWidget):
             self.view.selectionModel().clearSelection()
         finally:
             self._syncing = False
+
+    def set_pack_badge(self, source_key: str, badge) -> None:
+        """The verification badge (core.packs.Badge, or None to hide) for a dataset that comes from a data pack."""
+        self._pack_badges[source_key] = badge
+        self._show_pack_badge()
+
+    def _show_pack_badge(self) -> None:
+        badge = self._pack_badges.get(self._current_key)
+        self.pack_badge.setText(badge.text if badge else "")
+        self.pack_badge.setToolTip(badge.tooltip if badge else "")
+        self.pack_badge.setVisible(badge is not None)
+        self.pack_badge_help.setVisible(badge is not None)
 
     def set_dataset_note(self, source_key: str, text: str) -> None:
         """A provenance/status line for a live dataset (live / cached with its time / empty / unavailable), shown in the status line."""
