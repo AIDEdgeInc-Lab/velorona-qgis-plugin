@@ -50,6 +50,8 @@ def test_layout_is_the_maps_evidence_file():
     assert pre[0] == "# Velorona QGIS -- link study evidence export" and pre[1].startswith("# Analyses: 2 (one link:")
     assert "# Generated: 2026-10-30T12:00:00Z" in pre and "# Type key:" in pre and pre[-1] == "#"
     assert any(p.startswith("#   Reference data (DEM) = ") for p in pre) and any(p.startswith("# Earth-curvature convention:") for p in pre)
+    assert any(p.startswith("# Data limits (https://map.velorona.ai/guide#limits)") for p in pre)
+    assert any("It does not replace a field survey or a regulatory filing." in p for p in pre)
     assert rows[0] == ["Analysis", *EVIDENCE_HEADER]
     kinds = {r[0].split(":")[0] for r in rows[1:]}
     assert kinds == {"Path clearance", "Weather exposure"}

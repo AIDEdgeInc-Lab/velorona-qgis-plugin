@@ -35,6 +35,17 @@ TYPE_LEGEND = [
     ("Assumed", "used as an assumption: an engine default, or a value you supplied (typed in or in your own CSV) -- not an observation Velorona made from a source"),
     ("Inferred", "a derived interpretation or assessment, never a measurement or an outage claim"),
 ]
+# The user guide's "Data limits" section (Velorona Map web/guide.html#limits), word for word except the terrain line, which also names a local
+# raster (QGIS can use one; its resolution is the user's).
+DATA_LIMITS = [
+    "Terrain. Online, the elevation data is a 90 m surface model (with a local raster: that raster's resolution). It cannot resolve individual "
+    "buildings or trees, so a path can look clear or blocked when a single structure decides it. Near a threshold, a 10-15 m difference can change the status.",
+    "Weather. The rain rate is a model value for the place and the moment, not a measurement at your site. It describes now, not the next hour.",
+    "Records. Licence records show the licensee, which is not always the operator. Positions and heights are as filed.",
+    "Your own links. Imported values are Assumed. Velorona has not verified them.",
+    "A result is not a survey. It is a planning estimate. It does not replace a field survey or a regulatory filing.",
+]
+GUIDE_LIMITS_URL = "https://map.velorona.ai/guide#limits"
 PUBLIC_SOURCE_MARKERS = ("ISED", "FCC")       # site sources that are public registers (core/sources, core/countries)
 
 
@@ -170,6 +181,7 @@ def study_to_csv(results: List, include_names: bool = False, generated: Optional
              f"Analyses: {len(results)} (one link: {clean(_subject(results[0]))})",
              *identity_lines(decision=terrain, weather=weather),
              *_data_lines(results),
+             f"Data limits ({GUIDE_LIMITS_URL}):", *[f"  {line}" for line in DATA_LIMITS],
              "Not included: stored history (What changed) and anything not computed in this session.",
              ("Names: your own site and link names are included (you ticked 'Include my site names')." if include_names
               else "Names: your own site and link names are replaced by Site A / Site B / Link. Names from public registers are kept."),
