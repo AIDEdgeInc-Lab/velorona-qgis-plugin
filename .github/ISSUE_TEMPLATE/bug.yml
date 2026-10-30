@@ -1,0 +1,43 @@
+name: Report a bug
+description: Something in the Velorona QGIS plugin does not work as described.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please do **not** paste private network data, credentials or customer information: this repository is public.
+        If a message showed an ID (for example `E-TERRAIN-SERVICE-FAILED`), include it; its meaning is at https://map.velorona.ai/guide.
+  - type: input
+    id: plugin_version
+    attributes:
+      label: Velorona plugin version
+      description: Plugins > Manage and Install Plugins > Installed > Velorona.
+      placeholder: e.g. 1.1.11
+    validations:
+      required: true
+  - type: input
+    id: qgis_version
+    attributes:
+      label: QGIS version and operating system
+      placeholder: e.g. QGIS 4.2.2 on macOS 15
+    validations:
+      required: true
+  - type: input
+    id: message_id
+    attributes:
+      label: Message ID shown (if any)
+      placeholder: e.g. E-WEATHER-FETCH-FAILED
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Explore: Load Public Data\n2. Select ...\n3. Analyze: ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected and what happened instead
+    validations:
+      required: true

@@ -1,0 +1,24 @@
+name: Request a feature
+description: Suggest something the Velorona QGIS plugin should do.
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe the problem you want solved, not only the solution. Do not paste private network data: this repository is public.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help?
+  - type: input
+    id: plugin_version
+    attributes:
+      label: Velorona plugin version
+      placeholder: e.g. 1.1.11

@@ -306,6 +306,9 @@ try:
 except Exception as exc:   # pragma: no cover
     check("plugin Guide entry", False, repr(exc))
 
+_src = open(_pl.__file__, encoding="utf-8").read()
+check("plugin menu has Docs, Report a bug, Request a feature (menu only)", all(f'("{t}"' in _src for t in ("Docs", "Report a bug", "Request a feature")))
+check("the bug link carries the installed plugin version", VeloronaPlugin._plugin_version() == open(os.path.join(PLUGIN_DIR, "metadata.txt")).read().split("version=")[1].split()[0])
 _pick = VeloronaPlugin._selection_message
 check("selection messages are registry IDs (Map wording)", [_pick(0, 0), _pick(1, 0), _pick(3, 0), _pick(0, 2), _pick(2, 1)] ==
       ["I-SELECT-NONE", "I-SELECT-ONE-SITE", "I-SELECT-SITES", "I-SELECT-LINK", "I-SELECT-LINK"])

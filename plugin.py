@@ -24,7 +24,7 @@ from qgis.PyQt.QtCore import Qt, QTimer
 from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtWidgets import QAction, QApplication, QMessageBox, QWIDGETSIZE_MAX
 
-from .core import basemap_labels, messages
+from .core import basemap_labels, links, messages
 from .core import imagery
 from .core import layers as layer_helpers
 from .core import network_context
@@ -358,6 +358,16 @@ class VeloronaPlugin:
         self.action_guide.triggered.connect(lambda *_: self.open_guide())
         self.iface.addPluginToMenu(MENU_NAME, self.action_guide)
         self.actions.append(self.action_guide)
+        # Help links (menu only): public GitHub pages opened in the browser. Nothing is sent or counted by the plugin.
+        for label, tip, url in (("Docs", "Open the plugin documentation on GitHub.", lambda: links.DOCS_URL),
+                                ("Report a bug", "Open a bug report form on GitHub (needs a GitHub account; nothing is sent by the plugin).",
+                                 lambda: links.bug_url(self._plugin_version())),
+                                ("Request a feature", "Open a feature request form on GitHub (needs a GitHub account).", links.feature_url)):
+            action = QAction(label, self.iface.mainWindow())
+            action.setToolTip(tip)
+            action.triggered.connect(lambda *_, u=url: links.open_url(u()))
+            self.iface.addPluginToMenu(MENU_NAME, action)
+            self.actions.append(action)
 
         self._register_processing_provider()
 
@@ -404,6 +414,18 @@ class VeloronaPlugin:
             return
         from qgis import processing
         processing.execAlgorithmDialog("velorona:terrain_clearance_batch", {})
+
+    @staticmethod
+    def _plugin_version() -> str:
+        """``version=`` from this plugin's metadata.txt ("" if unreadable)."""
+        try:
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "metadata.txt"), encoding="utf-8") as fh:
+                for line in fh:
+                    if line.startswith("version="):
+                        return line.split("=", 1)[1].strip()
+        except OSError:
+            pass
+        return ""
 
     def open_guide(self, message_id: str = "") -> bool:
         from .core import guide
