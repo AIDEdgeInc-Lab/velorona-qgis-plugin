@@ -1,8 +1,1 @@
-[
-  {
-    "stage": "provenance.pairwise",
-    "detail": "ground elevation profile: Map ['Observed'] vs QGIS ['Reference data (DEM)']",
-    "decided": "2026-10-29",
-    "reason": "Owner decision: elevation (online DEM or local DEM) is typed 'Reference data (DEM)', never Observed, with the same kinds as the Map (observed / model-derived / calculated / reference). The Map checkout still types the row Observed; the Map is not changed from this repo. Delete this entry when the Map follows: the gate then needs no exception."
-  }
-]
+[]

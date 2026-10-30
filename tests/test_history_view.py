@@ -46,6 +46,6 @@ def test_empty_and_error_states_say_what_happened_and_that_nothing_leaves():
 
 def test_changes_block_lists_only_comparable_pairs_and_states_why_others_are_missing():
     html = V.changes_html([rec(5, 0.0), rec(0, 1.2)], {"A": "Site A"}, NOW, windows=(6, 24))
-    assert "Compared with 6 h ago" in html and "Rain rate at Site A: 1.2 mm/h now, 0.0 mm/h 6 h ago" in html
+    assert "Compared with 6 h ago" in html and "Rain rate at Site A: 1.2 mm/h now, 0.0 mm/h 5 h ago" in html   # the sentence states the stored value's real age (contract 0.2.0), not the requested window
     assert "Compared with 24 h ago" in html and "No stored value is close enough to 24 h ago" in html
     assert V.changes_html([], {"A": "Site A"}, NOW) == ""

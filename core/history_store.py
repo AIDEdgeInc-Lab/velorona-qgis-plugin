@@ -51,7 +51,7 @@ class HistoryUnavailable(HistoryError):
 
     def __init__(self):
         super().__init__("Local history needs the Python package aei-history-contract. In QGIS: Plugins > Python Console, run:  from pip._internal.cli.main "
-                         "import main; main(['install', '-U', 'aei-history-contract>=0.1.0,<0.2'])  then restart QGIS. Your analyses are not affected.",
+                         "import main; main(['install', '-U', 'aei-history-contract>=0.2.0,<0.3'])  then restart QGIS. Your analyses are not affected.",
                          "unavailable")
 
 
@@ -416,10 +416,17 @@ class HistoryStore:
     # -- export -------------------------------------------------------------------------------------------------------------------------
 
     def export_csv(self, entity_id: Optional[str] = None) -> Tuple[str, str]:
-        """(file name, CSV text) from the contract's ``to_csv`` / ``csv_filename``: schema-order columns, UTC, RFC 4180 quoting, formula-injection guard.
+        """(file name, CSV text) from the contract's ``to_csv`` / ``csv_filename``: schema-order columns (incl. the optional entity_label), UTC, RFC 4180 quoting, formula-injection guard.
         A local file only."""
         c = _contract()
-        text = c.to_csv([r.to_dict() for r in self.records(entity_id)])
+        names = self.labels()
+        rows = []
+        for r in self.records(entity_id):
+            d = r.to_dict()
+            if names.get(r.entity_id):
+                d["entity_label"] = names[r.entity_id]   # the user's own name for the site/link, next to the hashed id (contract 0.2.0)
+            rows.append(d)
+        text = c.to_csv(rows)
         return c.csv_filename(entity_id or "all", utc_text(self._clock())), text
 
 

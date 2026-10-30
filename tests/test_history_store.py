@@ -168,9 +168,22 @@ def test_csv_has_the_contract_columns_utc_rfc4180_and_a_formula_guard(store):
     assert name.startswith("velorona-history-s1-") and name.endswith("Z.csv") and "\r" not in text
     rows = list(csv.reader(io.StringIO(text)))
     assert rows[0] == list(contract.CSV_COLUMNS)
-    body = {r[5]: r for r in rows[1:]}
-    assert body["temperature"][2].startswith("'=") and body["temperature"][6] == "-3.5"      # injected source neutralised, negative number kept
-    assert body["rain_rate"][6] == "" and body["rain_rate"][11] == 'no "data", sorry'         # NO DATA is empty, never 0
+    col = {c: i for i, c in enumerate(rows[0])}
+    body = {r[col["metric"]]: r for r in rows[1:]}
+    assert body["temperature"][col["source"]].startswith("'=") and body["temperature"][col["value"]] == "-3.5"      # injected source neutralised, negative number kept
+    assert body["rain_rate"][col["value"]] == "" and body["rain_rate"][col["nodata_reason"]] == 'no "data", sorry'    # NO DATA is empty, never 0
+    assert all(r[col["entity_label"]] == "" for r in rows[1:])                                                         # no name stored -> empty cell
+
+
+def test_csv_carries_the_users_own_name_next_to_the_hashed_id(store):
+    store.add_many([rec(0, entity="h:abc"), rec(1, entity="h:other")])
+    store.set_labels({"h:abc": 'Toronto, "north" =link'})
+    _, text = store.export_csv()
+    rows = list(csv.reader(io.StringIO(text)))
+    col = {c: i for i, c in enumerate(rows[0])}
+    assert rows[0][col["entity_id"] + 1] == "entity_label"
+    by_id = {r[col["entity_id"]]: r[col["entity_label"]] for r in rows[1:]}
+    assert by_id == {"h:abc": 'Toronto, "north" =link', "h:other": ""}      # only entities that have a stored name; the hashed id is still there
 
 
 def test_clear_this_entity_and_clear_all(store):

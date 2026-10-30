@@ -135,7 +135,7 @@ and restart QGIS. **QGIS does not install Python packages for plugins** (the `pl
 from the Plugin Manager or from the ZIP leaves these packages to you; if they are missing Velorona loads a stub that shows this instruction, and if `aei-link-clearance` is
 outside its supported range (`aei-link-clearance>=0.2.0,<0.3`, `aei-microwave-link-exposure>=0.2.0,<0.3`) it warns when QGIS starts and refuses the first terrain analysis with the same instruction.
 
-Local history (History window, "What changed") additionally needs `aei-history-contract>=0.1.0,<0.2`, the shared package that also defines the rules in Velorona Map. It is optional:
+Local history (History window, "What changed") additionally needs `aei-history-contract>=0.2.0,<0.3`, the shared package that also defines the rules in Velorona Map. It is optional:
 without it history is switched off with this instruction and everything else, including the weather analysis, works.
 
 `aei-microwave-link-exposure` must be 0.2.0 or newer (0.2.x): 0.2.0 evaluates the ITU-R P.838-3 rain equations. `aei-link-clearance` must be 0.2.0 or newer (0.2.x): 0.2.0 corrects the earth-curvature sign, and the plugin
