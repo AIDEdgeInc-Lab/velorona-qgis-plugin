@@ -181,7 +181,7 @@ check("the request ran in a worker thread", bool(calls) and calls[0][1] is False
 release(A)
 settle()
 check("when it finished the same panel got the weather", plugin.dock._result is inv and inv.exposure is not None and not inv.weather_pending)
-check("... and no longer says loading", "Loading weather" not in plugin.dock.browser.toPlainText())
+check("... and no longer says fetching", "Fetching weather" not in plugin.dock.browser.toPlainText())
 n = len(calls)
 inv2 = select(A)
 check("selecting the link again is answered from the cache without a new request", inv2.exposure is not None and len(calls) == n)
