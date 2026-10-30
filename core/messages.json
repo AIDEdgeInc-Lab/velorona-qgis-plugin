@@ -77,8 +77,8 @@
    "what_to_do": "Wait. If every retry fails you get E-TERRAIN-SERVICE-FAILED; try again in a minute.",
    "recheck": "The notice disappears when a retry succeeds.",
    "source": [
-    "net.js:71",
-    "elevation.js:18"
+    "elevation.js:18",
+    "net.js:71"
    ]
   },
   {
@@ -194,8 +194,8 @@
    "what_to_do": "Wait. If every retry fails you get E-WEATHER-FETCH-FAILED; try again in a minute.",
    "recheck": "The notice disappears when a retry succeeds.",
    "source": [
-    "net.js:71",
-    "mwexposure.js:323"
+    "mwexposure.js:323",
+    "net.js:71"
    ]
   },
   {
@@ -484,8 +484,8 @@
    "what_to_do": "Open the file; the first lines explain the type key.",
    "recheck": "Export again any time.",
    "source": [
-    "workflow.js:269",
-    "agent_ui.js:273"
+    "agent_ui.js:273",
+    "workflow.js:269"
    ]
   },
   {
@@ -593,8 +593,8 @@
    "what_to_do": "Pick a shorter window, or analyse again and compare later.",
    "recheck": "Change the window or wait.",
    "source": [
-    "weather_history_ui.js:121",
-    "agent_history.js:69"
+    "agent_history.js:69",
+    "weather_history_ui.js:121"
    ]
   },
   {
@@ -667,7 +667,7 @@
    "what_to_do": "Try again; or clear the site's data in the browser settings.",
    "recheck": "Press Clear my history again.",
    "source": [
-    "weather_history.js:220"
+    "weather_history.js:221"
    ]
   },
   {
@@ -679,16 +679,16 @@
    "what_to_do": "Set it again next session.",
    "recheck": "–",
    "source": [
-    "weather_history.js:228"
+    "weather_history.js:229"
    ]
   },
   {
-   "id": "I-ASK-NO-FORECAST",
+   "id": "I-ASK-SCOPE",
    "level": "info",
    "area": "Ask",
-   "short_text": "Velorona Map does not predict outages or forecast link behaviour.",
-   "meaning": "Ask answers about current clearance and current-weather exposure, with evidence. It makes no forecasts.",
-   "what_to_do": "Ask about the selected links as they are now, or about your stored values.",
+   "short_text": "Ask answers from values stored on this computer: what changed, and what a value was N hours ago. For the selection it also shows current terrain clearance and current-weather exposure, each with its evidence and limits.",
+   "meaning": "Ask answers from what is on screen and from the values stored on this computer. This is the answer Ask gives when a question is about the future or about what is not held.",
+   "what_to_do": "Ask about the selected links as they are now, or ask what changed in the last few hours.",
    "recheck": "–",
    "source": [
     "agent.js:29"
@@ -707,11 +707,11 @@
    ]
   },
   {
-   "id": "I-ASK-OUTSIDE-HISTORY",
+   "id": "I-ASK-STORED-WINDOW",
    "level": "info",
    "area": "Ask",
-   "short_text": "Weather history from outside this computer is not available.",
-   "meaning": "Velorona keeps only the values it fetched while you used it, on your own computer.",
+   "short_text": "Ask answers from values stored on this computer, for as long as your history is kept (24 hours unless you chose otherwise): ask what changed in the last few hours, or what a value was N hours ago.",
+   "meaning": "History questions are answered from your own stored values, for the time your history is kept.",
    "what_to_do": "Ask what changed in the last few hours, or what a value was N hours ago.",
    "recheck": "–",
    "source": [
@@ -825,6 +825,28 @@
    "source": [
     "signup.js:70"
    ]
+  },
+  {
+   "id": "I-TERRAIN-ELEVATION-SOURCE",
+   "level": "info",
+   "area": "Terrain",
+   "short_text": "Ground heights: Velorona's online 90 m elevation data, or a raster of yours.",
+   "meaning": "Online: Open-Meteo Elevation API, a 90 m surface model (Copernicus GLO-90), typed Reference data (DEM). Local raster: a single-band raster in the QGIS project; its heights are read as metres, its model type (surface or terrain) and vertical datum are yours to know; it stays on your computer and is not rate-limited. A cell the raster does not cover makes the analysis NO DATA; nothing is substituted.",
+   "what_to_do": "Choose online data or a local raster in the plugin's terrain dialog.",
+   "recheck": "Run the analysis again after changing the source.",
+   "source": [],
+   "where": "velorona-qgis-plugin"
+  },
+  {
+   "id": "I-USA-DATA-SOURCE",
+   "level": "info",
+   "area": "USA",
+   "short_text": "USA data is Velorona's online data, not included in the plugin. Canada works without it.",
+   "meaning": "By default Velorona reads its online USA data (public FCC licence records, the same data Velorona Map shows) for the area you look at: USA links and sites appear as you move the map, and nothing is downloaded for areas you do not view. The data is not included in the plugin. Canada works without it.",
+   "what_to_do": "Explore: USA Data Setup reads it from a folder or another address instead, or turns it off.",
+   "recheck": "Move the map to a USA area and the links appear.",
+   "source": [],
+   "where": "velorona-qgis-plugin"
   }
  ]
 }
