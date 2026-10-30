@@ -17,7 +17,7 @@ from typing import Optional
 
 PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "packs.json")
 LEVELS = {"source-published": "Source-published", "cross-checked": "Cross-checked", "operator-confirmed": "Operator-confirmed"}
-GUIDE_ID = "I-PACK-VERIFICATION"
+GUIDE_IDS = {"source-published": "I-PACK-SOURCE-PUBLISHED", "cross-checked": "I-PACK-CROSS-CHECKED", "operator-confirmed": "I-PACK-OPERATOR-CONFIRMED"}
 # Layer source keys (core/layers.py SOURCE_*; spelled out so this module needs no QGIS) -> pack id. tests/qgis_ui_polish_e2e.py checks the keys.
 SOURCE_TO_PACK = {"fixed_sites": "ca-ised-fixed", "fixed_links": "ca-ised-fixed", "us_fixed_sites": "us-fcc-uls-micro", "us_fixed_links": "us-fcc-uls-micro"}
 
@@ -58,7 +58,14 @@ def badge(pack_id: str, loaded_generated_date: Optional[str]) -> Badge:
         return Badge("Verification: not stated for this pack build",
                      f"The level was stated for the build of {pack.get('generated_date')}; the records loaded here were built {loaded_generated_date}.", None)
     when = f" (verified {v['verified_on']})" if v["verified_on"] else ""
-    return Badge(f"Verification: {LEVELS[v['level']]}{when}", v["basis"] or LEVELS[v["level"]], v["level"])
+    from . import messages
+    word = messages.short_text(GUIDE_IDS[v["level"]])          # the registry's word for the level (same as the Map's badge)
+    return Badge(f"Verification: {word}{when}", v["basis"] or word, v["level"])
+
+
+def guide_id(badge: "Badge") -> str:
+    """The registry entry explaining the badge's level ("" when no level applies: the "?" is then hidden)."""
+    return GUIDE_IDS.get(badge.level or "", "")
 
 
 @lru_cache(maxsize=1)

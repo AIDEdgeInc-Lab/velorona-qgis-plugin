@@ -300,7 +300,7 @@ class VeloronaRecordsTable(QWidget):
         self.pack_badge = QLabel("", self)
         self.pack_badge.setObjectName("veloronaPackBadge")
         self.pack_badge.setStyleSheet("color: palette(mid);")
-        self.pack_badge_help = guide_button(packs.GUIDE_ID, self)
+        self.pack_badge_help = guide_button("I-PACK-SOURCE-PUBLISHED", self)     # its ID follows the badge level
         self.status_label = QLabel("Run Explore: Load Public Data to populate records.", self)
         self.status_label.setObjectName("veloronaRecordsStatus")
         self.status_label.setWordWrap(True)
@@ -598,7 +598,9 @@ class VeloronaRecordsTable(QWidget):
         self.pack_badge.setText(badge.text if badge else "")
         self.pack_badge.setToolTip(badge.tooltip if badge else "")
         self.pack_badge.setVisible(badge is not None)
-        self.pack_badge_help.setVisible(badge is not None)
+        help_id = packs.guide_id(badge) if badge else ""
+        self.pack_badge_help.setProperty("guideId", help_id)
+        self.pack_badge_help.setVisible(bool(help_id))
 
     def set_dataset_note(self, source_key: str, text: str) -> None:
         """A provenance/status line for a live dataset (live / cached with its time / empty / unavailable), shown in the status line."""

@@ -17,16 +17,11 @@ from typing import Dict
 PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "messages.json")
 
 # QGIS-only situations not (yet) in the Map registry: id -> (level, area, short_text).
-PLUGIN_ONLY: Dict[str, tuple] = {
-    "I-PACK-VERIFICATION": ("info", "Layers", "Each data pack states how its records were checked: source-published, cross-checked or operator-confirmed."),
+PLUGIN_ONLY: Dict[str, tuple] = {   # product-neutral wording (no "QGIS", no "tab"), so the Map can register the same text
     "I-RECORD-OFF": ("info", "Stored values", "Automatic recording is off. Values are stored only when you run an analysis."),
-    "I-RECORD-ON": ("info", "Stored values", "Recording N links every M min while QGIS is open. Values stay on this computer."),
     "I-RECORD-ADDED": ("info", "Stored values", "Link added to automatic recording."),
     "I-RECORD-ALREADY": ("info", "Stored values", "This link is already recorded."),
     "I-RECORD-NEEDS-WEATHER": ("info", "Stored values", "Run a weather analysis on the link first; recording repeats that analysis."),
-    "W-RECORD-LIMIT": ("warn", "Stored values", "The free plan records up to N links at a time."),
-    "W-RECORD-BUSY": ("warn", "Stored values", "The weather service is busy (HTTP 429). Recording waits N min before trying again."),
-    "W-RECORD-PAUSED": ("warn", "Stored values", "Recording paused: the weather service refused requests 3 times in a row. Switch it on again later."),
     "I-TERRAIN-ELEVATION-SOURCE": ("info", "Terrain", "Ground heights: Velorona's online 90 m elevation data, or a raster of yours."),
     "I-USA-DATA-SOURCE": ("info", "Layers", "USA data is Velorona's online data, not included in the plugin. Canada works without it."),
 }

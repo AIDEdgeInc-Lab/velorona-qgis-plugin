@@ -209,7 +209,7 @@ check("History has an 'Automatic recording' box, unticked", panel is not None an
 panel.add_button.click()
 check("the link in the results panel is added", len(plugin.recorder.links) == 1 and panel.links.count() == 1)
 panel.enabled_box.setChecked(True)
-check("switched on: status says how many links and how often", plugin.recorder.enabled and "Recording 1 links every 15 min" in panel.status.text())
+check("switched on: status says how many links and how often (the Map's I-RECORD-ON)", plugin.recorder.enabled and "Recording on: 1 links every 15 min." in panel.status.text() and "I-RECORD-ON" in panel.status.text(), panel.status.text())
 before = store.stats().rows if os.path.exists(store.path) else 0
 calls.clear()
 plugin._record_tick()
@@ -220,18 +220,22 @@ newest = max(store.records(), key=lambda r: r.fetched_ts or "")
 check("the real fetch time is stored with the values", newest.fetched_ts and abs(history_store.parse_utc(newest.fetched_ts) - time.time()) < 120, newest.fetched_ts)
 w = next(iter(plugin.recorder.links.values()))
 check("the link shows when it was last recorded", w.last_ok is not None and "last recorded: " in panel.links.item(0).text() and "not yet" not in panel.links.item(0).text())
-check("the next round is about 15 min away", 14 * 60 < plugin.recorder.next_due - time.time() <= 16 * 60 + auto_record.JITTER_S)
+check("the link is due again in about 15 min", 14 * 60 < w.next_due - time.time() <= 16 * 60 + auto_record.JITTER_S)
 
-print("== 3. a busy service backs off, three busy rounds pause ==")
+print("== 3. a busy source doubles that link's wait; three failures in a row stop that link (as in the Map) ==")
 mode["m"] = "busy"
 for i in range(3):
-    plugin.recorder.next_due = time.time()
+    w.next_due = time.time()
     plugin._record_tick()
     settle()
     if i == 0:
-        check("busy: the round stops, the wait doubles, the status says so", plugin.recorder.backoff == 2 and "W-RECORD-BUSY" in panel.status.text(), panel.status.text())
-check("three busy rounds in a row pause recording and say so", not plugin.recorder.enabled and "W-RECORD-PAUSED" in panel.status.text() and not panel.enabled_box.isChecked())
+        check("busy: the link waits twice as long, the status says so (W-RECORD-BUSY)", w.backoff == 2 and "W-RECORD-BUSY" in panel.status.text()
+              and "source busy, waiting longer" in panel.links.item(0).text(), panel.status.text())
+check("three failures in a row stop recording of that link and say so (W-RECORD-STOPPED)", w.stopped and "W-RECORD-STOPPED" in panel.status.text()
+      and "stopped after 3 failures" in panel.links.item(0).text(), panel.status.text())
+check("recording itself stays on; stored values are kept", plugin.recorder.enabled and store.stats().rows > 0)
 mode["m"] = "ok"
+plugin.recorder.set_enabled(False, time.time())
 
 print("== 4. the user's own link: code only unless ticked; free limit ==")
 me.analyze_sites = fake_sites

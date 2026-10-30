@@ -207,7 +207,7 @@
    "what_to_do": "Read the Evidence rows before relying on the result. Analyse again later for a station comparison.",
    "recheck": "Run weather exposure again.",
    "source": [
-    "workflow.js:498"
+    "workflow.js:523"
    ]
   },
   {
@@ -219,7 +219,7 @@
    "what_to_do": "Wait a few seconds.",
    "recheck": "The message clears when the result opens.",
    "source": [
-    "workflow.js:471"
+    "workflow.js:495"
    ]
   },
   {
@@ -679,7 +679,7 @@
    "what_to_do": "Set it again next session.",
    "recheck": "–",
    "source": [
-    "weather_history.js:229"
+    "weather_history.js:236"
    ]
   },
   {
@@ -847,6 +847,186 @@
    "recheck": "Move the map to a USA area and the links appear.",
    "source": [],
    "where": "velorona-qgis-plugin"
+  },
+  {
+   "id": "I-PACK-SOURCE-PUBLISHED",
+   "level": "info",
+   "area": "Layers",
+   "short_text": "Source-published",
+   "meaning": "The pack was built directly from the official data the agency publishes (for example ISED's extract or the FCC ULS file). Velorona did not compare it with a second source and no operator confirmed it. Records are as filed.",
+   "what_to_do": "Use it as the public record. For a decision that depends on one link, confirm the details with the operator or on site.",
+   "recheck": "Hover the badge for the date and basis; the pack's About this source shows the file dates.",
+   "source": [
+    "app.js:2467"
+   ]
+  },
+  {
+   "id": "I-PACK-CROSS-CHECKED",
+   "level": "info",
+   "area": "Layers",
+   "short_text": "Cross-checked",
+   "meaning": "The pack was compared against a named independent second source. The badge names that source, how many records were compared, and what matched and what did not. A difference found in the check stays visible: it is not silently corrected.",
+   "what_to_do": "Read the badge: second source, sample size and match result. For a record that differed, treat both sources as uncertain and confirm on site.",
+   "recheck": "Hover the badge for the source, sample size, match result and date.",
+   "source": [
+    "app.js:2468"
+   ]
+  },
+  {
+   "id": "I-PACK-OPERATOR-CONFIRMED",
+   "level": "info",
+   "area": "Layers",
+   "short_text": "Operator-confirmed",
+   "meaning": "The operator, or a contributor Velorona trusts for that network, confirmed this version of the pack in writing. Velorona keeps the confirmation privately and never shows who gave it. A later pack version needs a new confirmation.",
+   "what_to_do": "Treat the records as confirmed for the pack version and date shown on the badge, not for later changes in the network.",
+   "recheck": "Hover the badge for the pack version and date.",
+   "source": [
+    "app.js:2469"
+   ]
+  },
+  {
+   "id": "I-RECORD-ON",
+   "level": "info",
+   "area": "Stored values",
+   "short_text": "Recording on: N links every M min.",
+   "meaning": "You turned on recording for these links. While this page is open, the same weather analysis runs again every M minutes (15 to 240) and its values are kept on this computer only, with the real time each was fetched. It is off until you turn it on, and it stops when you close the page.",
+   "what_to_do": "Use Stop on the chip to end all recording, or Stop recording this link in a weather result. Read the values in Results, Stored values.",
+   "recheck": "The chip shows the time of the last recording.",
+   "source": [
+    "auto_record.js:127"
+   ]
+  },
+  {
+   "id": "I-RECORD-PAUSED",
+   "level": "info",
+   "area": "Stored values",
+   "short_text": "Recording paused while this tab is hidden.",
+   "meaning": "Browsers slow or stop timers in hidden tabs, so Velorona does not record then. When the tab is visible again it records what is due once, not a burst. The gap shows in Stored values as a gap.",
+   "what_to_do": "Keep the tab visible if you want an unbroken series.",
+   "recheck": "The chip says paused until the tab is visible again.",
+   "source": [
+    "auto_record.js:127"
+   ]
+  },
+  {
+   "id": "W-RECORD-BUSY",
+   "level": "warn",
+   "area": "Stored values",
+   "short_text": "Source busy: waiting longer.",
+   "meaning": "A weather source answered that it is busy (HTTP 429 or 5xx). Velorona doubles the wait for that link, up to eight times the interval, so it does not add to the load. Nothing is substituted for the missed values.",
+   "what_to_do": "Nothing. If it stays busy, recording of that link stops after three tries in a row.",
+   "recheck": "The warning clears after the next good recording.",
+   "source": [
+    "auto_record.js:131"
+   ]
+  },
+  {
+   "id": "W-RECORD-STOPPED",
+   "level": "warn",
+   "area": "Stored values",
+   "short_text": "Recording stopped after repeated failures.",
+   "meaning": "Three recordings of a link in a row failed or found the source busy, so recording of that link stopped. The values already stored are kept.",
+   "what_to_do": "Open the link's weather result and press Start recording again when the source is back.",
+   "recheck": "Run the weather analysis by hand to see whether the source answers.",
+   "source": [
+    "auto_record.js:132"
+   ]
+  },
+  {
+   "id": "W-RECORD-LIMIT",
+   "level": "warn",
+   "area": "Stored values",
+   "short_text": "At most 10 links can be recorded at once.",
+   "meaning": "The free plan records up to 10 links at the same time, to keep the load on the public weather sources low.",
+   "what_to_do": "Stop recording a link you no longer need, then start the new one.",
+   "recheck": "The chip shows how many links are recorded.",
+   "source": [
+    "auto_record.js:169"
+   ]
+  },
+  {
+   "id": "I-RECORD-MYDATA",
+   "level": "info",
+   "area": "Stored values",
+   "short_text": "Imported links are not recorded automatically.",
+   "meaning": "Links from your own imported file are never recorded on a timer, so nothing about them is fetched without you asking each time.",
+   "what_to_do": "Run the analysis again when you need a new value.",
+   "recheck": "–",
+   "source": [
+    "auto_record.js:150"
+   ]
+  },
+  {
+   "id": "I-SHARE-CREATED",
+   "level": "info",
+   "area": "Export",
+   "short_text": "Read-only link created.",
+   "meaning": "The evidence file of this study is stored on Velorona's server so that anyone with the link can read it, until it expires (30 days unless chosen otherwise) or you revoke it. It holds what the evidence file holds: no stored history, and no names of your own imported links unless you ticked the box. The page runs no script.",
+   "what_to_do": "Copy the link and send it. Revoke it when it is no longer needed.",
+   "recheck": "Open the link in a private window to see what others see.",
+   "source": [
+    "share_ui.js:33"
+   ]
+  },
+  {
+   "id": "I-SHARE-REVOKED",
+   "level": "info",
+   "area": "Export",
+   "short_text": "Revoked. The link no longer opens.",
+   "meaning": "The share was revoked and its stored copy deleted at once. Anyone opening the link now sees that it is no longer available.",
+   "what_to_do": "Create a new link if you need to share the study again.",
+   "recheck": "Open the old link: it says the study is no longer available.",
+   "source": [
+    "share_ui.js:41"
+   ]
+  },
+  {
+   "id": "E-SHARE-PLAN",
+   "level": "error",
+   "area": "Export",
+   "short_text": "Share links are part of the Enterprise plan.",
+   "meaning": "Your account's plan does not include hosted share links, so nothing was stored.",
+   "what_to_do": "Export the evidence file and send it instead, or ask Velorona about the Enterprise plan.",
+   "recheck": "Your plan is set by Velorona; the menu item appears when it includes share links.",
+   "source": [
+    "share_ui.js:47"
+   ]
+  },
+  {
+   "id": "E-SHARE-LIMIT",
+   "level": "error",
+   "area": "Export",
+   "short_text": "You have the most active share links your plan allows.",
+   "meaning": "Your plan caps how many links can be live at once. Nothing new was stored.",
+   "what_to_do": "Revoke a link you no longer need, then share again.",
+   "recheck": "Share again after revoking.",
+   "source": [
+    "share_ui.js:48"
+   ]
+  },
+  {
+   "id": "E-SHARE-FAILED",
+   "level": "error",
+   "area": "Export",
+   "short_text": "The link could not be created. Nothing was stored.",
+   "meaning": "The server did not accept the share (signed out, the service is off, or it is temporarily unavailable). Nothing was stored.",
+   "what_to_do": "Export the evidence file instead, or sign in and try again.",
+   "recheck": "Try again in a minute.",
+   "source": [
+    "share_ui.js:49"
+   ]
+  },
+  {
+   "id": "E-SHARE-GONE",
+   "level": "error",
+   "area": "Export",
+   "short_text": "This shared study is no longer available.",
+   "meaning": "The person who shared it revoked the link, or it reached its expiry date. Its stored copy has been deleted.",
+   "what_to_do": "Ask them for a new link or for the evidence file.",
+   "recheck": "–",
+   "source": [
+    "functions/s/[id].js:10"
+   ]
   }
  ]
 }

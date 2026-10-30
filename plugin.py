@@ -2301,7 +2301,7 @@ class VeloronaPlugin:
         return self.recorder.set_enabled(on, time.time())
 
     def set_interval(self, minutes: int) -> None:
-        self.recorder.set_interval(max(minutes, entitlements.limit("auto_record_min_interval_min")))
+        self.recorder.set_interval(minutes, floor=entitlements.limit("auto_record_min_minutes"))
 
     def remove(self, key) -> None:
         self.recorder.remove(key)
@@ -2341,16 +2341,16 @@ class VeloronaPlugin:
             code = history_capture.entity_ids(result, self._history_store())[0][:8]
             label = f"{link.site_a.name} \u2194 {link.site_b.name}" if include_names else f"Your link (code {code})"
         return self.recorder.add(auto_record.Watched(key=study_export.study_key(result), label=label, public=public,
-                                                     include_names=include_names or public, request=request))
+                                                     include_names=include_names or public, request=request), now=time.time())
 
     def _record_tick(self) -> None:
         if self._record_task is None and self.recorder.due(time.time()):
             self._record_round()
 
     def _record_round(self) -> None:
-        """One background round: the recorded links ONE AT A TIME; a busy service (429 / daily limit) stops the round at once."""
-        watched = self.recorder.round()
-        self.recorder.next_due = None                       # not due again until this round has finished
+        """One background round: the DUE links ONE AT A TIME; a busy source (429 / 5xx / daily limit) ends the round at once."""
+        watched = self.recorder.due_links(time.time())
+        self.recorder.hold(watched)                         # not due again until their result is in
 
         def no_history(*_a, **_k):                          # recording stores the current values only; the hourly context is not fetched
             raise ValueError("not fetched by automatic recording")
@@ -2377,28 +2377,31 @@ class VeloronaPlugin:
         def finished(exception, result=None):
             self._record_task = None
             outcomes, busy = result if result is not None else ([], False)
-            self._finish_record_round(outcomes, busy)
+            self._finish_record_round(outcomes, busy, watched)
 
         self._record_task = QgsTask.fromFunction("Velorona: automatic recording", work, on_finished=finished)
         QgsApplication.taskManager().addTask(self._record_task)
 
-    def _finish_record_round(self, outcomes, busy: bool) -> None:
-        """GUI thread: store what was fetched (same capture as a manual analysis), names only where the user ticked them."""
+    def _finish_record_round(self, outcomes, busy: bool, taken=()) -> None:
+        """GUI thread: store what was fetched (same capture as a manual analysis), names only where the user ticked them; per-link back-off/stop."""
         store = self._history_store()
+        now = time.time()
         for key, outcome, value, fetched in outcomes:
             w = self.recorder.links.get(key)
             if w is None:
                 continue                                    # removed while the round ran
             if outcome != "ok":
                 w.last_error = str(value)[:120]
+                self.recorder.link_done(key, now, ok=False, busy=auto_record.is_busy_failure(value))
                 continue
             result = inspector.LinkInvestigation(entry=w.request["entry"], exposure=value) if w.public else value
             report = history_capture.capture(result, store, fetched)
             if w.include_names:
                 self._remember_history_labels(result)
             w.last_ok, w.last_error = (fetched, "") if report.ok else (w.last_ok, report.user_text()[:120])
-        if self.recorder.enabled:
-            self.recorder.finish_round(time.time(), busy)
+            self.recorder.link_done(key, now, ok=True)
+        self.recorder.skipped(list(taken), now)              # links the round did not reach (it ended at a busy source)
+        self.recorder.round_finished()
         if self._recording_panel is not None:
             self._recording_panel.refresh()
 

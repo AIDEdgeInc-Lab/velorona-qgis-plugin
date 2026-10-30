@@ -315,7 +315,7 @@ _rt = VeloronaRecordsTable()
 _rt._current_key = L.SOURCE_FIXED_LINKS
 _rt.set_pack_badge(L.SOURCE_FIXED_LINKS, _packs.Badge("Verification: Cross-checked (verified 2026-10-30)", "basis", "cross-checked"))
 check("Records shows the pack badge with a ? to the guide", _rt.pack_badge.text().startswith("Verification: Cross-checked") and _rt.pack_badge_help.isVisibleTo(_rt)
-      and _rt.pack_badge_help.property("guideId") == "I-PACK-VERIFICATION")
+      and _rt.pack_badge_help.property("guideId") == "I-PACK-CROSS-CHECKED")
 _rt._current_key = L.SOURCE_TOWERS
 _rt._show_pack_badge()
 check("datasets without a pack show no badge", not _rt.pack_badge.isVisibleTo(_rt) and not _rt.pack_badge_help.isVisibleTo(_rt))

@@ -1,7 +1,7 @@
 {
  "schema": "velorona.packs/1",
  "map_version": "1.1.6",
- "note": "Identifies the public-data packs the Map ships: which source, which dates, which builder and schema. Kept consistent with the pack files by tests/test_packs_registry.py. The Map itself reads each pack's own header (the Canada snapshot, the US index.json).",
+ "note": "Identifies the public-data packs the Map ships: which source, which dates, which builder and schema. Kept consistent with the pack files by tests/test_packs_registry.py. The Map itself reads each pack's own header (the Canada snapshot, the US index.json). `verification` says how far a pack has been checked; the three levels and the fields each needs are defined in `verification_levels` and on /guide (I-PACK-*).",
  "packs": [
   {
    "id": "ca-ised-fixed",
@@ -32,7 +32,12 @@
     "name": "Open Government Licence - Canada",
     "status": "stated on the open.canada.ca catalogue record"
    },
-   "doc": "docs/CANADA_FIXED_SERVICE_SNAPSHOT.md"
+   "doc": "docs/CANADA_FIXED_SERVICE_SNAPSHOT.md",
+   "verification": {
+    "level": "source-published",
+    "verified_on": "2026-09-09",
+    "basis": "Built directly from ISED's published SMS Authorization Data Extract (Fixed Service), source file updated 2026-09-01. Not compared with a second source and not confirmed by operators."
+   }
   },
   {
    "id": "us-fcc-uls-micro",
@@ -64,7 +69,42 @@
     "name": "U.S. Government Works",
     "status": "public record published for public use (data.gov listing); licensee-reported record data, not field measurement (see data/us/index.json)"
    },
-   "doc": "docs/USA_FCC_ULS_PACK.md"
+   "doc": "docs/USA_FCC_ULS_PACK.md",
+   "verification": {
+    "level": "source-published",
+    "verified_on": "2026-10-03",
+    "basis": "Built directly from the FCC ULS public access database (Microwave, l_micro.zip), file dated 2026-09-27. Not compared with a second source and not confirmed by operators."
+   }
   }
- ]
+ ],
+ "verification_levels": {
+  "source-published": {
+   "means": "Built directly from the official data the agency publishes. No extra check.",
+   "requires": [
+    "verified_on",
+    "basis"
+   ]
+  },
+  "cross-checked": {
+   "means": "Compared against a named independent second source.",
+   "requires": [
+    "verified_on",
+    "basis",
+    "second_source",
+    "sample_size",
+    "match_result"
+   ],
+   "rule": "basis says how the comparison was made; second_source names the independent source; sample_size is the number of records compared; match_result states what matched and what did not (for example '412 of 420 records matched on position and frequency; 8 differed, listed in the pack notes')."
+  },
+  "operator-confirmed": {
+   "means": "Written confirmation from the operator or a trusted contributor for this pack version.",
+   "requires": [
+    "verified_on",
+    "basis",
+    "pack_version",
+    "evidence_ref"
+   ],
+   "rule": "The written confirmation is kept privately; evidence_ref is an opaque reference to it (for example 'OC-2026-001'). Partner names are never shown publicly: basis and every other public field must not name the operator or contributor."
+  }
+ }
 }

@@ -23,9 +23,6 @@ ALLOWED = {
     "tests.test_messages::test_plugin_copy_equals_the_map_registry_when_a_map_checkout_is_present",
     "tests.test_packs::test_plugin_copy_equals_the_map_registry_when_present",
     "tests.test_entitlements::test_plugin_copy_equals_the_map_registry_when_present",
-    # PENDING on the Map (sprint2): packs.json has no `verification` field and web/entitlements.json does not exist yet.
-    "tests.test_packs::test_real_registry_states_a_level_for_every_pack",
-    "tests.test_entitlements::test_real_registry_is_the_map_file",
 }
 
 

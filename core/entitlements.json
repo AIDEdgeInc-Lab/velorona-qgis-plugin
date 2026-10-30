@@ -1,0 +1,49 @@
+{
+ "schema": "velorona.entitlements/1",
+ "note": "The one place plans are defined. Read by the server (functions/_lib/plans.js: which routes an account may use) and by the map (limits shown and applied in the browser). Plans are set by the owner through POST /api/admin/plan; there are no payments. With ACCOUNTS_ENABLED unset everyone is on the free plan and no route reads or writes a plan. Limits on recording and on local history apply in the browser (they protect the public weather sources and the user's own storage); share limits are enforced by the server.",
+ "default_plan": "free",
+ "plans": {
+  "free": {
+   "title": "Free",
+   "features": [
+    "map",
+    "terrain_clearance",
+    "weather_exposure",
+    "ask",
+    "stored_values",
+    "evidence_file",
+    "auto_record"
+   ],
+   "limits": {
+    "auto_record_links": 10,
+    "auto_record_min_minutes": 15,
+    "history_default_hours": 24,
+    "history_max_hours": 168,
+    "share_links_active": 0
+   }
+  },
+  "enterprise": {
+   "title": "Enterprise",
+   "features": [
+    "map",
+    "terrain_clearance",
+    "weather_exposure",
+    "ask",
+    "stored_values",
+    "evidence_file",
+    "auto_record",
+    "share_link"
+   ],
+   "limits": {
+    "auto_record_links": 50,
+    "auto_record_min_minutes": 5,
+    "history_default_hours": 168,
+    "history_max_hours": 168,
+    "share_links_active": 200,
+    "share_expiry_days_default": 30,
+    "share_expiry_days_max": 365,
+    "share_revoked_metadata_days": 90
+   }
+  }
+ }
+}

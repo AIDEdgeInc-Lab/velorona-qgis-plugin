@@ -33,6 +33,8 @@ def test_each_level_has_its_label_date_and_basis(registry):
         registry(pack(verification={"level": level, "verified_on": "2026-10-30", "basis": "Compared with the ISED extract row by row."}))
         b = packs.badge("ca-ised-fixed", "2026-09-09")
         assert (b.text, b.tooltip, b.level) == (f"Verification: {label} (verified 2026-10-30)", "Compared with the ISED extract row by row.", level)
+        assert packs.guide_id(b) == {"source-published": "I-PACK-SOURCE-PUBLISHED", "cross-checked": "I-PACK-CROSS-CHECKED",
+                                     "operator-confirmed": "I-PACK-OPERATOR-CONFIRMED"}[level]
 
 
 def test_flat_shape_is_accepted_too(registry):
@@ -44,7 +46,7 @@ def test_no_field_or_unknown_level_states_nothing_and_never_guesses(registry):
     for extra in ({}, {"verification": {"level": "field-verified"}}, {"verification": None}):
         registry(pack(**extra))
         b = packs.badge("ca-ised-fixed", "2026-09-09")
-        assert b.level is None and b.text == "Verification: not stated"
+        assert b.level is None and b.text == "Verification: not stated" and packs.guide_id(b) == ""
 
 
 def test_a_level_does_not_carry_over_to_another_pack_build(registry):
@@ -69,8 +71,9 @@ def test_plugin_copy_equals_the_map_registry_when_present():
     assert json.load(open(MAP_PACKS, encoding="utf-8")) == json.load(open(packs.PATH, encoding="utf-8")), "run tools/sync_from_map.py"
 
 
-@pytest.mark.skip(reason="PENDING: the Map's packs.json has no `verification` field yet (Map sprint2); un-skip when it does")
 def test_real_registry_states_a_level_for_every_pack():
     packs.registry.cache_clear()
-    for pid in packs.registry():
-        assert packs.verification(pid) is not None, pid
+    for pid, p in packs.registry().items():
+        v = packs.verification(pid)
+        assert v is not None and v["verified_on"] and v["basis"], pid
+        assert packs.badge(pid, p["generated_date"]).text.startswith("Verification: Source-published"), pid   # today both packs are source-published

@@ -55,7 +55,8 @@ class RecordingPanel(QGroupBox):
         self.links.clear()
         for w in rec.round():
             when = self._control.time_text(w.last_ok) if w.last_ok else "not yet"
-            item = QListWidgetItem(f"{w.label}  (last recorded: {when}{'; ' + w.last_error if w.last_error else ''})")
+            state = "; stopped after 3 failures" if w.stopped else ("; source busy, waiting longer" if w.backoff > 1 else "")
+            item = QListWidgetItem(f"{w.label}  (last recorded: {when}{state}{'; ' + w.last_error if w.last_error and not w.stopped else ''})")
             item.setData(Qt.ItemDataRole.UserRole, w.key)
             self.links.addItem(item)
         mid = message_id or rec.status_id
@@ -66,8 +67,7 @@ class RecordingPanel(QGroupBox):
 
     def _n_for(self, mid: str):
         rec = self._control.recorder
-        return {auto_record.ON: len(rec.links), auto_record.LIMIT: rec.max_links,
-                auto_record.BUSY: rec.interval_min * rec.backoff}.get(mid, "")
+        return {auto_record.ON: sum(1 for w in rec.links.values() if not w.stopped), auto_record.LIMIT: rec.max_links}.get(mid, "")
 
     def _on_enabled(self, on: bool) -> None:
         self.refresh(self._control.set_enabled(on))

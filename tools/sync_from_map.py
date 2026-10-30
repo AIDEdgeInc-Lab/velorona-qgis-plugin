@@ -4,7 +4,7 @@
 
   <Map>/web/messages.json      -> core/messages.json      (message IDs and short texts)
   <Map>/web/data/packs.json    -> core/packs.json         (data packs, verification level)
-  <Map>/web/entitlements.json  -> core/entitlements.json  (plan limits; skipped with a note while the Map has none)
+  <Map>/web/data/entitlements.json -> core/entitlements.json (plan limits)
 Then run the tests: the drift tests compare each copy with the Map checkout."""
 import json
 import os
@@ -14,7 +14,7 @@ import sys
 CORE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "core")
 FILES = (("web/messages.json", "messages.json", "velorona.messages/1"),
          ("web/data/packs.json", "packs.json", "velorona.packs/1"),
-         ("web/entitlements.json", "entitlements.json", "velorona.entitlements/1"))
+         ("web/data/entitlements.json", "entitlements.json", "velorona.entitlements/1"))
 
 if len(sys.argv) != 2:
     sys.exit(__doc__)

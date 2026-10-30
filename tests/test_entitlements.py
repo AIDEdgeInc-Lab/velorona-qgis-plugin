@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core import entitlements as E  # noqa: E402
 
-MAP_FILE = os.path.join(os.environ.get("MAP_REPO") or os.path.expanduser("~/velorona-repos/_worktrees/map-sprint2"), "web", "entitlements.json")
+MAP_FILE = os.path.join(os.environ.get("MAP_REPO") or os.path.expanduser("~/velorona-repos/_worktrees/map-sprint2"), "web", "data", "entitlements.json")
 
 
 @pytest.fixture
@@ -24,12 +24,12 @@ def file(tmp_path, monkeypatch):
 
 
 def test_free_limits_come_from_the_file(file):
-    file({"schema": "velorona.entitlements/1", "plans": {"free": {"limits": {"auto_record_links": 5}}, "pro": {"limits": {"auto_record_links": 100}}}})
+    file({"schema": "velorona.entitlements/1", "plans": {"free": {"limits": {"auto_record_links": 5}}, "enterprise": {"limits": {"auto_record_links": 50}}}})
     assert E.limit("auto_record_links") == 5 and "copied from Velorona Map" in E.source()
 
 
 def test_only_the_free_plan_is_ever_read(file):
-    file({"schema": "velorona.entitlements/1", "plans": {"pro": {"limits": {"auto_record_links": 100}}}})
+    file({"schema": "velorona.entitlements/1", "plans": {"enterprise": {"limits": {"auto_record_links": 50}}}})
     assert E.limit("auto_record_links") == E.FALLBACK_FREE_LIMITS["auto_record_links"]
 
 
@@ -47,7 +47,7 @@ def test_plugin_copy_equals_the_map_registry_when_present():
     assert json.load(open(MAP_FILE, encoding="utf-8")) == json.load(open(E.PATH, encoding="utf-8")), "run tools/sync_from_map.py"
 
 
-@pytest.mark.skip(reason="PENDING: the Map has not published web/entitlements.json yet (Map sprint2); un-skip when it does")
-def test_real_registry_is_the_map_file():
+def test_the_shipped_copy_is_read_and_holds_the_free_limits():
     E._data.cache_clear()
-    assert E._data() is not None
+    assert E._data() is not None and "copied from Velorona Map" in E.source()
+    assert E.limit("auto_record_links") == 10 and E.limit("auto_record_min_minutes") == 15
