@@ -40,7 +40,7 @@
     "elevation.js:26",
     "linkmath.js:57"
    ],
-   "match": "\\(R5\\)(?!.*antenna height)|non-numeric"
+   "match": "non-numeric value \\(R5\\)|elevation is null, NaN or non-numeric"
   },
   {
    "id": "E-TERRAIN-PROFILE-MISSING",
@@ -66,7 +66,7 @@
    "source": [
     "context.js:82"
    ],
-   "match": "antenna height at Site"
+   "match": "antenna height at Site .* is outside 0\\.1-1000 m \\(R5\\)"
   },
   {
    "id": "W-TERRAIN-BUSY",
@@ -183,7 +183,7 @@
    "source": [
     "mwexposure.js:420"
    ],
-   "match": "frequency|fade margin"
+   "match": "\\b(Frequency|Polarization|Fade margin) (must be|-?[\\d.]+ (GHz|dB) is outside)"
   },
   {
    "id": "W-WEATHER-BUSY",

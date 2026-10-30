@@ -60,11 +60,14 @@ def test_path_and_input_reasons_are_the_registrys_text_and_resolve_to_its_ids():
     assert V.interval_reason(None) == messages.short_text("E-WEATHER-INTERVAL")
     reasons = V.terrain_input_reasons(44, -79, 45, -80, 2000, 30, 11)
     assert len(reasons) == 1 and reasons[0].startswith("record antenna height at Site A (2000 m) is outside 0.1-1000 m (R5)")
-    # (the Map's own pattern order resolves the height text to E-TERRAIN-VALUE-MISSING: reported to the Map agent, see CHANGES.md)
-    for reason, expected in ((V.path_reasons(91, 0, 0, 0)[0], "E-PATH-COORDINATES"),
+    weather = V.weather_input_reasons(44, -79, 45, -80, {"frequency_ghz": 0.5, "fade_margin_db": "x", "polarization": "Q"})
+    assert weather == ["Frequency 0.5 GHz is outside 1-100 GHz. Derived and library-enforced: ITU-R P.838-3's tabulated range (1-100 GHz).",
+                       "Fade margin must be a number.", "Polarization must be one of V, H."]
+    for reason, expected in ((reasons[0], "E-TERRAIN-HEIGHT-RANGE"), ("the elevation service returned a missing or non-numeric value (R5)", "E-TERRAIN-VALUE-MISSING"),
+                             *((w, "E-WEATHER-PARAMS") for w in weather), (V.path_reasons(91, 0, 0, 0)[0], "E-PATH-COORDINATES"),
                              (V.path_reasons(44, -79, 44, -79)[0], "E-PATH-ZERO-LENGTH"), ("elevation request failed (T1): HTTP 503", "E-TERRAIN-SERVICE-FAILED"),
                              (messages.short_text("E-TERRAIN-SERVICE-BAD-REPLY"), "E-TERRAIN-SERVICE-BAD-REPLY"),
-                             ("Could not fetch live weather (Open-Meteo) for: A (x) (T3)", "E-WEATHER-FETCH-FAILED"), ("frequency outside 1-100 GHz", "E-WEATHER-PARAMS")):
+                             ("Could not fetch live weather (Open-Meteo) for: A (x) (T3)", "E-WEATHER-FETCH-FAILED"), ("frequency outside 0.1-100 GHz", None)):
         assert messages.id_for_reason(reason) == expected, reason
 
 

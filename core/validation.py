@@ -96,14 +96,17 @@ def terrain_input_reasons(lat_a, lon_a, lat_b, lon_b, height_a, height_b, freque
 
 def weather_input_reasons(lat_a, lon_a, lat_b, lon_b, params) -> list:
     reasons = path_reasons(lat_a, lon_a, lat_b, lon_b)
-    r = _range_reason(params.get("frequency_ghz"), WEATHER_FREQ_GHZ, "frequency", "GHz (ITU-R P.838-3 range)")
-    if r:
-        reasons.append(r)
-    r = _range_reason(params.get("fade_margin_db"), FADE_DB, "fade margin", "dB")
-    if r:
-        reasons.append(r)
+    # The Map's wording (mwexposure.js validateMwParams, registry E-WEATHER-PARAMS): refused, never clamped.
+    for key, label, unit, (lo, hi), basis in (
+            ("frequency_ghz", "Frequency", "GHz", WEATHER_FREQ_GHZ, "Derived and library-enforced: ITU-R P.838-3's tabulated range (1-100 GHz)."),
+            ("fade_margin_db", "Fade margin", "dB", FADE_DB, "Lower bound derived: the link model rejects a fade margin <= 0.")):
+        v = params.get(key)
+        if not is_finite_number(v):
+            reasons.append(f"{label} must be a number.")
+        elif not lo <= v <= hi:
+            reasons.append(f"{label} {v:g} {unit} is outside {lo:g}-{hi:g} {unit}. {basis}")
     if params.get("polarization") not in ("V", "H"):
-        reasons.append("polarization must be V or H")
+        reasons.append("Polarization must be one of V, H.")
     return reasons
 
 
