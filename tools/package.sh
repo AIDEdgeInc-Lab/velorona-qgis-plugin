@@ -46,6 +46,8 @@ tar -C "$PLUGIN" -cf - \
     --exclude='SESSION_HANDOFF.md' \
     --exclude='.github' \
     --exclude='CONTRIBUTING.md' \
+    --exclude='AGENTS.md' \
+    --exclude='CONTEXT.md' \
     . | tar -C "$STAGE/$NAME" -xf -
 
 (cd "$STAGE" && zip -qr9 "$ZIP" "$NAME")
