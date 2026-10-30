@@ -36,3 +36,15 @@ def test_panel_html_links_the_source_licence_and_guide():
     for url in ("https://open-meteo.com/", "https://open-meteo.com/en/license", "https://map.velorona.ai/guide#data-types"):
         assert f"href='{url}'" in h
     assert attribution.html([]) == ""
+
+
+def test_online_elevation_also_carries_the_copernicus_notice_and_weather_alone_does_not():
+    assert attribution.COPERNICUS_NOTICE in attribution.text(["elevation"])
+    assert attribution.COPERNICUS_NOTICE in export.export_csv(F.terrain_result(), include_names=True)
+    assert attribution.COPERNICUS_NOTICE in study_export.study_to_csv([F.terrain_result(), F.weather_result()])
+    assert "Copernicus" not in attribution.text(["weather"]) and "Copernicus" not in export.export_csv(F.weather_result(), include_names=True)
+    h = attribution.html(["elevation"])
+    assert "Copernicus DEM</a> GLO-90" in h and f"href='{attribution.COPERNICUS_URL}'" in h
+    local = F.terrain_result()
+    local.result = SimpleNamespace(elevation_source="Local DEM: my.tif")
+    assert "Copernicus" not in export.export_csv(local, include_names=True)
