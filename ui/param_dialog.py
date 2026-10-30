@@ -11,10 +11,14 @@ from qgis.PyQt.QtWidgets import (
     QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QMessageBox,
     QVBoxLayout,
 )
+
+from ..core import guide
+from .guide_button import guide_button
 
 
 class ParamDialog(QDialog):
@@ -74,11 +78,13 @@ class ParamDialog(QDialog):
                 combo.setToolTip(elevation_note)
             self._elevation_combo = combo
             form.addRow("Elevation source", combo)
-            hint = QLabel(elevation_note or "Online: Open-Meteo, 90 m surface model. Local raster: single-band, heights read as metres; "
-                                            "its model type and vertical datum are yours to know.", self)
+            hint = QLabel(elevation_note or guide.PLUGIN_MESSAGE_IDS["I-terrain-elevation-source"], self)
             hint.setWordWrap(True)
             hint.setStyleSheet("color: palette(mid);")
-            form.addRow("", hint)
+            hint_row = QHBoxLayout()
+            hint_row.addWidget(hint, 1)
+            hint_row.addWidget(guide_button("I-terrain-elevation-source", self))   # online vs local raster, units, datum: in the guide
+            form.addRow("", hint_row)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)

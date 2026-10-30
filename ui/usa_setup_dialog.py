@@ -9,7 +9,9 @@ from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import (QApplication, QDialog, QDialogButtonBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                  QTextBrowser, QVBoxLayout)
 
+from ..core import guide
 from ..core.countries import usa_setup
+from .guide_button import guide_button
 
 # Status colours are chosen to read on both light and dark QGIS themes (text colour only, no backgrounds).
 _COLOURS = {usa_setup.NOT_CONFIGURED: "#8a8f98", usa_setup.LOADED: "#2e9e5b", usa_setup.ERROR: "#d9534f"}
@@ -29,13 +31,13 @@ class UsaSetupDialog(QDialog):
         self.off_requested = False
 
         layout = QVBoxLayout(self)
-        lead = ("USA data is turned off for this project. " if is_off else "") + \
-            ("By default Velorona reads <b>Velorona's online USA data</b> (public FCC licence records, the same data Velorona Map shows) for the area you "
-             "look at: USA links and sites appear as you move the map, and nothing is downloaded for areas you do not view. The data is <b>not included in "
-             "the plugin</b>. Use this window to read it from a folder or another address instead, or to turn it off. <b>Canada works without it.</b>")
+        lead = ("USA data is turned off for this project. " if is_off else "") + guide.PLUGIN_MESSAGE_IDS["I-usa-data-source"]
         self.lead = QLabel(lead)
         self.lead.setWordWrap(True)
-        layout.addWidget(self.lead)
+        lead_row = QHBoxLayout()
+        lead_row.addWidget(self.lead, 1)
+        lead_row.addWidget(guide_button("I-usa-data-source", self))      # what the data is, that it is not in the plugin, folder / address / off: in the guide
+        layout.addLayout(lead_row)
 
         self.status = QLabel()
         self.status.setWordWrap(True)

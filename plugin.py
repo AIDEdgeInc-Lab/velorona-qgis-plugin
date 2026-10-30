@@ -351,6 +351,13 @@ class VeloronaPlugin:
             self.show_panel,
         )
 
+        # "Guide" is in the plugin menu only (not a toolbar button): opens the user guide in the browser.
+        self.action_guide = QAction("Guide", self.iface.mainWindow())
+        self.action_guide.setToolTip("Open the Velorona user guide in your browser.")
+        self.action_guide.triggered.connect(lambda *_: self.open_guide())
+        self.iface.addPluginToMenu(MENU_NAME, self.action_guide)
+        self.actions.append(self.action_guide)
+
         self._register_processing_provider()
 
         # Guard against a stale/pre-existing project: one saved before
@@ -396,6 +403,10 @@ class VeloronaPlugin:
             return
         from qgis import processing
         processing.execAlgorithmDialog("velorona:terrain_clearance_batch", {})
+
+    def open_guide(self, message_id: str = "") -> bool:
+        from .core import guide
+        return guide.open_guide(message_id)
 
     def show_panel(self):
         """Reopens the one Velorona dock. QGIS also lists it under View >

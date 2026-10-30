@@ -24,7 +24,7 @@ class HistoryDialog(QDialog):
         self._wanted_entity = entity_id
 
         self.entity_combo = QComboBox(self)
-        self.entity_combo.setToolTip("History is kept per link or site. Your own sites and links are stored under a private code, not their names.")
+        self.entity_combo.setToolTip("History is kept per link or site, on this computer only. Your own sites and links are stored under a private code; the names you see are kept next to it in the same file.")
         self.window_combo = QComboBox(self)
         for hours in (1, 3, 6, 24):
             self.window_combo.addItem(f"Compare with {hours} h ago", hours)
