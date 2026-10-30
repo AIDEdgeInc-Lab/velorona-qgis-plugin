@@ -14,5 +14,5 @@ def guide_button(message_id: str, parent=None) -> QToolButton:
     b.setToolTip("Open the guide for this message in your browser")
     b.setAccessibleName("Guide")
     b.setProperty("guideId", message_id)
-    b.clicked.connect(lambda _=False, mid=message_id: guide.open_guide(mid))
+    b.clicked.connect(lambda _=False: guide.open_guide(b.property("guideId")))     # read at click time: a status line can change its ID
     return b

@@ -14,11 +14,12 @@ from ..core import history_changes, history_view, messages
 from ..core.history_store import HistoryError, HistoryStore
 from . import theme
 from .names_option import ask_include_names
+from .recording_panel import RecordingPanel
 
 
 class HistoryDialog(QDialog):
     def __init__(self, parent, store: HistoryStore, known_labels: Optional[Dict[str, str]] = None, entity_id: Optional[str] = None,
-                 dark: bool = True, clock=time.time):
+                 dark: bool = True, clock=time.time, recording=None):
         super().__init__(parent)
         self.setWindowTitle("Velorona -- History")
         self.resize(820, 620)
@@ -51,7 +52,12 @@ class HistoryDialog(QDialog):
             bottom.addWidget(w)
         bottom.addStretch(1); bottom.addWidget(close)
         layout = QVBoxLayout(self)
-        layout.addLayout(top); layout.addLayout(ret); layout.addWidget(self.view, 1); layout.addLayout(bottom)
+        layout.addLayout(top); layout.addLayout(ret); layout.addWidget(self.view, 1)
+        # Automatic recording (off by default): only when the plugin passes its recording control.
+        self.recording_panel = RecordingPanel(recording, self) if recording is not None else None
+        if self.recording_panel is not None:
+            layout.addWidget(self.recording_panel)
+        layout.addLayout(bottom)
 
         self.entity_combo.currentIndexChanged.connect(lambda _i: self.refresh(keep_entity=True))
         self.window_combo.currentIndexChanged.connect(lambda _i: self.refresh(keep_entity=True))

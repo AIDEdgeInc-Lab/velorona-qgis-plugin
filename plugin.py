@@ -24,7 +24,7 @@ from qgis.PyQt.QtCore import Qt, QTimer
 from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtWidgets import QAction, QApplication, QMessageBox, QWIDGETSIZE_MAX
 
-from .core import basemap_labels, links, messages, packs, study_export
+from .core import auto_record, basemap_labels, entitlements, links, messages, packs, study_export
 from .core import imagery
 from .core import layers as layer_helpers
 from .core import network_context
@@ -292,6 +292,11 @@ class VeloronaPlugin:
         self._dataset_notes = {}               # source key -> provenance/status line shown in Records (replayed when the dock is created)
         self._pack_badges = {}                 # source key -> core.packs.Badge (replayed when the dock is created)
         self._session_results = []             # analyses of this session (newest last, at most 50), for the link-study export
+        # Automatic recording (opt-in, off at every start, session only): core/auto_record.py decides, _record_tick/_record_round run it.
+        self.recorder = auto_record.Recorder(max_links=entitlements.limit("auto_record_links"))
+        self._record_timer = None
+        self._record_task = None
+        self._recording_panel = None           # the History window's panel while it is open (refreshed after each round)
         self._viewport_status = {}             # source key -> what the live viewport layers are showing (see _set_viewport_status)
         self._satellites_task = None           # the running QgsTask that loads satellite data (None when idle)
         self._history = None                   # HistoryStore, created on first use (history is local to this computer)
@@ -370,6 +375,11 @@ class VeloronaPlugin:
             action.triggered.connect(lambda *_, u=url: links.open_url(u()))
             self.iface.addPluginToMenu(MENU_NAME, action)
             self.actions.append(action)
+
+        self._record_timer = QTimer(self.iface.mainWindow())
+        self._record_timer.setInterval(30 * 1000)               # only checks whether a round is due; nothing is fetched unless recording is on
+        self._record_timer.timeout.connect(self._record_tick)
+        self._record_timer.start()
 
         self._register_processing_provider()
 
@@ -466,6 +476,14 @@ class VeloronaPlugin:
         return action
 
     def unload(self):
+        # Automatic recording stops with the plugin (QGIS closing unloads it): nothing runs or is kept for the next session.
+        self.recorder.stop()
+        if self._record_timer is not None:
+            self._record_timer.stop()
+            self._record_timer = None
+        if self._record_task is not None:
+            self._record_task.cancel()
+            self._record_task = None
         self._link_weather_wanted = None
         if self._link_weather_task is not None:
             self._link_weather_task.cancel()
@@ -966,7 +984,7 @@ class VeloronaPlugin:
             loaded = CanadaProvider().load_all()      # identical to terrestrial_public.load_fixed_service_snapshot()
             sites, links = loaded.sites, loaded.links
             for key in (layer_helpers.SOURCE_FIXED_SITES, layer_helpers.SOURCE_FIXED_LINKS):
-                self._set_pack_badge(key, loaded.attribution.pack_generated)
+                self._set_pack_badge(key, packs.bundled_canada_generated_date())      # the bundled snapshot's own build date
             link_fields = terrestrial_public.FIXED_LINK_FIELDS
             sites_layer = self._ensure_public_layer(
                 layer_helpers.SOURCE_FIXED_SITES, infra_group, visible=True, kind="site",
@@ -2270,8 +2288,119 @@ class VeloronaPlugin:
             known = {**self._history_store().labels(), **self._history_labels}
         except history_store.HistoryError:
             known = dict(self._history_labels)
-        dialog = HistoryDialog(self.iface.mainWindow(), self._history_store(), known, entity, dark=self._map_appearance == "dark")
-        dialog.exec()
+        dialog = HistoryDialog(self.iface.mainWindow(), self._history_store(), known, entity, dark=self._map_appearance == "dark", recording=self)
+        self._recording_panel = dialog.recording_panel
+        try:
+            dialog.exec()
+        finally:
+            self._recording_panel = None
+
+    # -- automatic recording (History window) ------------------------------------------------------------------------------------------
+
+    def set_enabled(self, on: bool) -> str:
+        return self.recorder.set_enabled(on, time.time())
+
+    def set_interval(self, minutes: int) -> None:
+        self.recorder.set_interval(max(minutes, entitlements.limit("auto_record_min_interval_min")))
+
+    def remove(self, key) -> None:
+        self.recorder.remove(key)
+
+    @staticmethod
+    def time_text(ts: float) -> str:
+        return time.strftime("%H:%M", time.localtime(ts))
+
+    def _recordable(self):
+        """The weather result in the results panel that recording can repeat, or None."""
+        result = self._shown_result()
+        mw = history_capture.exposure_of(result) if result is not None else None
+        if getattr(result, "kind", "") not in ("microwave-exposure", "link-investigation") or mw is None:
+            return None
+        return result
+
+    def current_label(self):
+        result = self._recordable()
+        if result is None:
+            return None
+        link = history_capture.exposure_of(result).exposure.link
+        return f"{link.site_a.name} \u2194 {link.site_b.name}"
+
+    def add_current(self, include_names: bool) -> str:
+        result = self._recordable()
+        if result is None:
+            return auto_record.NEEDS_WEATHER
+        link = history_capture.exposure_of(result).exposure.link
+        params = {"frequency_ghz": link.frequency_ghz, "polarization": link.polarization, "fade_margin_db": link.fade_margin_db}
+        public = history_capture.is_public(result)
+        if public:
+            entry = result.entry
+            request = {"public": True, "a": entry.site_a_point, "b": entry.site_b_point, "data": dict(entry.data), "params": params, "entry": entry}
+            label = f"{entry.data.get('authorization_number') or link.id}: {link.site_a.name} \u2194 {link.site_b.name}"
+        else:
+            request = {"public": False, "site_a": link.site_a, "site_b": link.site_b, "params": params, "link_id": link.id}
+            code = history_capture.entity_ids(result, self._history_store())[0][:8]
+            label = f"{link.site_a.name} \u2194 {link.site_b.name}" if include_names else f"Your link (code {code})"
+        return self.recorder.add(auto_record.Watched(key=study_export.study_key(result), label=label, public=public,
+                                                     include_names=include_names or public, request=request))
+
+    def _record_tick(self) -> None:
+        if self._record_task is None and self.recorder.due(time.time()):
+            self._record_round()
+
+    def _record_round(self) -> None:
+        """One background round: the recorded links ONE AT A TIME; a busy service (429 / daily limit) stops the round at once."""
+        watched = self.recorder.round()
+        self.recorder.next_due = None                       # not due again until this round has finished
+
+        def no_history(*_a, **_k):                          # recording stores the current values only; the hourly context is not fetched
+            raise ValueError("not fetched by automatic recording")
+
+        def work(task):
+            out, busy = [], False
+            for w in watched:
+                if task.isCanceled():
+                    break
+                r = w.request
+                try:
+                    if r["public"]:
+                        value = microwave_exposure.analyze_link_record(r["a"], r["b"], r["data"], r["params"], history_fetcher=no_history)
+                    else:
+                        value = microwave_exposure.analyze_sites(r["site_a"], r["site_b"], r["params"], link_id=r["link_id"], history_fetcher=no_history)
+                    out.append((w.key, "ok", value, time.time()))
+                except Exception as exc:                    # live public services -- a failure is recorded for this link, never a value
+                    out.append((w.key, "error", exc, time.time()))
+                    if auto_record.is_busy_failure(exc):
+                        busy = True
+                        break
+            return out, busy
+
+        def finished(exception, result=None):
+            self._record_task = None
+            outcomes, busy = result if result is not None else ([], False)
+            self._finish_record_round(outcomes, busy)
+
+        self._record_task = QgsTask.fromFunction("Velorona: automatic recording", work, on_finished=finished)
+        QgsApplication.taskManager().addTask(self._record_task)
+
+    def _finish_record_round(self, outcomes, busy: bool) -> None:
+        """GUI thread: store what was fetched (same capture as a manual analysis), names only where the user ticked them."""
+        store = self._history_store()
+        for key, outcome, value, fetched in outcomes:
+            w = self.recorder.links.get(key)
+            if w is None:
+                continue                                    # removed while the round ran
+            if outcome != "ok":
+                w.last_error = str(value)[:120]
+                continue
+            result = inspector.LinkInvestigation(entry=w.request["entry"], exposure=value) if w.public else value
+            report = history_capture.capture(result, store, fetched)
+            if w.include_names:
+                self._remember_history_labels(result)
+            w.last_ok, w.last_error = (fetched, "") if report.ok else (w.last_ok, report.user_text()[:120])
+        if self.recorder.enabled:
+            self.recorder.finish_round(time.time(), busy)
+        if self._recording_panel is not None:
+            self._recording_panel.refresh()
 
     def _show_result(self, result):
         self._ensure_dock()
