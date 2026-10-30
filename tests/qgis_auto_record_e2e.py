@@ -237,25 +237,25 @@ check("recording itself stays on; stored values are kept", plugin.recorder.enabl
 mode["m"] = "ok"
 plugin.recorder.set_enabled(False, time.time())
 
-print("== 4. the user's own link: code only unless ticked; free limit ==")
+print("== 4. the user's own link is never recorded (as in the Map); free limit ==")
 me.analyze_sites = fake_sites
 own = own_result("My Secret Tower")
 plugin._shown_result = lambda: own
-label_count = len(store.labels())
-plugin.add_current(False)
-own_w = [x for x in plugin.recorder.links.values() if not x.public][0]
-check("own link without the tick: listed under its code, not its name", own_w.label.startswith("Your link (code ") and "My Secret Tower" not in own_w.label)
+label_count, link_count = len(store.labels()), len(plugin.recorder.links)
+check("own link: refused with I-RECORD-MYDATA, nothing added", plugin.add_current() == auto_record.MYDATA and len(plugin.recorder.links) == link_count)
 plugin.recorder.set_enabled(True, time.time())
 plugin._record_tick(); settle()
-check("own link recorded without storing its names", "My Secret Tower" not in store.labels().values() and len(store.labels()) == label_count)
-plugin.add_current(True)
-plugin.recorder.next_due = time.time()
-plugin._record_tick(); settle()
-check("with the tick, the names are stored on this computer", "My Secret Tower" in " ".join(store.labels().values()))
-plugin.recorder.max_links = 2
-other = own_result("Other", lat_shift=0.5)
+check("nothing about it is fetched or stored", "My Secret Tower" not in " ".join(store.labels().values()) and len(store.labels()) == label_count)
+plugin._shown_result = lambda: own
+panel.add_button.click()
+check("the panel says why (I-RECORD-MYDATA)", "I-RECORD-MYDATA" in panel.status.text(), panel.status.text())
+import copy
+plugin.recorder.max_links = len(plugin.recorder.links)
+other = copy.copy(inv)
+other.entry = copy.copy(inv.entry)
+other.entry.site_a_point = (inv.entry.site_a_point[0] + 0.5, inv.entry.site_a_point[1])
 plugin._shown_result = lambda: other
-check("beyond the free limit a link is refused with the plan message", plugin.add_current(False) == auto_record.LIMIT)
+check("beyond the free limit a link is refused with the plan message", plugin.add_current() == auto_record.LIMIT)
 
 print("== 5. unloading stops everything ==")
 plugin.unload()

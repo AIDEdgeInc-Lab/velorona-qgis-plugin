@@ -2325,23 +2325,18 @@ class VeloronaPlugin:
         link = history_capture.exposure_of(result).exposure.link
         return f"{link.site_a.name} \u2194 {link.site_b.name}"
 
-    def add_current(self, include_names: bool) -> str:
+    def add_current(self) -> str:
         result = self._recordable()
         if result is None:
             return auto_record.NEEDS_WEATHER
+        if not history_capture.is_public(result):
+            return auto_record.MYDATA                      # the user's own links are never recorded on a timer (as in the Map)
         link = history_capture.exposure_of(result).exposure.link
         params = {"frequency_ghz": link.frequency_ghz, "polarization": link.polarization, "fade_margin_db": link.fade_margin_db}
-        public = history_capture.is_public(result)
-        if public:
-            entry = result.entry
-            request = {"public": True, "a": entry.site_a_point, "b": entry.site_b_point, "data": dict(entry.data), "params": params, "entry": entry}
-            label = f"{entry.data.get('authorization_number') or link.id}: {link.site_a.name} \u2194 {link.site_b.name}"
-        else:
-            request = {"public": False, "site_a": link.site_a, "site_b": link.site_b, "params": params, "link_id": link.id}
-            code = history_capture.entity_ids(result, self._history_store())[0][:8]
-            label = f"{link.site_a.name} \u2194 {link.site_b.name}" if include_names else f"Your link (code {code})"
-        return self.recorder.add(auto_record.Watched(key=study_export.study_key(result), label=label, public=public,
-                                                     include_names=include_names or public, request=request), now=time.time())
+        entry = result.entry
+        request = {"a": entry.site_a_point, "b": entry.site_b_point, "data": dict(entry.data), "params": params, "entry": entry}
+        label = f"{entry.data.get('authorization_number') or link.id}: {link.site_a.name} \u2194 {link.site_b.name}"
+        return self.recorder.add(auto_record.Watched(key=study_export.study_key(result), label=label, request=request), now=time.time())
 
     def _record_tick(self) -> None:
         if self._record_task is None and self.recorder.due(time.time()):
@@ -2362,10 +2357,7 @@ class VeloronaPlugin:
                     break
                 r = w.request
                 try:
-                    if r["public"]:
-                        value = microwave_exposure.analyze_link_record(r["a"], r["b"], r["data"], r["params"], history_fetcher=no_history)
-                    else:
-                        value = microwave_exposure.analyze_sites(r["site_a"], r["site_b"], r["params"], link_id=r["link_id"], history_fetcher=no_history)
+                    value = microwave_exposure.analyze_link_record(r["a"], r["b"], r["data"], r["params"], history_fetcher=no_history)
                     out.append((w.key, "ok", value, time.time()))
                 except Exception as exc:                    # live public services -- a failure is recorded for this link, never a value
                     out.append((w.key, "error", exc, time.time()))
@@ -2383,7 +2375,7 @@ class VeloronaPlugin:
         QgsApplication.taskManager().addTask(self._record_task)
 
     def _finish_record_round(self, outcomes, busy: bool, taken=()) -> None:
-        """GUI thread: store what was fetched (same capture as a manual analysis), names only where the user ticked them; per-link back-off/stop."""
+        """GUI thread: store what was fetched (same capture as a manual analysis), per-link back-off/stop."""
         store = self._history_store()
         now = time.time()
         for key, outcome, value, fetched in outcomes:
@@ -2394,10 +2386,9 @@ class VeloronaPlugin:
                 w.last_error = str(value)[:120]
                 self.recorder.link_done(key, now, ok=False, busy=auto_record.is_busy_failure(value))
                 continue
-            result = inspector.LinkInvestigation(entry=w.request["entry"], exposure=value) if w.public else value
+            result = inspector.LinkInvestigation(entry=w.request["entry"], exposure=value)
             report = history_capture.capture(result, store, fetched)
-            if w.include_names:
-                self._remember_history_labels(result)
+            self._remember_history_labels(result)
             w.last_ok, w.last_error = (fetched, "") if report.ok else (w.last_ok, report.user_text()[:120])
             self.recorder.link_done(key, now, ok=True)
         self.recorder.skipped(list(taken), now)              # links the round did not reach (it ended at a busy source)

@@ -27,16 +27,13 @@ class RecordingPanel(QGroupBox):
         self.links.setMaximumHeight(110)
         self.remove_button = QPushButton("Remove", self)
         self.add_button = QPushButton("Record the link in the results panel", self)
-        self.add_names = QCheckBox("Include my site names", self)
-        self.add_names.setChecked(False)
-        self.add_names.setToolTip("For your own sites and links: store their names on this computer next to the private code. Off: only the code.")
         note = QLabel("Stops when QGIS closes. Gaps are normal when the computer sleeps; nothing is filled in.", self)
         note.setWordWrap(True)
         note.setStyleSheet("color: palette(mid);")
 
         row1 = QHBoxLayout(); row1.addWidget(self.enabled_box, 1); row1.addWidget(self.interval_combo)
         row2 = QHBoxLayout(); row2.addWidget(self.status, 1); row2.addWidget(self.status_help)
-        row3 = QHBoxLayout(); row3.addWidget(self.add_button); row3.addWidget(self.add_names); row3.addStretch(1); row3.addWidget(self.remove_button)
+        row3 = QHBoxLayout(); row3.addWidget(self.add_button); row3.addStretch(1); row3.addWidget(self.remove_button)
         layout = QVBoxLayout(self)
         layout.addLayout(row1); layout.addLayout(row2); layout.addWidget(self.links); layout.addLayout(row3); layout.addWidget(note)
 
@@ -73,7 +70,7 @@ class RecordingPanel(QGroupBox):
         self.refresh(self._control.set_enabled(on))
 
     def _on_add(self) -> None:
-        self.refresh(self._control.add_current(self.add_names.isChecked()))
+        self.refresh(self._control.add_current())
 
     def _on_remove(self) -> None:
         item = self.links.currentItem() or (self.links.item(0) if self.links.count() == 1 else None)

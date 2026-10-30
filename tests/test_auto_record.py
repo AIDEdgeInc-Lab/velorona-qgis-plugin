@@ -9,8 +9,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core import auto_record as A, messages  # noqa: E402
 
 
-def w(i, public=True):
-    return A.Watched(key=(("l", i),), label=f"L{i}", public=public, include_names=False, request={})
+def w(i):
+    return A.Watched(key=(("l", i),), label=f"L{i}", request={})
 
 
 def rec(max_links=10):
@@ -121,10 +121,8 @@ def test_busy_detection_uses_the_providers_wording():
 
 
 def test_registry_ids_and_wording():
-    for mid in (A.OFF, A.ON, A.LIMIT, A.BUSY, A.STOPPED, A.ADDED, A.ALREADY, A.NEEDS_WEATHER):
+    for mid in (A.OFF, A.ON, A.LIMIT, A.BUSY, A.STOPPED, A.ADDED, A.ALREADY, A.NEEDS_WEATHER, A.MYDATA):
         assert messages.has(mid), mid
-    for mid in (A.ON, A.LIMIT, A.BUSY, A.STOPPED):                 # the Map's own entries, not plugin copies
-        assert mid not in messages.PLUGIN_ONLY, mid
-    assert messages.text(A.ON, N=3, M=15) == "Recording on: 3 links every 15 min."
-    for _, (_, _, text) in messages.PLUGIN_ONLY.items():
-        assert "QGIS" not in text and " tab" not in text            # product-neutral, so the Map can register the same words
+        assert mid not in messages.PLUGIN_ONLY, mid                # all are the Map registry's entries, not plugin copies
+    assert messages.text(A.ON, N=3, M=15).startswith("Recording on: 3 links every 15 min.")
+    assert "PAUSED" not in "".join(vars(A))                        # W-RECORD-PAUSED was W-RECORD-STOPPED's situation

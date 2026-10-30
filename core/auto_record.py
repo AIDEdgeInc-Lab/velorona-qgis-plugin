@@ -9,8 +9,9 @@ What it promises, and nothing more:
 * per link, as in the Map: a busy source (HTTP 429 or 5xx, or a daily limit) doubles that link's wait, up to 8x the interval, and ends the
   round so nothing more is asked of it now; three failed or busy fetches of a link in a row stop recording of that link (W-RECORD-STOPPED)
   and the values already stored are kept. A failure is never stored as a value;
-* values are stored by the same capture as a manual analysis, with the time the provider gives and the real fetch time; the user's own
-  sites and links are stored under their private code, and their NAMES only when the user ticked "Include my site names" for that link.
+* only links of public records (a Fixed Service link from a public register) are recorded. The user's own imported links and sites are never
+  recorded on a timer (I-RECORD-MYDATA, as in the Map): nothing about them is fetched without the user asking each time;
+* values are stored by the same capture as a manual analysis, with the time the provider gives and the real fetch time.
 Gaps are normal (the computer sleeps, QGIS is closed): the series is what was fetched, nothing is filled in.
 """
 
@@ -27,17 +28,16 @@ MAX_BACKOFF_FACTOR = 8
 STOP_AFTER_FAILURES = 3
 JITTER_S = 60
 
-# Message IDs. ON, BUSY, STOPPED, LIMIT are the Map registry's (same situations, same words); the other four are plugin-only (core/messages.py).
-OFF, ON, LIMIT, BUSY, STOPPED, ADDED, ALREADY, NEEDS_WEATHER = (
-    "I-RECORD-OFF", "I-RECORD-ON", "W-RECORD-LIMIT", "W-RECORD-BUSY", "W-RECORD-STOPPED", "I-RECORD-ADDED", "I-RECORD-ALREADY", "I-RECORD-NEEDS-WEATHER")
+# Message IDs: all from the Map registry (core/messages.json), same situations, same words.
+OFF, ON, LIMIT, BUSY, STOPPED, ADDED, ALREADY, NEEDS_WEATHER, MYDATA = (
+    "I-RECORD-OFF", "I-RECORD-ON", "W-RECORD-LIMIT", "W-RECORD-BUSY", "W-RECORD-STOPPED", "I-RECORD-ADDED", "I-RECORD-ALREADY", "I-RECORD-NEEDS-WEATHER",
+    "I-RECORD-MYDATA")
 
 
 @dataclass
 class Watched:
     key: tuple                      # core.study_export.study_key of the link
-    label: str                      # what the History window shows (the user's own names only if include_names)
-    public: bool                    # a public Fixed Service record (stored by its id) or the user's own sites (stored under a private code)
-    include_names: bool
+    label: str                      # what the History window shows
     request: Dict[str, Any]         # what the worker needs to fetch again (see plugin.py _record_round)
     last_ok: Optional[float] = None
     last_error: str = ""
