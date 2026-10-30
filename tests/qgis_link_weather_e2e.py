@@ -174,7 +174,7 @@ inv = select(A)
 check("the selection returned while the weather request was still blocked (not on the interface thread)", time.time() - t0 < 10 and state["running"] <= 1)
 check("the panel is a link investigation marked as loading", getattr(inv, "kind", "") == "link-investigation" and inv.weather_pending and inv.exposure is None)
 text = plugin.dock.browser.toPlainText()
-check("the panel says the weather is loading, not that it failed", "Loading weather" in text and "could not be retrieved" not in text)
+check("the panel says the weather is loading, not that it failed", "Fetching weather at both endpoints" in text and "could not be retrieved" not in text)
 for _ in range(10):
     qgs.processEvents()
 check("the request ran in a worker thread", bool(calls) and calls[0][1] is False, str(calls))

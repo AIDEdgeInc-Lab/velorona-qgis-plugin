@@ -117,7 +117,9 @@ def analyze_endpoints(lat_a, lon_a, lat_b, lon_b, params: dict, link_id: str, el
         return call_with_backoff(lambda: analyze_link(**inputs), retryable=(ElevationDataError, requests.exceptions.RequestException))
     except (ElevationDataError, requests.exceptions.RequestException) as exc:   # the two explicit elevation-data failures only (T1, R5)
         failure = classify(exc)
-        raise NoDataError("terrain", [elevation_source.request_failed(failure.reason(exc))], transient=failure.transient) from exc
+        reason = (elevation_source.bad_reply(exc) if isinstance(exc, ElevationDataError) and not failure.transient
+                  else elevation_source.request_failed(failure.reason(exc)))
+        raise NoDataError("terrain", [reason], transient=failure.transient) from exc
 
 
 def prepare(entries) -> dict:
