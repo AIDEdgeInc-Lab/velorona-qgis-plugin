@@ -15,7 +15,7 @@ _ID = re.compile(r"^[EWI]-[a-z0-9]+(?:-[a-z0-9]+)+$")
 # Plugin-only message IDs (until the registry has them): id -> the one line the panel shows.
 PLUGIN_MESSAGE_IDS = {
     "I-terrain-elevation-source": "Ground heights: Velorona's online 90 m elevation data, or a raster of yours.",
-    "I-usa-data-source": "USA links and sites come from Velorona's online data by default. Canada works without it.",
+    "I-usa-data-source": "USA data is Velorona's online data, not included in the plugin. Canada works without it.",
 }
 
 
