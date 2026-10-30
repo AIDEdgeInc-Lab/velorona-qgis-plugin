@@ -226,7 +226,7 @@ try:
         _reset_messages()
         plugin.run_terrestrial()
         wait_for_terrain_task()
-        check("nothing selected -> a clear instruction, no analysis", any("exactly one Fixed Service link" in m for m in messages()), str(messages()))
+        check("nothing selected -> a clear instruction, no analysis", any("Nothing is selected." in m and "I-SELECT-NONE" in m for m in messages()), str(messages()))
     finally:
         requests.get = orig_get
 
@@ -570,7 +570,7 @@ try:
     plugin3._refresh_usa_view()
     plugin3._refresh_usa_view()
     check("a broken pack is a quiet note, not a pop-up, and is not retried on every pan", not [m for m in messages() if "does not exist" in m]
-          and "could not be refreshed" in plugin3._dataset_notes.get(layer_helpers.SOURCE_US_SITES, "") and plugin3._usa_retry_after > 0)
+          and "United States microwave data unavailable" in plugin3._dataset_notes.get(layer_helpers.SOURCE_US_SITES, "") and plugin3._usa_retry_after > 0)
 
     print("\n== a view too large for detailed records shows the US OVERVIEW (counts, not records), like Velorona Map ==")
     set_source(pack_dir)

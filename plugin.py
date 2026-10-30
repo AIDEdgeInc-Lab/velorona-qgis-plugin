@@ -295,6 +295,7 @@ class VeloronaPlugin:
         self._history = None                   # HistoryStore, created on first use (history is local to this computer)
         self._link_weather_task = None          # the one running link-selection weather request (QgsTask) ...
         self._link_weather_wanted = None        # ... and the newest selection waiting for it
+        self._warn_guide_id = None              # set by _warn_id for the duration of one warning box
         self._history_labels = {}              # {entity id: name}, this session; the names are also kept in the history file on this computer
         self._analysis_task = None             # the running QgsTask of a terrain or weather analysis (None when idle); progress shows in the QGIS task manager
         self._endpoint_index = {}
@@ -509,17 +510,22 @@ class VeloronaPlugin:
         self.network_context_layer = None
 
     def _warn(self, message: str) -> None:
-        QMessageBox.warning(self.iface.mainWindow(), "Velorona", message)
+        """A warning box. When it was raised for a registry message (``_warn_id``) it also has a Guide button for that ID."""
+        guide_id, self._warn_guide_id = self._warn_guide_id, None
+        box = QMessageBox(QMessageBox.Icon.Warning, "Velorona", message, QMessageBox.StandardButton.Ok, self.iface.mainWindow())
+        guide_button = box.addButton("Guide", QMessageBox.ButtonRole.HelpRole) if guide_id else None
+        box.exec()
+        if guide_button is not None and box.clickedButton() is guide_button:
+            self.open_guide(guide_id)
 
     def _warn_id(self, message_id: str, **fill) -> None:
-        """A registry message (same ID and wording as Velorona Map): its short text, its ID so it can be quoted, and a Guide button that opens
-        https://map.velorona.ai/guide#<ID> in the browser."""
-        box = QMessageBox(QMessageBox.Icon.Warning, "Velorona", f"{messages.text(message_id, **fill)}\n\n{message_id}", QMessageBox.StandardButton.Ok,
-                          self.iface.mainWindow())
-        guide_button = box.addButton("Guide", QMessageBox.ButtonRole.HelpRole)
-        box.exec()
-        if box.clickedButton() is guide_button:
-            self.open_guide(message_id)
+        """A registry message (same ID and wording as Velorona Map): its short text and its ID so it can be quoted, with a Guide button that opens
+        https://map.velorona.ai/guide#<ID>. Goes through ``_warn`` so there is one place that shows warnings."""
+        self._warn_guide_id = message_id
+        try:
+            self._warn(f"{messages.text(message_id, **fill)}\n\n{message_id}")
+        finally:
+            self._warn_guide_id = None
 
     def _error(self, message: str) -> None:
         QMessageBox.critical(self.iface.mainWindow(), "Velorona", message)
