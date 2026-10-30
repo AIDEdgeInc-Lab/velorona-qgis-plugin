@@ -1,0 +1,830 @@
+{
+ "schema": "velorona.messages/1",
+ "note": "The single source of every message the Map shows and of the /guide page (scripts/build_guide.py). IDs are shared with the QGIS plugin. Levels: error = result blocked; warn = result shown, review it; info = explains a result or a change. 'source' lists where the text lives in code (checked by tests/test_guide.py).",
+ "messages": [
+  {
+   "id": "E-TERRAIN-SERVICE-FAILED",
+   "level": "error",
+   "area": "Terrain",
+   "short_text": "elevation request failed (T1)",
+   "meaning": "The elevation service did not answer, so there is no ground profile for this link. Nothing was substituted.",
+   "what_to_do": "Wait a minute and analyse again. If it keeps failing, check your connection.",
+   "recheck": "Run Analyze again on the same link.",
+   "source": [
+    "elevation.js:19"
+   ],
+   "match": "elevation request failed \\(T1\\)"
+  },
+  {
+   "id": "E-TERRAIN-SERVICE-BAD-REPLY",
+   "level": "error",
+   "area": "Terrain",
+   "short_text": "the elevation service returned an unexpected number of values (T1)",
+   "meaning": "The service answered, but not with one elevation for every sample point on the path. A partial profile is never used.",
+   "what_to_do": "Analyse again. If it repeats, the service is having trouble; try later.",
+   "recheck": "Run Analyze again on the same link.",
+   "source": [
+    "elevation.js:22"
+   ],
+   "match": "unexpected number of values \\(T1\\)"
+  },
+  {
+   "id": "E-TERRAIN-VALUE-MISSING",
+   "level": "error",
+   "area": "Terrain",
+   "short_text": "a required elevation is null, NaN or non-numeric (R5)",
+   "meaning": "At least one point on the path has no elevation. It is never treated as 0 m, because that would invent a hill or a valley.",
+   "what_to_do": "Analyse again. A path over open water or outside the elevation dataset can stay empty; use a survey for that link.",
+   "recheck": "Run Analyze again.",
+   "source": [
+    "elevation.js:26",
+    "linkmath.js:57"
+   ],
+   "match": "\\(R5\\)(?!.*antenna height)|non-numeric"
+  },
+  {
+   "id": "E-TERRAIN-PROFILE-MISSING",
+   "level": "error",
+   "area": "Terrain",
+   "short_text": "elevation profile missing or its length does not match the sample points",
+   "meaning": "The ground profile is absent or does not line up with the path, so clearance cannot be computed.",
+   "what_to_do": "Analyse again.",
+   "recheck": "Run Analyze again.",
+   "source": [
+    "linkmath.js:56"
+   ],
+   "match": "elevation profile missing"
+  },
+  {
+   "id": "E-TERRAIN-HEIGHT-RANGE",
+   "level": "error",
+   "area": "Terrain",
+   "short_text": "record antenna height ... is outside 0.1-1000 m (R5)",
+   "meaning": "The antenna height on the record is not believable, so Velorona does not clamp or guess it.",
+   "what_to_do": "Correct the height in your file and import again, or analyse a link whose record has a valid height.",
+   "recheck": "Import the corrected file and analyse again.",
+   "source": [
+    "context.js:82"
+   ],
+   "match": "antenna height at Site"
+  },
+  {
+   "id": "W-TERRAIN-BUSY",
+   "level": "warn",
+   "area": "Terrain",
+   "short_text": "The elevation service (Open-Meteo) is busy (HTTP 429). Retrying in N s",
+   "meaning": "The elevation service is rate-limiting requests. Velorona waits and retries up to three times. Nothing is substituted while it waits.",
+   "what_to_do": "Wait. If every retry fails you get E-TERRAIN-SERVICE-FAILED; try again in a minute.",
+   "recheck": "The notice disappears when a retry succeeds.",
+   "source": [
+    "net.js:71",
+    "elevation.js:18"
+   ]
+  },
+  {
+   "id": "E-PATH-COORDINATES",
+   "level": "error",
+   "area": "Path",
+   "short_text": "invalid coordinates (R4)",
+   "meaning": "A latitude or longitude is missing or outside its range, so no path exists.",
+   "what_to_do": "Fix the coordinates (decimal degrees, WGS84) and import again.",
+   "recheck": "Import the corrected file.",
+   "source": [
+    "linkmath.js:45"
+   ],
+   "match": "invalid coordinates \\(R4"
+  },
+  {
+   "id": "E-PATH-ZERO-LENGTH",
+   "level": "error",
+   "area": "Path",
+   "short_text": "zero-length link: identical endpoints (R4, R9)",
+   "meaning": "Both ends are at the same point, so there is no path to analyse.",
+   "what_to_do": "Check that site B has its own coordinates.",
+   "recheck": "Import the corrected file.",
+   "source": [
+    "linkmath.js:46"
+   ],
+   "match": "zero-length link"
+  },
+  {
+   "id": "E-WEATHER-FETCH-FAILED",
+   "level": "error",
+   "area": "Weather",
+   "short_text": "Could not fetch live weather (Open-Meteo) for: <site> (T3)",
+   "meaning": "The weather model did not answer for one end of the link. Weather is needed at both ends, so no result is shown and nothing is substituted.",
+   "what_to_do": "Analyse again in a minute.",
+   "recheck": "Run weather exposure again.",
+   "source": [
+    "mwexposure.js:521"
+   ],
+   "match": "Could not fetch live weather"
+  },
+  {
+   "id": "E-WEATHER-NO-CURRENT",
+   "level": "error",
+   "area": "Weather",
+   "short_text": "Open-Meteo weather service returned no current conditions (T3)",
+   "meaning": "The service answered without current conditions for that place.",
+   "what_to_do": "Analyse again later.",
+   "recheck": "Run weather exposure again.",
+   "source": [
+    "mwexposure.js:326"
+   ],
+   "match": "no current conditions"
+  },
+  {
+   "id": "E-WEATHER-INTERVAL",
+   "level": "error",
+   "area": "Weather",
+   "short_text": "Open-Meteo `current.interval` missing or invalid (R3)",
+   "meaning": "The reply does not say how long its rain rate applies, so the rain rate cannot be used.",
+   "what_to_do": "Analyse again later.",
+   "recheck": "Run weather exposure again.",
+   "source": [
+    "mwexposure.js:292"
+   ],
+   "match": "current\\.interval"
+  },
+  {
+   "id": "E-WEATHER-NO-PRECIP-TYPE",
+   "level": "error",
+   "area": "Weather",
+   "short_text": "precipitation type not reported: rain and showers absent (W1)",
+   "meaning": "The reply has neither a rain value nor a showers value. A missing rain rate is not read as dry.",
+   "what_to_do": "Analyse again later.",
+   "recheck": "Run weather exposure again.",
+   "source": [
+    "mwexposure.js:300"
+   ],
+   "match": "\\(W1\\)"
+  },
+  {
+   "id": "E-WEATHER-INVALID-VALUE",
+   "level": "error",
+   "area": "Weather",
+   "short_text": "invalid <field> value (W4)",
+   "meaning": "A precipitation value in the reply is negative or not a number, so it is not used.",
+   "what_to_do": "Analyse again later.",
+   "recheck": "Run weather exposure again.",
+   "source": [
+    "mwexposure.js:296"
+   ],
+   "match": "\\(W4\\)"
+  },
+  {
+   "id": "E-WEATHER-PARAMS",
+   "level": "error",
+   "area": "Weather",
+   "short_text": "a link parameter is outside its allowed range",
+   "meaning": "Frequency must be 1-100 GHz and fade margin 0.1-100 dB. The rain model refuses outside its range instead of extrapolating.",
+   "what_to_do": "Change the value (or the row in your file) to a value in range.",
+   "recheck": "Edit the value and analyse again.",
+   "source": [
+    "mwexposure.js:420"
+   ],
+   "match": "frequency|fade margin"
+  },
+  {
+   "id": "W-WEATHER-BUSY",
+   "level": "warn",
+   "area": "Weather",
+   "short_text": "Open-Meteo weather service is busy (HTTP 429). Retrying in N s",
+   "meaning": "The weather model is rate-limiting requests. Velorona waits and retries up to three times; nothing is substituted.",
+   "what_to_do": "Wait. If every retry fails you get E-WEATHER-FETCH-FAILED; try again in a minute.",
+   "recheck": "The notice disappears when a retry succeeds.",
+   "source": [
+    "net.js:71",
+    "mwexposure.js:323"
+   ]
+  },
+  {
+   "id": "W-WEATHER-STATIONS-DOWN",
+   "level": "warn",
+   "area": "Weather",
+   "short_text": "Some weather-station sources were unavailable. The result uses the model rain rate",
+   "meaning": "ECCC stations or radar did not answer. The result is built from the model rain rate only, and the evidence rows say what was and was not available.",
+   "what_to_do": "Read the Evidence rows before relying on the result. Analyse again later for a station comparison.",
+   "recheck": "Run weather exposure again.",
+   "source": [
+    "workflow.js:498"
+   ]
+  },
+  {
+   "id": "I-WEATHER-FETCHING",
+   "level": "info",
+   "area": "Weather",
+   "short_text": "Fetching weather at both endpoints (Open-Meteo, ECCC)…",
+   "meaning": "Weather is being requested for both ends of the link.",
+   "what_to_do": "Wait a few seconds.",
+   "recheck": "The message clears when the result opens.",
+   "source": [
+    "workflow.js:471"
+   ]
+  },
+  {
+   "id": "I-TERRAIN-FETCHING",
+   "level": "info",
+   "area": "Terrain",
+   "short_text": "Fetching terrain elevations…",
+   "meaning": "About 50 elevation points along the path are being requested.",
+   "what_to_do": "Wait a few seconds.",
+   "recheck": "The message clears when the result opens.",
+   "source": [
+    "app.js:2386"
+   ]
+  },
+  {
+   "id": "W-LAYER-LIVE-DOWN",
+   "level": "warn",
+   "area": "Layers",
+   "short_text": "<layer>: <reason> No cellular/tower markers for this view; other layers are unaffected.",
+   "meaning": "A live layer (cellular or towers) did not answer for this view.",
+   "what_to_do": "Pan or zoom to retry. Other layers keep working.",
+   "recheck": "Move the map and the layer asks again.",
+   "source": [
+    "app.js:1197"
+   ]
+  },
+  {
+   "id": "W-LAYER-US-DOWN",
+   "level": "warn",
+   "area": "Layers",
+   "short_text": "United States microwave data unavailable: <reason> Canada is unaffected.",
+   "meaning": "The US pack did not load. Canadian data is not affected.",
+   "what_to_do": "Zoom in again (the US pack loads at zoom 8 or closer) or reload.",
+   "recheck": "Zoom out and in.",
+   "source": [
+    "app.js:1375",
+    "app.js:2449"
+   ]
+  },
+  {
+   "id": "I-LAYER-MYDATA-HIDDEN",
+   "level": "info",
+   "area": "Layers",
+   "short_text": "The My Data layer is hidden -- switch it on under Data sources",
+   "meaning": "Your imported link is analysed but its layer is switched off, so you cannot see it.",
+   "what_to_do": "Switch My Data on under Data sources.",
+   "recheck": "The link appears on the map.",
+   "source": [
+    "app.js:2057"
+   ]
+  },
+  {
+   "id": "I-FILTER-NO-MATCH",
+   "level": "info",
+   "area": "Layers",
+   "short_text": "Nothing matches the current filters yet",
+   "meaning": "The filters and checked layers leave no records to act on.",
+   "what_to_do": "Relax Operator/Search, Frequency or Select Area, or check more layers.",
+   "recheck": "Records appear as soon as something matches.",
+   "source": [
+    "app.js:2335"
+   ]
+  },
+  {
+   "id": "I-SOURCES-SEARCH-EMPTY",
+   "level": "info",
+   "area": "Layers",
+   "short_text": "No source or layer matches. Clear the search to see all sources.",
+   "meaning": "The search box in Data sources matches nothing.",
+   "what_to_do": "Clear the search.",
+   "recheck": "All sources are listed again.",
+   "source": [
+    "app.html:87"
+   ]
+  },
+  {
+   "id": "I-SATELLITE-LOADING",
+   "level": "info",
+   "area": "Satellites",
+   "short_text": "Connecting to satellite data (CelesTrak) -- this may take a few seconds…",
+   "meaning": "Orbital elements are being fetched.",
+   "what_to_do": "Wait a few seconds.",
+   "recheck": "The message clears when positions appear.",
+   "source": [
+    "space.js:222"
+   ]
+  },
+  {
+   "id": "W-SATELLITE-PARTIAL",
+   "level": "warn",
+   "area": "Satellites",
+   "short_text": "Satellites: N of M CelesTrak groups did not respond -- showing the rest.",
+   "meaning": "Some satellite groups are missing from the map.",
+   "what_to_do": "Switch the Satellites layer off and on to retry.",
+   "recheck": "Groups appear after a successful retry.",
+   "source": [
+    "space.js:228"
+   ]
+  },
+  {
+   "id": "E-SATELLITE-DOWN",
+   "level": "error",
+   "area": "Satellites",
+   "short_text": "Satellite data unavailable -- <reason>",
+   "meaning": "No satellite data could be loaded.",
+   "what_to_do": "Switch the Satellites layer off and on to retry.",
+   "recheck": "Satellites appear after a successful retry.",
+   "source": [
+    "space.js:241"
+   ]
+  },
+  {
+   "id": "I-SELECT-HINT",
+   "level": "info",
+   "area": "Selection",
+   "short_text": "Click a feature to select it. Shift-click a second feature",
+   "meaning": "How to start an analysis.",
+   "what_to_do": "Click a site or link; Shift-click a second one.",
+   "recheck": "The Analyze button lights up when the selection is valid.",
+   "source": [
+    "app.html:383"
+   ]
+  },
+  {
+   "id": "I-SELECT-NONE",
+   "level": "info",
+   "area": "Selection",
+   "short_text": "Nothing is selected.",
+   "meaning": "No analysis can run without a selection.",
+   "what_to_do": "Click a site or a Fixed Service link (Shift-click to add another), or use Import.",
+   "recheck": "Select something.",
+   "source": [
+    "workflow.js:159"
+   ]
+  },
+  {
+   "id": "I-SELECT-AREA",
+   "level": "info",
+   "area": "Selection",
+   "short_text": "This is an area selection.",
+   "meaning": "An area selection holds many features; analyses need specific ones.",
+   "what_to_do": "Press Clear, then pick two sites, one link, or one satellite plus one ground station. Export still exports the selected records.",
+   "recheck": "Select again.",
+   "source": [
+    "workflow.js:160"
+   ]
+  },
+  {
+   "id": "I-SELECT-IMPORTED",
+   "level": "info",
+   "area": "Selection",
+   "short_text": "Imported links are analysed one at a time.",
+   "meaning": "Weather exposure runs on a single imported link.",
+   "what_to_do": "Press Clear and select one imported link.",
+   "recheck": "Select again.",
+   "source": [
+    "workflow.js:161"
+   ]
+  },
+  {
+   "id": "I-SELECT-LINK",
+   "level": "info",
+   "area": "Selection",
+   "short_text": "A Fixed Service link is analysed on its own.",
+   "meaning": "A link plus other features has no analysis.",
+   "what_to_do": "Press Clear and select just the link, or select two sites.",
+   "recheck": "Select again.",
+   "source": [
+    "workflow.js:162"
+   ]
+  },
+  {
+   "id": "I-SELECT-ONE-SITE",
+   "level": "info",
+   "area": "Selection",
+   "short_text": "1 site selected. Shift-click a second site",
+   "meaning": "Path analyses need two sites.",
+   "what_to_do": "Shift-click a second site, or select a Fixed Service link on its own.",
+   "recheck": "Select again.",
+   "source": [
+    "workflow.js:163"
+   ]
+  },
+  {
+   "id": "I-SELECT-SITES",
+   "level": "info",
+   "area": "Selection",
+   "short_text": "N sites are selected, but path clearance and weather exposure use exactly two.",
+   "meaning": "Too many sites for a path analysis.",
+   "what_to_do": "Press Clear and pick two.",
+   "recheck": "Select again.",
+   "source": [
+    "workflow.js:164"
+   ]
+  },
+  {
+   "id": "I-SELECT-SATELLITE",
+   "level": "info",
+   "area": "Selection",
+   "short_text": "Satellite selected. Shift-click a ground/earth station",
+   "meaning": "Look angles need one satellite and one ground station.",
+   "what_to_do": "Shift-click a ground or earth station.",
+   "recheck": "Select again.",
+   "source": [
+    "workflow.js:166"
+   ]
+  },
+  {
+   "id": "I-SELECT-STATION",
+   "level": "info",
+   "area": "Selection",
+   "short_text": "Ground/earth station selected. Shift-click a satellite",
+   "meaning": "Look angles need one satellite and one ground station.",
+   "what_to_do": "Shift-click a satellite.",
+   "recheck": "Select again.",
+   "source": [
+    "workflow.js:167"
+   ]
+  },
+  {
+   "id": "I-SELECT-LOOKANGLE",
+   "level": "info",
+   "area": "Selection",
+   "short_text": "Look angles use exactly one satellite and one ground/earth station.",
+   "meaning": "The space selection does not match a look-angle analysis.",
+   "what_to_do": "Select one satellite and one ground station.",
+   "recheck": "Select again.",
+   "source": [
+    "workflow.js:168"
+   ]
+  },
+  {
+   "id": "I-SELECT-MIX",
+   "level": "info",
+   "area": "Selection",
+   "short_text": "Terrestrial sites and space features are not analysed together",
+   "meaning": "Ground sites and space features belong to different analyses.",
+   "what_to_do": "Select either two sites, or one satellite and one ground station.",
+   "recheck": "Select again.",
+   "source": [
+    "workflow.js:171"
+   ]
+  },
+  {
+   "id": "I-SELECT-OTHER",
+   "level": "info",
+   "area": "Selection",
+   "short_text": "This combination has no analysis.",
+   "meaning": "The selection matches no analysis.",
+   "what_to_do": "Path clearance and weather exposure need two sites or one link; look angles need one satellite and one ground station.",
+   "recheck": "Select again.",
+   "source": [
+    "workflow.js:173"
+   ]
+  },
+  {
+   "id": "I-EXPORT-DONE",
+   "level": "info",
+   "area": "Export",
+   "short_text": "Exported <file or N records>.",
+   "meaning": "A file was saved to your downloads. The evidence export lists every value with its type and source.",
+   "what_to_do": "Open the file; the first lines explain the type key.",
+   "recheck": "Export again any time.",
+   "source": [
+    "workflow.js:269",
+    "agent_ui.js:273"
+   ]
+  },
+  {
+   "id": "I-EXPORT-NOTHING",
+   "level": "info",
+   "area": "Export",
+   "short_text": "Nothing to export yet -- select features, analyse a selection, or import your own links",
+   "meaning": "Export has nothing to write.",
+   "what_to_do": "Select features, run an analysis, or import links.",
+   "recheck": "The Export button fills in when there is something.",
+   "source": [
+    "workflow.js:200"
+   ]
+  },
+  {
+   "id": "I-RESULT-CLEAR",
+   "level": "info",
+   "area": "Result",
+   "short_text": "Clear, N% above minimum -- comfortable margin.",
+   "meaning": "The line of sight clears the 60% first-Fresnel-zone standard with good headroom.",
+   "what_to_do": "Nothing to do.",
+   "recheck": "Re-run after the inputs change.",
+   "source": [
+    "explain.js:30"
+   ]
+  },
+  {
+   "id": "I-RESULT-CLEAR-LIMITED",
+   "level": "info",
+   "area": "Result",
+   "short_text": "Clear, but only N% above minimum clearance -- limited headroom.",
+   "meaning": "It clears the standard, but not by much.",
+   "what_to_do": "Check antenna heights and the elevation source; consider a survey if it matters.",
+   "recheck": "Re-run with corrected heights.",
+   "source": [
+    "explain.js:28"
+   ]
+  },
+  {
+   "id": "W-RESULT-NEAR-THRESHOLD",
+   "level": "warn",
+   "area": "Result",
+   "short_text": "Near threshold -- a ~10-15m elevation difference could change this result",
+   "meaning": "The elevation data is accurate to roughly this much, which is enough to flip the status.",
+   "what_to_do": "Verify with a survey before relying on it.",
+   "recheck": "A survey result replaces the model value.",
+   "source": [
+    "explain.js:21"
+   ]
+  },
+  {
+   "id": "W-RESULT-MARGINAL",
+   "level": "warn",
+   "area": "Result",
+   "short_text": "Marginal -- N% below standard microwave link clearance practice (60% of the first Fresnel zone)",
+   "meaning": "The path clears the ground but not the standard clearance.",
+   "what_to_do": "Review the profile; consider higher antennas or a different path.",
+   "recheck": "Re-run with changed heights.",
+   "source": [
+    "explain.js:34"
+   ]
+  },
+  {
+   "id": "W-RESULT-OBSTRUCTED",
+   "level": "warn",
+   "area": "Result",
+   "short_text": "Obstructed -- ground is N m above the line of sight",
+   "meaning": "The terrain model rises above the line of sight. Trees and buildings are not in the model, so reality can differ.",
+   "what_to_do": "Treat as a stop sign for planning; confirm with a survey.",
+   "recheck": "Re-run with changed heights or a different path.",
+   "source": [
+    "explain.js:38"
+   ]
+  },
+  {
+   "id": "I-STORED-EMPTY",
+   "level": "info",
+   "area": "Stored values",
+   "short_text": "Nothing stored yet. Values are saved when you analyse the weather exposure of a link.",
+   "meaning": "The store on this computer is empty.",
+   "what_to_do": "Analyse the weather exposure of a link.",
+   "recheck": "Values appear after the next weather analysis.",
+   "source": [
+    "weather_history_ui.js:57"
+   ]
+  },
+  {
+   "id": "I-STORED-NOTHING-TO-COMPARE",
+   "level": "info",
+   "area": "Stored values",
+   "short_text": "Nothing to compare yet.",
+   "meaning": "There is no earlier value to compare with.",
+   "what_to_do": "Analyse again later; the comparison needs a value from about the chosen hours ago.",
+   "recheck": "Check again after a later analysis.",
+   "source": [
+    "weather_history_ui.js:123"
+   ]
+  },
+  {
+   "id": "I-STORED-THIN",
+   "level": "info",
+   "area": "Stored values",
+   "short_text": "no stored value from about N h ago",
+   "meaning": "Nothing was stored at that point in the past. A gap is a real gap: a failed fetch stores nothing.",
+   "what_to_do": "Pick a shorter window, or analyse again and compare later.",
+   "recheck": "Change the window or wait.",
+   "source": [
+    "weather_history_ui.js:121",
+    "agent_history.js:69"
+   ]
+  },
+  {
+   "id": "I-STORED-NOTE",
+   "level": "info",
+   "area": "Stored values",
+   "short_text": "The weather values Velorona Map fetched for your links, kept on this computer only.",
+   "meaning": "Stored values never leave your browser. Velorona does not receive them.",
+   "what_to_do": "Use Export CSV to keep a copy; Clear my history to delete them.",
+   "recheck": "–",
+   "source": [
+    "app.html:482"
+   ]
+  },
+  {
+   "id": "W-HISTORY-PRIVATE-MODE",
+   "level": "warn",
+   "area": "Stored values",
+   "short_text": "This browser does not allow stored history here (for example a private window). Values are kept only until this tab is closed.",
+   "meaning": "Storage is blocked, so history lives in memory only.",
+   "what_to_do": "Use a normal window if you want the values to survive a restart.",
+   "recheck": "Reopen in a normal window.",
+   "source": [
+    "weather_history.js:117"
+   ]
+  },
+  {
+   "id": "W-HISTORY-CLOCK",
+   "level": "warn",
+   "area": "Stored values",
+   "short_text": "This computer's clock looks about N min behind the data source",
+   "meaning": "Stored times come from the data source; the comparison uses your computer's clock for \"now\".",
+   "what_to_do": "Correct the computer's clock.",
+   "recheck": "The warning clears after the next analysis.",
+   "source": [
+    "weather_history.js:164"
+   ]
+  },
+  {
+   "id": "W-HISTORY-STORAGE-FULL",
+   "level": "warn",
+   "area": "Stored values",
+   "short_text": "Storage on this computer is full, so history is kept only until this tab is closed.",
+   "meaning": "The browser refused more storage.",
+   "what_to_do": "Export CSV, then Clear my history; or free space in the browser.",
+   "recheck": "Reload after freeing space.",
+   "source": [
+    "weather_history.js:174"
+   ]
+  },
+  {
+   "id": "W-HISTORY-STORE-FAILED",
+   "level": "warn",
+   "area": "Stored values",
+   "short_text": "Storing history failed, so it is kept only until this tab is closed.",
+   "meaning": "Writing to the browser's database failed.",
+   "what_to_do": "Export CSV now if you need the values.",
+   "recheck": "Reload the page.",
+   "source": [
+    "weather_history.js:174",
+    "weather_history.js:181"
+   ]
+  },
+  {
+   "id": "W-HISTORY-CLEAR-FAILED",
+   "level": "warn",
+   "area": "Stored values",
+   "short_text": "History could not be cleared",
+   "meaning": "The delete did not complete.",
+   "what_to_do": "Try again; or clear the site's data in the browser settings.",
+   "recheck": "Press Clear my history again.",
+   "source": [
+    "weather_history.js:220"
+   ]
+  },
+  {
+   "id": "W-HISTORY-SETTING-LOST",
+   "level": "warn",
+   "area": "Stored values",
+   "short_text": "The retention choice could not be remembered after this tab closes.",
+   "meaning": "Your hours setting works now but will reset to 24 h next time.",
+   "what_to_do": "Set it again next session.",
+   "recheck": "–",
+   "source": [
+    "weather_history.js:228"
+   ]
+  },
+  {
+   "id": "I-ASK-NO-FORECAST",
+   "level": "info",
+   "area": "Ask",
+   "short_text": "Velorona Map does not predict outages or forecast link behaviour.",
+   "meaning": "Ask answers about current clearance and current-weather exposure, with evidence. It makes no forecasts.",
+   "what_to_do": "Ask about the selected links as they are now, or about your stored values.",
+   "recheck": "–",
+   "source": [
+    "agent.js:29"
+   ]
+  },
+  {
+   "id": "I-ASK-NO-OPERATOR",
+   "level": "info",
+   "area": "Ask",
+   "short_text": "The public record gives the spectrum licensee, which is not a confirmed network operator",
+   "meaning": "A licence holder is not necessarily who runs the link.",
+   "what_to_do": "Use the licensee shown in the Source record.",
+   "recheck": "–",
+   "source": [
+    "agent.js:31"
+   ]
+  },
+  {
+   "id": "I-ASK-OUTSIDE-HISTORY",
+   "level": "info",
+   "area": "Ask",
+   "short_text": "Weather history from outside this computer is not available.",
+   "meaning": "Velorona keeps only the values it fetched while you used it, on your own computer.",
+   "what_to_do": "Ask what changed in the last few hours, or what a value was N hours ago.",
+   "recheck": "–",
+   "source": [
+    "agent.js:33"
+   ]
+  },
+  {
+   "id": "I-ASK-STORED-EMPTY",
+   "level": "info",
+   "area": "Ask",
+   "short_text": "Nothing is stored on this computer yet.",
+   "meaning": "There are no stored values to answer from.",
+   "what_to_do": "Analyse the weather exposure of a link first.",
+   "recheck": "Ask again after an analysis.",
+   "source": [
+    "agent_history.js:41"
+   ]
+  },
+  {
+   "id": "I-ASK-STORED-SOURCE",
+   "level": "info",
+   "area": "Ask",
+   "short_text": "Answered from values stored on this computer only. Nothing was fetched or sent.",
+   "meaning": "Every stored-value answer is built from your own history and nothing else.",
+   "what_to_do": "–",
+   "recheck": "–",
+   "source": [
+    "agent_history.js:10"
+   ]
+  },
+  {
+   "id": "I-HELP-CLUSTER",
+   "level": "info",
+   "area": "Help",
+   "short_text": "A numbered circle groups nearby points of one layer",
+   "meaning": "Dense layers are grouped to stay readable.",
+   "what_to_do": "Zoom in to separate the points.",
+   "recheck": "–",
+   "source": [
+    "app.html:90"
+   ]
+  },
+  {
+   "id": "I-HELP-FILTER-BLANK",
+   "level": "info",
+   "area": "Help",
+   "short_text": "Leave a box blank for no bound on that side.",
+   "meaning": "A blank frequency box means no limit on that side. The frequency filter does not apply to Cellular/Mobile, Tower structures or the Space layers (Satellites, Ground/Earth Stations): those sources carry no comparable licensed frequency.",
+   "what_to_do": "Leave a box empty to remove that bound.",
+   "recheck": "–",
+   "source": [
+    "app.html:289"
+   ]
+  },
+  {
+   "id": "I-HELP-LABELS",
+   "level": "info",
+   "area": "Help",
+   "short_text": "Shows an identifying field per point.",
+   "meaning": "The label is the record's own identifier: authorization number, licensee or record ID, depending on the source. It is always available on hover and shown permanently once you zoom in far enough to read it without clutter.",
+   "what_to_do": "Hover a point, or zoom in.",
+   "recheck": "–",
+   "source": [
+    "app.html:314"
+   ]
+  },
+  {
+   "id": "I-HELP-IMPORT",
+   "level": "info",
+   "area": "Help",
+   "short_text": "All eight template columns are required, one link per row.",
+   "meaning": "Use the template: all eight columns, named exactly as in it, one link per row, decimal degrees (WGS84), plain numbers without units. Optional for weather exposure: polarization (V or H) and fade_margin_db. A row that fails a check is skipped and the reason is shown.",
+   "what_to_do": "Download the template, fill it, and import.",
+   "recheck": "Import again after fixing the rows.",
+   "source": [
+    "app.html:430"
+   ]
+  },
+  {
+   "id": "I-SIGNUP-PENDING",
+   "level": "info",
+   "area": "Sign-up",
+   "short_text": "Request received and kept as pending.",
+   "meaning": "You are signed up only after you confirm with a link we email you.",
+   "what_to_do": "Open the email and press the confirm link.",
+   "recheck": "–",
+   "source": [
+    "signup.js:67"
+   ]
+  },
+  {
+   "id": "W-SIGNUP-CLOSED",
+   "level": "warn",
+   "area": "Sign-up",
+   "short_text": "Sign-up is not open yet. Nothing was saved.",
+   "meaning": "The server is not accepting sign-ups yet.",
+   "what_to_do": "Write to map@velorona.ai instead.",
+   "recheck": "Try again later.",
+   "source": [
+    "signup.js:68"
+   ]
+  },
+  {
+   "id": "E-SIGNUP-UNREACHABLE",
+   "level": "error",
+   "area": "Sign-up",
+   "short_text": "We could not reach the server. Nothing was saved.",
+   "meaning": "The request never arrived.",
+   "what_to_do": "Check your connection and try again.",
+   "recheck": "Send again.",
+   "source": [
+    "signup.js:70"
+   ]
+  }
+ ]
+}

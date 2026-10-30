@@ -3,13 +3,14 @@ setting, clear this link / clear everything. Everything shown comes from the loc
 
 from __future__ import annotations
 
+import os
 import time
 from typing import Dict, Optional
 
-from qgis.PyQt.QtWidgets import (QComboBox, QDialog, QFileDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton, QSpinBox, QTextBrowser,
+from qgis.PyQt.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton, QSpinBox, QTextBrowser,
                                  QVBoxLayout)
 
-from ..core import history_changes, history_view
+from ..core import history_changes, history_view, messages
 from ..core.history_store import HistoryError, HistoryStore
 from . import theme
 
@@ -126,9 +127,32 @@ class HistoryDialog(QDialog):
             QMessageBox.warning(self, "Velorona", f"The retention was not changed.\n\n{exc}")
         self.refresh(keep_entity=True)
 
+    def _ask_include_names(self) -> Optional[bool]:
+        """The export options: False (the default) writes only the private codes; True also writes the names you gave your sites and links.
+        None = cancelled. Replaceable in tests."""
+        box = QDialog(self)
+        box.setWindowTitle("Export history as CSV")
+        layout = QVBoxLayout(box)
+        layout.addWidget(QLabel("The file lists the stored values. Your own sites and links appear under their private codes."))
+        include = QCheckBox("Include my site names", box)
+        include.setChecked(False)
+        include.setToolTip("Adds a column with the names you see in the History window. Leave it off if the file will be shared.")
+        layout.addWidget(include)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, box)
+        buttons.accepted.connect(box.accept)
+        buttons.rejected.connect(box.reject)
+        layout.addWidget(buttons)
+        include.setObjectName("veloronaIncludeNames")
+        if box.exec() != QDialog.DialogCode.Accepted:
+            return None
+        return include.isChecked()
+
     def _on_export(self) -> None:
+        include_names = self._ask_include_names()
+        if include_names is None:
+            return
         try:
-            name, text = self._store.export_csv(self._selected_entity())
+            name, text = self._store.export_csv(self._selected_entity(), include_names=include_names)
         except HistoryError as exc:
             QMessageBox.warning(self, "Velorona", f"History could not be exported.\n\n{exc}")
             return
@@ -141,7 +165,7 @@ class HistoryDialog(QDialog):
         except OSError as exc:
             QMessageBox.warning(self, "Velorona", f"The file could not be written.\n\n{exc}")
             return
-        QMessageBox.information(self, "Velorona", f"Exported to {path}\n\nThis file is yours; Velorona does not upload it.")
+        QMessageBox.information(self, "Velorona", messages.text("I-EXPORT-DONE", file=os.path.basename(path)) + "\n\nThis file is yours; Velorona does not upload it.")
 
     def _on_clear_entity(self) -> None:
         entity = self._selected_entity()

@@ -99,7 +99,7 @@ def test_identical_endpoints_never_produce_a_result(monkeypatch):
 def test_null_or_nonnumeric_elevation_is_refused_never_zero(monkeypatch, bad):
     vals = [200.0] * 50; vals[10] = bad
     _elev(monkeypatch, vals)
-    with pytest.raises(NoDataError, match="never treated as 0 m|elevation data unavailable"):
+    with pytest.raises(NoDataError, match="missing or non-numeric value \\(R5\\)"):
         _terrain()
 
 

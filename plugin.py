@@ -24,7 +24,7 @@ from qgis.PyQt.QtCore import Qt, QTimer
 from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtWidgets import QAction, QApplication, QMessageBox, QWIDGETSIZE_MAX
 
-from .core import basemap_labels
+from .core import basemap_labels, messages
 from .core import imagery
 from .core import layers as layer_helpers
 from .core import network_context
@@ -510,6 +510,16 @@ class VeloronaPlugin:
 
     def _warn(self, message: str) -> None:
         QMessageBox.warning(self.iface.mainWindow(), "Velorona", message)
+
+    def _warn_id(self, message_id: str, **fill) -> None:
+        """A registry message (same ID and wording as Velorona Map): its short text, its ID so it can be quoted, and a Guide button that opens
+        https://map.velorona.ai/guide#<ID> in the browser."""
+        box = QMessageBox(QMessageBox.Icon.Warning, "Velorona", f"{messages.text(message_id, **fill)}\n\n{message_id}", QMessageBox.StandardButton.Ok,
+                          self.iface.mainWindow())
+        guide_button = box.addButton("Guide", QMessageBox.ButtonRole.HelpRole)
+        box.exec()
+        if box.clickedButton() is guide_button:
+            self.open_guide(message_id)
 
     def _error(self, message: str) -> None:
         QMessageBox.critical(self.iface.mainWindow(), "Velorona", message)
@@ -1117,7 +1127,7 @@ class VeloronaPlugin:
             return
         bar = self.iface.messageBar()
         if bar is not None:
-            bar.pushMessage("Velorona", "Loading satellite data...", Qgis.MessageLevel.Info, 0)
+            bar.pushMessage("Velorona", messages.text("I-SATELLITE-LOADING"), Qgis.MessageLevel.Info, 0)
         cache = self._orbit_cache()                 # resolved here, in the GUI thread
 
         def work(task):
@@ -1163,7 +1173,7 @@ class VeloronaPlugin:
             return
         if exception is not None or not result:
             if bar is not None:
-                bar.pushMessage("Velorona", "Satellite data unavailable.", Qgis.MessageLevel.Warning, 8)
+                bar.pushMessage("Velorona", messages.text("E-SATELLITE-DOWN", reason=f"{exception or 'cancelled'}"), Qgis.MessageLevel.Warning, 8)
             self._warn(f"Satellites (CelesTrak) unavailable right now: {exception or 'cancelled'}")
             self._set_satellite_note("CelesTrak satellites: unavailable right now; nothing is substituted.")
             return
@@ -1179,13 +1189,17 @@ class VeloronaPlugin:
             pass
         elif status == "unavailable" or not rows:
             if bar is not None:
-                bar.pushMessage("Velorona", "Satellite data unavailable -- no valid CelesTrak element sets. The layer is empty.", Qgis.MessageLevel.Warning, 8)
+                bar.pushMessage("Velorona", messages.text("E-SATELLITE-DOWN", reason="no valid CelesTrak element sets. The layer is empty."), Qgis.MessageLevel.Warning, 8)
             self._warn("No usable CelesTrak element sets: " + (detail or "none returned") + ". The Satellites layer is empty; nothing is substituted. "
                        "The source is not asked again until its back-off has passed.")
         else:
             label = {"stale": "older than the 2-hour refresh window (shown, flagged 'stale')", "partial": "only some groups available"}.get(status, status)
             if bar is not None:
-                bar.pushMessage("Velorona", f"Satellite data is {label}.", Qgis.MessageLevel.Warning, 8)
+                groups = list(feed.get("per_group", {}).values())
+                missing = sum(1 for g in groups if g.get("status") == "unavailable")
+                shown = (messages.text("W-SATELLITE-PARTIAL", N=missing, M=len(groups)) if status == "partial" and groups
+                         else f"Satellite data is {label}.")
+                bar.pushMessage("Velorona", shown, Qgis.MessageLevel.Warning, 8)
             self._warn(f"Satellites: {label}. {detail}")
         if skipped:
             self._warn(f"{skipped} element set(s) were not shown (SGP4 could not propagate them to this time).")
@@ -1619,6 +1633,17 @@ class VeloronaPlugin:
                 entries.append((kind, layer, feature))
         return entries
 
+    @staticmethod
+    def _selection_message(sites: int, links: int) -> str:
+        """The registry message for a selection that does not make a terrestrial analysis (same situations and wording as Velorona Map)."""
+        if links:
+            return "I-SELECT-LINK"                     # a Fixed Service link is analysed on its own
+        if sites == 0:
+            return "I-SELECT-NONE"
+        if sites == 1:
+            return "I-SELECT-ONE-SITE"
+        return "I-SELECT-SITES"
+
     def _selected_by_kind(self, kind: str):
         return [(layer, feature) for k, layer, feature in self._gather_selected_entries() if k == kind]
 
@@ -1631,11 +1656,7 @@ class VeloronaPlugin:
             if not entries and len(links) == 1:
                 self._run_terrestrial_for_link(*links[0])
                 return
-            self._warn(
-                f"Select exactly two 'site' features (any layer, public or your own import) as "
-                f"the link's endpoints, or exactly one Fixed Service link. Currently {len(entries)} site(s) and "
-                f"{len(links)} link(s) selected."
-            )
+            self._warn_id(self._selection_message(len(entries), len(links)), N=len(entries))
             return
         defaults = terrestrial.build_params(entries)
         dialog = self._terrain_dialog("Velorona -- Terrestrial Path Clearance", defaults)
@@ -1903,7 +1924,7 @@ class VeloronaPlugin:
                 self._usa_retry_after = time.monotonic() + 60.0
                 if have_layers:
                     for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
-                        self._set_note(key, f"USA records could not be refreshed for this view: {exc}")
+                        self._set_note(key, messages.text("W-LAYER-US-DOWN", reason=f"{exc}."))
                 else:
                     QgsMessageLog.logMessage(f"USA data could not be loaded for this view: {exc}", "Velorona", Qgis.MessageLevel.Warning)
                 return
@@ -1975,10 +1996,7 @@ class VeloronaPlugin:
     def run_microwave(self):
         entries = self._selected_by_kind("site")
         if len(entries) != 2:
-            self._warn(
-                f"Select exactly two 'site' features (any layer -- public or your own import) as "
-                f"the link's endpoints. Currently {len(entries)} selected."
-            )
+            self._warn_id(self._selection_message(len(entries), len(self._selected_by_kind("link"))), N=len(entries))
             return
         defaults = microwave_exposure.build_params(entries)
         dialog = ParamDialog(self.iface.mainWindow(), "Velorona -- Microwave Weather Exposure", microwave_exposure.PARAM_SPEC, defaults)
@@ -2002,10 +2020,14 @@ class VeloronaPlugin:
         ground_stations = self._selected_by_kind("ground-station")
         satellites = self._selected_by_kind("satellite")
         if len(ground_stations) != 1 or len(satellites) != 1:
-            self._warn(
-                f"Select exactly 1 Ground/Earth Station feature and 1 Satellite feature. Currently "
-                f"{len(ground_stations)} ground station(s), {len(satellites)} satellite(s) selected."
-            )
+            if len(satellites) == 1 and not ground_stations:
+                self._warn_id("I-SELECT-SATELLITE")
+            elif len(ground_stations) == 1 and not satellites:
+                self._warn_id("I-SELECT-STATION")
+            elif not ground_stations and not satellites:
+                self._warn_id("I-SELECT-NONE")
+            else:
+                self._warn_id("I-SELECT-LOOKANGLE")
             return
         try:
             result = satellite_earth_space.analyze(ground_stations[0], satellites[0])

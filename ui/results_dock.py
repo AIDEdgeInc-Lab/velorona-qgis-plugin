@@ -17,6 +17,7 @@ irrelevant for that kind)."""
 from __future__ import annotations
 
 import html
+import os
 
 from qgis.PyQt.QtCore import QUrl, Qt
 from qgis.PyQt.QtGui import QTextDocument
@@ -36,7 +37,7 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
-from ..core import elevation_source
+from ..core import elevation_source, messages
 from ..core.export import NotExportable, result_to_csv, result_to_xlsx
 from ..core.presentation import ask as ask_module
 from ..core.export import _precip_note
@@ -79,6 +80,7 @@ class VeloronaResultsDock(QDockWidget):
         layout = QVBoxLayout(evidence)
         layout.setContentsMargins(6, 6, 6, 6)
         self.browser = QTextBrowser(evidence)
+        self.browser.setOpenExternalLinks(True)          # message IDs link to the user guide (map.velorona.ai/guide#ID)
         button_row = QHBoxLayout()
         self.export_button = QPushButton("Export as CSV...", evidence)
         self.export_button.clicked.connect(self._on_export_clicked)
@@ -286,7 +288,7 @@ class VeloronaResultsDock(QDockWidget):
             return
         with open(path, "wb") as f:
             f.write(data)
-        QMessageBox.information(self, "Velorona", f"Exported to {path}")
+        QMessageBox.information(self, "Velorona", messages.text("I-EXPORT-DONE", file=os.path.basename(path)))
 
     def _on_export_clicked(self):
         if self._result is None:
@@ -301,7 +303,7 @@ class VeloronaResultsDock(QDockWidget):
             return
         with open(path, "w", encoding="utf-8", newline="") as f:
             f.write(csv_text)
-        QMessageBox.information(self, "Velorona", f"Exported to {path}")
+        QMessageBox.information(self, "Velorona", messages.text("I-EXPORT-DONE", file=os.path.basename(path)))
 
     def _on_elevation_clicked(self):
         if self.elevation_profile_requested:
@@ -779,7 +781,7 @@ def _render_link_investigation(result) -> str:
     ]
 
     if exposure is None and getattr(result, "weather_pending", False):
-        parts.append("<p><b>Loading weather&hellip;</b> The weather for both endpoints is being fetched; this panel updates by itself when it arrives. "
+        parts.append(f"<p><b>{messages.text('I-WEATHER-FETCHING')}</b> This panel updates by itself when it arrives. "
                      "The rest of the record above is complete.</p>")
     elif exposure is None:
         parts.append(f"<p>{NOT_DETERMINED} &mdash; live weather evidence could not be retrieved for this link.</p>"

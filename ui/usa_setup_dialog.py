@@ -9,7 +9,7 @@ from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import (QApplication, QDialog, QDialogButtonBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                  QTextBrowser, QVBoxLayout)
 
-from ..core import guide
+from ..core import messages
 from ..core.countries import usa_setup
 from .guide_button import guide_button
 
@@ -31,12 +31,12 @@ class UsaSetupDialog(QDialog):
         self.off_requested = False
 
         layout = QVBoxLayout(self)
-        lead = ("USA data is turned off for this project. " if is_off else "") + guide.PLUGIN_MESSAGE_IDS["I-usa-data-source"]
+        lead = ("USA data is turned off for this project. " if is_off else "") + messages.text("I-USA-DATA-SOURCE")
         self.lead = QLabel(lead)
         self.lead.setWordWrap(True)
         lead_row = QHBoxLayout()
         lead_row.addWidget(self.lead, 1)
-        lead_row.addWidget(guide_button("I-usa-data-source", self))      # what the data is, that it is not in the plugin, folder / address / off: in the guide
+        lead_row.addWidget(guide_button("I-USA-DATA-SOURCE", self))      # what the data is, that it is not in the plugin, folder / address / off: in the guide
         layout.addLayout(lead_row)
 
         self.status = QLabel()

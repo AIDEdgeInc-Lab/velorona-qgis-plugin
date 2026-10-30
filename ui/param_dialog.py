@@ -17,7 +17,7 @@ from qgis.PyQt.QtWidgets import (
     QVBoxLayout,
 )
 
-from ..core import guide
+from ..core import messages
 from .guide_button import guide_button
 
 
@@ -78,12 +78,12 @@ class ParamDialog(QDialog):
                 combo.setToolTip(elevation_note)
             self._elevation_combo = combo
             form.addRow("Elevation source", combo)
-            hint = QLabel(elevation_note or guide.PLUGIN_MESSAGE_IDS["I-terrain-elevation-source"], self)
+            hint = QLabel(elevation_note or messages.text("I-TERRAIN-ELEVATION-SOURCE"), self)
             hint.setWordWrap(True)
             hint.setStyleSheet("color: palette(mid);")
             hint_row = QHBoxLayout()
             hint_row.addWidget(hint, 1)
-            hint_row.addWidget(guide_button("I-terrain-elevation-source", self))   # online vs local raster, units, datum: in the guide
+            hint_row.addWidget(guide_button("I-TERRAIN-ELEVATION-SOURCE", self))   # online vs local raster, units, datum: in the guide
             form.addRow("", hint_row)
 
         buttons = QDialogButtonBox(

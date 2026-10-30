@@ -2295,7 +2295,7 @@ try:
     _toggle_seconds = time.monotonic() - _t_toggle
     check("the layer toggle returns at once while the load is still running (the GUI thread is not blocked)",
           plugin._satellites_task is not None and _toggle_seconds < 1.5, f"{_toggle_seconds:.2f}s, task running={plugin._satellites_task is not None}")
-    _connecting_calls = [c for c in _mb_calls if c[0] == "push" and "Loading satellite data" in str(c[1])]
+    _connecting_calls = [c for c in _mb_calls if c[0] == "push" and "Connecting to satellite data" in str(c[1])]
     check("the in-progress message is pushed while the worker is still running", len(_connecting_calls) == 1, str(_mb_calls))
     _gate.set()
     check("the load finishes", _wait_sat_task())

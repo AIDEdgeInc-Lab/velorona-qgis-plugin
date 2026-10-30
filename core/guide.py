@@ -1,26 +1,18 @@
 """Links from the plugin to the Velorona user guide (https://map.velorona.ai/guide#<id>).
 
-A panel keeps ONE line of text; whatever needs more words is explained in the guide under a message ID. The IDs follow the Velorona Map registry
-(web/messages.json): E-/W-/I- + area + name, lower case, e.g. ``I-terrain-elevation-source``. The same situation uses the same ID and wording in the Map
-and here. IDs that exist only in the plugin are listed in CHANGES.md (PLUGIN_MESSAGE_IDS below is the same list) so they can be added to the registry.
+A panel keeps ONE line of text; whatever needs more words is explained in the guide under a message ID. The IDs are the Velorona Map registry's (core/messages.py, a copy of web/messages.json): upper case, e.g. ``I-TERRAIN-ELEVATION-SOURCE``.
 Nothing is sent anywhere: the browser opens the page, the plugin passes no data in the address."""
 
 from __future__ import annotations
 
-import re
+from . import messages
 
 GUIDE_URL = "https://map.velorona.ai/guide"
-_ID = re.compile(r"^[EWI]-[a-z0-9]+(?:-[a-z0-9]+)+$")
-
-# Plugin-only message IDs (until the registry has them): id -> the one line the panel shows.
-PLUGIN_MESSAGE_IDS = {
-    "I-terrain-elevation-source": "Ground heights: Velorona's online 90 m elevation data, or a raster of yours.",
-    "I-usa-data-source": "USA data is Velorona's online data, not included in the plugin. Canada works without it.",
-}
 
 
 def is_message_id(message_id: str) -> bool:
-    return bool(_ID.match(message_id or ""))
+    """A well-formed registry ID (upper case, e.g. ``I-TERRAIN-ELEVATION-SOURCE``) that the registry knows."""
+    return messages.is_message_id(message_id) and messages.has(message_id)
 
 
 def guide_url(message_id: str = "") -> str:

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from . import messages
+
 ONLINE_LABEL = "Online (Open-Meteo, 90 m surface model)"
 # What the library 0.2.x constant says; used only for a result that predates the ``elevation_source`` field.
 ONLINE_SOURCE_TEXT = "Open-Meteo Elevation API (Copernicus DEM GLO-90, 90 m surface model)"
@@ -62,6 +64,19 @@ def is_online(result) -> bool:
     return text == SOURCE
 
 
+def request_failed(detail: str) -> str:
+    """The Map's wording for a failed elevation request (registry E-TERRAIN-SERVICE-FAILED); ``detail`` says why (rate limit, unreachable...)."""
+    return f"{messages.short_text('E-TERRAIN-SERVICE-FAILED')}: {detail}"
+
+
+def bad_reply(exc: BaseException) -> str:
+    """The Map's wording for a service answer that cannot be used: a missing/non-numeric value (E-TERRAIN-VALUE-MISSING) or a wrong number of
+    values (E-TERRAIN-SERVICE-BAD-REPLY). Never a guess at which value is which."""
+    if "non-numeric" in str(exc) or "missing" in str(exc):
+        return "the elevation service returned a missing or non-numeric value (R5)"
+    return messages.short_text("E-TERRAIN-SERVICE-BAD-REPLY")
+
+
 def failure_reason(exc: BaseException) -> Optional[tuple]:
     """(reason, transient) for the library's elevation errors, or None for anything else. The reason is written to the user; for a failure of
     the SERVICE it says so and never presents it as a property of the link."""
@@ -70,7 +85,7 @@ def failure_reason(exc: BaseException) -> Optional[tuple]:
     except ImportError:
         return None
     if isinstance(exc, ElevationServiceUnavailable):
-        return f"elevation data unavailable (T1/R5): {exc}", bool(exc.transient)
+        return request_failed(str(exc)), bool(exc.transient)
     if isinstance(exc, DEMCrsMismatchError):
         return f"the chosen elevation raster cannot be used (T1): {exc}", False
     if isinstance(exc, ElevationCoverageError):

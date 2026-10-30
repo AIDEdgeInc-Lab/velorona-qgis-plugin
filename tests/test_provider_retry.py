@@ -104,7 +104,7 @@ def test_persistent_rate_limit_is_no_data_marked_transient_with_the_real_cause(m
     with pytest.raises(NoDataError) as exc:
         TR.analyze_endpoints(A[0], A[1], B[0], B[1], PARAMS, "t")
     assert exc.value.transient is True and exc.value.domain == "terrain"
-    assert "rate-limiting" in exc.value.reasons[0] and "(T1/R5)" in exc.value.reasons[0]
+    assert "rate-limiting" in exc.value.reasons[0] and exc.value.reasons[0].startswith("elevation request failed (T1): ")
     assert len(calls) == 3 and no_real_backoff_sleep == [1.0, 3.0]          # bounded: 1 try + 2 retries
 
 

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import math
 
+from . import messages
+
 # Owner decision P11 (CONFIRMED PHYSICS CORRECTION): effective-earth bulge is subtracted from geometric clearance. aei_link_clearance
 # announces the convention it implements; the plugin refuses a library that still has the pre-correction sign rather than show
 # clearance numbers that are wrong by twice the bulge.
@@ -66,9 +68,9 @@ def valid_coordinate(lat, lon) -> bool:
 def path_reasons(lat_a, lon_a, lat_b, lon_b) -> list:
     """R4 (invalid coordinates) and R9 (zero-length link: identical endpoints). Identical endpoints never produce CLEAR."""
     if not (valid_coordinate(lat_a, lon_a) and valid_coordinate(lat_b, lon_b)):
-        return ["invalid coordinates (R4)"]
+        return [messages.short_text("E-PATH-COORDINATES")]
     if lat_a == lat_b and lon_a == lon_b:
-        return ["zero-length link: identical endpoints (R4, R9)"]
+        return [messages.short_text("E-PATH-ZERO-LENGTH")]
     return []
 
 
@@ -80,10 +82,12 @@ def _range_reason(value, bounds, label, unit):
 
 def terrain_input_reasons(lat_a, lon_a, lat_b, lon_b, height_a, height_b, frequency_ghz) -> list:
     reasons = path_reasons(lat_a, lon_a, lat_b, lon_b)
-    for label, value in (("antenna height A", height_a), ("antenna height B", height_b)):
-        r = _range_reason(value, HEIGHT_M, label, "m")
-        if r:
-            reasons.append(r)
+    for site, value in (("A", height_a), ("B", height_b)):
+        if not is_finite_number(value) or not (HEIGHT_M[0] <= value <= HEIGHT_M[1]):
+            shown = f"{value:g} m" if is_finite_number(value) else "no value"
+            # The Map's wording (registry E-TERRAIN-HEIGHT-RANGE): the height is refused, never clamped or replaced by a default.
+            reasons.append(f"record antenna height at Site {site} ({shown}) is outside {HEIGHT_M[0]:g}-{HEIGHT_M[1]:g} m (R5); "
+                           "it is not clamped and not replaced by a default")
     r = _range_reason(frequency_ghz, TERRAIN_FREQ_GHZ, "frequency", "GHz")
     if r:
         reasons.append(r)
@@ -106,5 +110,5 @@ def weather_input_reasons(lat_a, lon_a, lat_b, lon_b, params) -> list:
 def interval_reason(interval):
     """R3: without a valid averaging interval the provider value cannot be converted to a rate; no default is assumed."""
     if not is_finite_number(interval) or interval <= 0:
-        return "Open-Meteo `current.interval` missing or invalid (R3)"
+        return messages.short_text("E-WEATHER-INTERVAL")
     return None

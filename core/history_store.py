@@ -26,6 +26,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
+from . import messages
+
 
 SCHEMA_VERSION = 1
 DEFAULT_RETENTION_HOURS = 24
@@ -128,6 +130,7 @@ class WriteReport:
     rejected_future: int = 0
     invalid: int = 0
     skew_suspected: bool = False
+    skew_minutes: int = 0                  # how far the data source is ahead of this computer's clock (largest rejected row), in minutes
     pruned: int = 0
     error: Optional[str] = None            # locked | disk_full | corrupt | other
     message: str = ""
@@ -142,7 +145,7 @@ class WriteReport:
         if self.error:
             parts.append(f"History was not saved: {self.message}")
         if self.skew_suspected:
-            parts.append(f"{self.rejected_future} value(s) were not stored because their time is ahead of this computer's clock; check the clock.")
+            parts.append(messages.text("W-HISTORY-CLOCK", N=self.skew_minutes or "several") + f". {self.rejected_future} value(s) were not stored.")
         if self.recovered:
             parts.append(f"The history file was unreadable and was set aside as {os.path.basename(self.recovered)}; a new one was started.")
         return " ".join(parts)
@@ -270,6 +273,7 @@ class HistoryStore:
             if r.kind != "forecast" and parse_utc(r.ts) > now + FUTURE_TOLERANCE_S:
                 report.rejected_future += 1
                 report.skew_suspected = True
+                report.skew_minutes = max(report.skew_minutes, round((parse_utc(r.ts) - now) / 60))
                 continue
             good.append(r)
         if not good:
@@ -415,11 +419,11 @@ class HistoryStore:
 
     # -- export -------------------------------------------------------------------------------------------------------------------------
 
-    def export_csv(self, entity_id: Optional[str] = None) -> Tuple[str, str]:
+    def export_csv(self, entity_id: Optional[str] = None, include_names: bool = False) -> Tuple[str, str]:
         """(file name, CSV text) from the contract's ``to_csv`` / ``csv_filename``: schema-order columns (incl. the optional entity_label), UTC, RFC 4180 quoting, formula-injection guard.
         A local file only."""
         c = _contract()
-        names = self.labels()
+        names = self.labels() if include_names else {}      # names leave the History window only when the user ticks "Include my site names"
         rows = []
         for r in self.records(entity_id):
             d = r.to_dict()

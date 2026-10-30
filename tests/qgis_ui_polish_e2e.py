@@ -266,12 +266,12 @@ opened = []
 QDesktopServices.openUrl = staticmethod(lambda url: opened.append(url.toString()) or True)    # never launch a browser in a test
 pd = ParamDialog(None, "T", [], {}, elevation_layers=[])
 gb = [b for b in pd.findChildren(QToolButton) if b.property("guideId")]
-check("terrain dialog: elevation hint is one line with a ? button", len(gb) == 1 and gb[0].property("guideId") == "I-terrain-elevation-source")
+check("terrain dialog: elevation hint is one line with a ? button", len(gb) == 1 and gb[0].property("guideId") == "I-TERRAIN-ELEVATION-SOURCE")
 gb[0].click()
-check("? opens the guide at the message ID", opened == ["https://map.velorona.ai/guide#I-terrain-elevation-source"], opened)
+check("? opens the guide at the message ID", opened == ["https://map.velorona.ai/guide#I-TERRAIN-ELEVATION-SOURCE"], opened)
 ud = UsaSetupDialog(None)
 ub = [b for b in ud.findChildren(QToolButton) if b.property("guideId")]
-check("USA setup: lead text is one short line with a ? button", len(ub) == 1 and ub[0].property("guideId") == "I-usa-data-source" and len(ud.lead.text()) < 120, ud.lead.text())
+check("USA setup: lead text is one short line with a ? button", len(ub) == 1 and ub[0].property("guideId") == "I-USA-DATA-SOURCE" and len(ud.lead.text()) < 120, ud.lead.text())
 
 from velorona.plugin import VeloronaPlugin  # noqa: E402
 
@@ -305,6 +305,10 @@ try:
     check("Guide opens the guide top page", opened == ["https://map.velorona.ai/guide"], opened)
 except Exception as exc:   # pragma: no cover
     check("plugin Guide entry", False, repr(exc))
+
+_pick = VeloronaPlugin._selection_message
+check("selection messages are registry IDs (Map wording)", [_pick(0, 0), _pick(1, 0), _pick(3, 0), _pick(0, 2), _pick(2, 1)] ==
+      ["I-SELECT-NONE", "I-SELECT-ONE-SITE", "I-SELECT-SITES", "I-SELECT-LINK", "I-SELECT-LINK"])
 
 passed = sum(1 for _, ok, _ in RESULTS if ok)
 print(f"\n===== {passed}/{len(RESULTS)} checks passed =====")

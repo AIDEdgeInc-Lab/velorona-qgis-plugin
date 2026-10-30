@@ -69,9 +69,37 @@ store.set_retention_hours(24)
 out = os.path.join(tmp, "export.csv")
 QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: (out, ""))
 QMessageBox.information = staticmethod(lambda *a, **k: None)
+from qgis.PyQt.QtCore import QTimer  # noqa: E402
+from qgis.PyQt.QtWidgets import QApplication as _QApp, QCheckBox  # noqa: E402
+seen = {}
+
+
+def _answer(tick):
+    def handler():
+        box = _QApp.activeModalWidget()
+        cb = box.findChild(QCheckBox, "veloronaIncludeNames")
+        seen["default"] = cb.isChecked()
+        if tick:
+            cb.setChecked(True)
+        box.accept()
+    return handler
+
+
+QTimer.singleShot(50, _answer(False))
 dlg._on_export()
 text = open(out, encoding="utf-8").read()
 check("CSV has the contract header and rows", text.splitlines()[0].startswith("ts,fetched_ts,source,entity_id") and len(text.splitlines()) > 1)
+import csv as _csv, io as _io  # noqa: E402
+rows_default = list(_csv.reader(_io.StringIO(text)))
+col = {c: i for i, c in enumerate(rows_default[0])}
+check("export dialog: 'Include my site names' is off by default", seen.get("default") is False)
+check("default export has NO names (entity_label empty for every row)", all(r[col["entity_label"]] == "" for r in rows_default[1:]) and len(rows_default) > 1)
+QTimer.singleShot(50, _answer(True))
+dlg._on_export()
+rows_named = list(_csv.reader(_io.StringIO(open(out, encoding="utf-8").read())))
+named = {r[col["entity_label"]] for r in rows_named[1:]} - {""}
+check("ticking 'Include my site names' writes the names next to the codes", named and named <= set(store.labels().values()), named)
+check("names stay visible in the History window either way", "Site" in dlg.view.toPlainText() or any(v in dlg.view.toPlainText() for v in store.labels().values()))
 
 # clearing
 QMessageBox.question = staticmethod(lambda *a, **k: QMessageBox.StandardButton.Yes)

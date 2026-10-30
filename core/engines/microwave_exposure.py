@@ -13,6 +13,7 @@ from aei_mw_exposure import LinkExposure, MicrowaveLink, MicrowaveSite, Provenan
 from aei_mw_exposure.providers import eccc
 from aei_mw_exposure.representativeness import WeatherRepresentativeness, assess_representativeness
 
+from .. import messages
 from ..features import feature_id_name, feature_to_latlon
 from ..presentation import history as weather_history
 from ..presentation import precip
@@ -121,8 +122,7 @@ def analyze_sites(site_a: MicrowaveSite, site_b: MicrowaveSite, params: dict,
     missing = [s.id for s in (site_a, site_b) if s.id not in weather_by_site]
     if missing:
         raise NoDataError("weather", [
-            "Could not fetch live weather (Open-Meteo) for: "
-            + ", ".join(f"{site_id} ({weather_errors.get(site_id, 'unknown error')})" for site_id in missing) + " (T3)"],
+            messages.text("E-WEATHER-FETCH-FAILED", site=", ".join(f"{site_id} ({weather_errors.get(site_id, 'unknown error')})" for site_id in missing))],
             transient=True)
 
     exposure = calculate_exposure(link=link, weather_by_site=weather_by_site)

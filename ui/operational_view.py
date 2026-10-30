@@ -80,6 +80,13 @@ def _changes_block(brief: Brief) -> str:
             f"Hourly values are compared with hourly values, so they can differ from the current reading above.</p>")
 
 
+def _guide_link(reason: str) -> str:
+    """The registry ID of a known NO DATA reason, as a link to its entry in the user guide (the Map shows the same ID)."""
+    from ..core import guide, messages
+    mid = messages.id_for_reason(reason)
+    return f" <a href='{_e(guide.guide_url(mid))}'>{_e(mid)}</a>" if mid else ""
+
+
 def _header(brief: Brief) -> str:
     # The reason line already says why the status is NO DATA; the badge is the status itself.
     reason = brief.reason or ""
@@ -88,7 +95,7 @@ def _header(brief: Brief) -> str:
         reason = re.sub(r"^\s*NO DATA(?:\s*\([^)]*\))?\s*:\s*", "", reason)
     return (f"<div class='kicker'>{_e(brief.title)}</div>"
             f"<h3>{_e(brief.heading or brief.location)}</h3>"
-            f"<p>{status_badge(brief.status)} &nbsp;{_e(reason)}</p>")
+            f"<p>{status_badge(brief.status)} &nbsp;{_e(reason)}{_guide_link(reason) if brief.status == NO_DATA else ''}</p>")
 
 
 def _answer_line(brief: Brief) -> str:

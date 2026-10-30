@@ -106,18 +106,18 @@ def analyze_endpoints(lat_a, lon_a, lat_b, lon_b, params: dict, link_id: str, el
         except ElevationDataError as exc:
             known = elevation_source.failure_reason(exc)
             if known is None:                       # bad data from the service (null/NaN/wrong count): deterministic, not transient
-                raise NoDataError("terrain", [f"elevation data unavailable (T1/R5): {exc}"], transient=False) from exc
+                raise NoDataError("terrain", [elevation_source.bad_reply(exc)], transient=False) from exc
             raise NoDataError("terrain", [known[0]], transient=known[1]) from exc
         except requests.exceptions.RequestException as exc:   # only a custom provider can let this through
             failure = classify(exc)
-            raise NoDataError("terrain", [f"elevation data unavailable (T1/R5): {failure.reason(exc)}"], transient=failure.transient) from exc
+            raise NoDataError("terrain", [elevation_source.request_failed(failure.reason(exc))], transient=failure.transient) from exc
     if elevation_provider is not None:
         raise NoDataError("terrain", ["a local elevation raster needs aei-link-clearance 0.3 or newer; the installed library is older, so nothing was computed"])
     try:
         return call_with_backoff(lambda: analyze_link(**inputs), retryable=(ElevationDataError, requests.exceptions.RequestException))
     except (ElevationDataError, requests.exceptions.RequestException) as exc:   # the two explicit elevation-data failures only (T1, R5)
         failure = classify(exc)
-        raise NoDataError("terrain", [f"elevation data unavailable (T1/R5): {failure.reason(exc)}"], transient=failure.transient) from exc
+        raise NoDataError("terrain", [elevation_source.request_failed(failure.reason(exc))], transient=failure.transient) from exc
 
 
 def prepare(entries) -> dict:

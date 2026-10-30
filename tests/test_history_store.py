@@ -172,13 +172,15 @@ def test_csv_has_the_contract_columns_utc_rfc4180_and_a_formula_guard(store):
     body = {r[col["metric"]]: r for r in rows[1:]}
     assert body["temperature"][col["source"]].startswith("'=") and body["temperature"][col["value"]] == "-3.5"      # injected source neutralised, negative number kept
     assert body["rain_rate"][col["value"]] == "" and body["rain_rate"][col["nodata_reason"]] == 'no "data", sorry'    # NO DATA is empty, never 0
-    assert all(r[col["entity_label"]] == "" for r in rows[1:])                                                         # no name stored -> empty cell
+    assert all(r[col["entity_label"]] == "" for r in rows[1:])                                                         # names are written only on request
 
 
 def test_csv_carries_the_users_own_name_next_to_the_hashed_id(store):
     store.add_many([rec(0, entity="h:abc"), rec(1, entity="h:other")])
     store.set_labels({"h:abc": 'Toronto, "north" =link'})
-    _, text = store.export_csv()
+    _, plain = store.export_csv()
+    assert all(r[list(csv.reader(io.StringIO(plain)))[0].index("entity_label")] == "" for r in list(csv.reader(io.StringIO(plain)))[1:])   # default: no names
+    _, text = store.export_csv(include_names=True)
     rows = list(csv.reader(io.StringIO(text)))
     col = {c: i for i, c in enumerate(rows[0])}
     assert rows[0][col["entity_id"] + 1] == "entity_label"
