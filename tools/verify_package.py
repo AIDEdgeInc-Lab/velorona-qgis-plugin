@@ -4,7 +4,7 @@
     python3 tools/verify_package.py dist/velorona-<version>.zip [expected-version]
 
 Checks: exactly one top-level folder named velorona; metadata.txt version (and the expected one, if given); the files QGIS needs; the runtime
-modules the USA support adds; NOTHING development-only (tests, parity, tools, .git, caches); NO USA data of any kind (no tile folders, no FCC/US
+modules the USA support adds; NOTHING development-only (tests, parity, tools, .git, any dotted or *_cache folder, private-looking names); NO USA data of any kind (no tile folders, no FCC/US
 fixtures or extracts, no file named like a pack index, nothing over 20 MB); the Canadian snapshot present and unchanged in size class.
 """
 import os
@@ -31,6 +31,13 @@ def main(path, expected=None):
     for r in REQUIRED:
         if r not in names:
             problems.append(f"missing {r}")
+    for i in z.infolist():                       # directories too: an empty cache folder is still a cache folder
+        parts = i.filename.rstrip("/").split("/")[1:]
+        if any(p.startswith(".") or p.endswith("_cache") or p in ("__pycache__", "node_modules") for p in parts):
+            problems.append(f"hidden, cache or environment entry shipped: {i.filename}")
+        low_parts = [p.lower() for p in parts]
+        if any(p in ("_private", "private", "secrets", "audit", "backup") or p.endswith((".pem", ".key", ".p12")) or p.startswith(("id_rsa", ".env")) for p in low_parts):
+            problems.append(f"possibly private entry shipped: {i.filename}")
     for n in names:
         if any(n.startswith(p) for p in FORBIDDEN_PREFIX) or "__pycache__" in n or n.endswith((".pyc", ".DS_Store")):
             problems.append(f"development-only file shipped: {n}")
