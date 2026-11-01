@@ -111,3 +111,23 @@ def test_old_rain_library_alone_is_flagged_with_its_own_fix(monkeypatch):
     assert "aei-link-clearance" not in w.split("In QGIS")[0]
     _installed(monkeypatch, "0.3.0", {"aei-microwave-link-exposure": "0.2.0"})
     assert dependencies.library_range_warning() == ""
+
+
+def test_a_library_without_the_elevation_seam_is_refused_with_the_install_command():
+    from types import SimpleNamespace
+    from core.validation import LibraryOutOfDateError, require_elevation_seam
+    for old in (SimpleNamespace(), SimpleNamespace(OpenMeteoProvider=object)):          # 0.2.x has neither provider / only one
+        with pytest.raises(LibraryOutOfDateError) as exc:
+            require_elevation_seam(old)
+        assert "aei-link-clearance>=0.3.0,<0.4" in str(exc.value) and "Python Console" in str(exc.value) and "restart QGIS" in str(exc.value)
+    import aei_link_clearance
+    require_elevation_seam(aei_link_clearance)                                           # the pinned library passes
+
+
+def test_terrain_analysis_with_an_old_library_is_refused_before_any_request(monkeypatch):
+    import types
+    from core.engines import terrestrial
+    from core.validation import LibraryOutOfDateError
+    monkeypatch.setattr(terrestrial, "_library", types.SimpleNamespace())
+    with pytest.raises(LibraryOutOfDateError):
+        terrestrial.analyze_endpoints(43.7, -79.4, 43.8, -79.2, {"site_a_height_m": 30.0, "site_b_height_m": 30.0, "frequency_ghz": 7.0}, "t")

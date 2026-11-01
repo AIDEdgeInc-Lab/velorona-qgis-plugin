@@ -8,12 +8,13 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from aei_link_clearance import LinkClearanceResult, analyze_link, explain
+import aei_link_clearance as _library
 from aei_link_clearance import terrain as _library_terrain
 
 from .. import elevation_source
 from ..provider_retry import classify
 from ..record_source import (frequency_ghz_from_record, frequency_origin, height_origin, record_labels)
-from ..validation import NoDataError, require_corrected_clearance, terrain_input_reasons
+from ..validation import NoDataError, require_corrected_clearance, require_elevation_seam, terrain_input_reasons
 
 from ..features import feature_attr, feature_id_name, feature_to_latlon
 
@@ -87,6 +88,7 @@ def analyze_endpoints(lat_a, lon_a, lat_b, lon_b, params: dict, link_id: str, el
     ``elevation_provider``: a library provider chosen by the user (a local DEM), or None for the shared online provider. Caching and 429
     backoff for the online service are the library's (aei-link-clearance >= 0.3, the pinned range)."""
     require_corrected_clearance(_library_terrain)
+    require_elevation_seam(_library)
     reasons = terrain_input_reasons(lat_a, lon_a, lat_b, lon_b, params["site_a_height_m"], params["site_b_height_m"], params["frequency_ghz"])
     if reasons:
         raise NoDataError("terrain", reasons)

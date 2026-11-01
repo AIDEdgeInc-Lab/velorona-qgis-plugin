@@ -31,6 +31,16 @@ def require_corrected_clearance(terrain_module) -> None:
             "main(['install', '-U', 'aei-link-clearance>=0.3.0,<0.4'])  then restart QGIS.")
 
 
+def require_elevation_seam(library_module) -> None:
+    """The plugin needs aei-link-clearance >= 0.3 (the elevation-provider seam: cache, 429 backoff, local raster). An older release is refused with the
+    install instruction, never a raw ImportError and never a silent different behaviour (the plugin has no fallback for the old library)."""
+    if not (hasattr(library_module, "OpenMeteoProvider") and hasattr(library_module, "LocalDEMProvider")):
+        raise LibraryOutOfDateError(
+            "The installed aei-link-clearance is older than this Velorona version needs (it has no elevation provider: caching, rate-limit backoff, local "
+            "elevation raster). Upgrade aei-link-clearance>=0.3.0,<0.4: in QGIS, Plugins > Python Console, run:  from pip._internal.cli.main import main; "
+            "main(['install', '-U', 'aei-link-clearance>=0.3.0,<0.4'])  then restart QGIS.")
+
+
 # ---------------------------------------------------------------------------------------------------------------------------------
 # NO DATA (owner-approved P5, R3, R4, R5, R9). Each validator returns a list of reasons; an empty list means the inputs are usable. A
 # caller that gets reasons raises NoDataError. Nothing here (or at the call sites) wraps unexpected exceptions into NO DATA.
