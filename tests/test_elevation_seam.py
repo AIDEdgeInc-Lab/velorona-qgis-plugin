@@ -1,6 +1,4 @@
-"""The plugin's use of the library's elevation-provider seam (aei-link-clearance >= 0.3, unreleased): a local DEM, caching, failure wording.
-Needs that library; against the released 0.2.x the whole module is skipped (allowlisted in tools/check_skips.py) and tools/gate.sh runs it in
-the seam lane."""
+"""The plugin's use of the library's elevation-provider seam (aei-link-clearance >= 0.3, the pinned range): a local DEM, caching, failure wording."""
 import math
 import sys
 import types
@@ -23,9 +21,6 @@ if "qgis" not in sys.modules:
 from core import elevation_source
 from core.engines import terrestrial as TR
 from core.validation import NoDataError
-
-if not elevation_source.providers_supported():
-    pytest.skip("needs aei-link-clearance >= 0.3 (the elevation-provider seam), not yet released", allow_module_level=True)
 
 from aei_link_clearance import DEMCrsMismatchError, LocalDEMProvider  # noqa: E402
 
@@ -111,13 +106,6 @@ def test_online_provider_down_is_service_wording_never_link_wording(monkeypatch)
     with pytest.raises(NoDataError) as e:
         TR.analyze_endpoints(*A, *B, PARAMS, "t")
     assert e.value.transient and "could not be reached" in e.value.reasons[0]
-
-
-def test_old_library_with_a_local_dem_is_refused_clearly(monkeypatch):
-    monkeypatch.setattr(elevation_source, "providers_supported", lambda: False)
-    with pytest.raises(NoDataError) as e:
-        TR.analyze_endpoints(*A, *B, PARAMS, "t", elevation_provider=object())
-    assert "0.3 or newer" in e.value.reasons[0]
 
 
 def _wrapped(result):

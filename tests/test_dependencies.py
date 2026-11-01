@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core import dependencies  # noqa: E402
 
-LC_REQUIREMENT = "aei-link-clearance>=0.2.0,<0.3"   # 0.2.0 corrected the earth-curvature sign; 0.3 is not yet vetted
+LC_REQUIREMENT = "aei-link-clearance>=0.3.0,<0.4"   # 0.2.0 corrected the earth-curvature sign; 0.3.0 adds the elevation seam this version needs
 
 
 def test_missing_requirements_reports_only_absent_packages(monkeypatch):
@@ -53,7 +53,7 @@ def test_install_message_does_not_quote_plain_requirements():
 def test_installed_link_clearance_is_inside_the_declared_range():
     from importlib.metadata import version
     major_minor = tuple(int(x) for x in version("aei-link-clearance").split(".")[:2])
-    assert (0, 2) <= major_minor < (0, 3), "install the released aei-link-clearance>=0.2.0,<0.3 (see requirements.txt)"
+    assert (0, 3) <= major_minor < (0, 4), "install the released aei-link-clearance>=0.3.0,<0.4 (see requirements.txt)"
 
 
 # --- first-run guidance (stage 2): version range warning, actionable messages ----------------------------------------------------------------------
@@ -69,18 +69,18 @@ def _installed(monkeypatch, version, per_dist=None):
     monkeypatch.setattr(dependencies._metadata, "version", fake)
 
 
-@pytest.mark.parametrize("v", ["0.2.0", "0.2.1", "0.2.17", "0.2.1.post1", "0.2.1rc1"])
+@pytest.mark.parametrize("v", ["0.3.0", "0.3.1", "0.3.17", "0.3.1.post1", "0.3.1rc1"])
 def test_supported_library_versions_give_no_warning(monkeypatch, v):
-    _installed(monkeypatch, v)
+    _installed(monkeypatch, v, {"aei-microwave-link-exposure": "0.2.0"})
     assert dependencies.library_range_warning() == ""
 
 
-@pytest.mark.parametrize("v", ["0.1.0", "0.1.9", "0.3.0", "1.0.0"])
+@pytest.mark.parametrize("v", ["0.1.0", "0.1.9", "0.2.1", "0.4.0", "1.0.0"])
 def test_out_of_range_library_warns_with_the_fix(monkeypatch, v):
     _installed(monkeypatch, v)
     w = dependencies.library_range_warning()
-    assert v in w and "aei-link-clearance>=0.2.0,<0.3" in w and "Python Console" in w and "restart QGIS" in w
-    assert "'aei-link-clearance>=0.2.0,<0.3'" in w and w.count("Plugins > Python Console") == 1
+    assert v in w and "aei-link-clearance>=0.3.0,<0.4" in w and "Python Console" in w and "restart QGIS" in w
+    assert "'aei-link-clearance>=0.3.0,<0.4'" in w and w.count("Plugins > Python Console") == 1
 
 
 def test_not_installed_or_unreadable_version_is_not_reported_here(monkeypatch):
@@ -101,13 +101,13 @@ def test_old_library_refusal_names_the_version_needed_and_how_to_install():
     from core.validation import LibraryOutOfDateError, require_corrected_clearance
     with pytest.raises(LibraryOutOfDateError) as exc:
         require_corrected_clearance(SimpleNamespace())
-    assert "aei-link-clearance>=0.2.0,<0.3" in str(exc.value) and "Python Console" in str(exc.value) and t is not None
+    assert "aei-link-clearance>=0.3.0,<0.4" in str(exc.value) and "Python Console" in str(exc.value) and t is not None
 
 
 def test_old_rain_library_alone_is_flagged_with_its_own_fix(monkeypatch):
-    _installed(monkeypatch, "0.2.1", {"aei-microwave-link-exposure": "0.1.5"})
+    _installed(monkeypatch, "0.3.0", {"aei-microwave-link-exposure": "0.1.5"})
     w = dependencies.library_range_warning()
     assert "aei-microwave-link-exposure 0.1.5" in w and "aei-microwave-link-exposure>=0.2.0,<0.3" in w and "P.838-3" in w
     assert "aei-link-clearance" not in w.split("In QGIS")[0]
-    _installed(monkeypatch, "0.2.1", {"aei-microwave-link-exposure": "0.2.0"})
+    _installed(monkeypatch, "0.3.0", {"aei-microwave-link-exposure": "0.2.0"})
     assert dependencies.library_range_warning() == ""

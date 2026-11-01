@@ -26,10 +26,6 @@ from velorona.core import elevation_source, local_dem  # noqa: E402
 from velorona.core.engines import terrestrial as TR  # noqa: E402
 from velorona.core.validation import NoDataError  # noqa: E402
 
-if not elevation_source.providers_supported():
-    print("SKIPPED: needs aei-link-clearance >= 0.3")
-    sys.exit(3)
-
 PARAMS = {"site_a_height_m": 30.0, "site_b_height_m": 30.0, "frequency_ghz": 7.0}
 A, B = (43.70, -79.40), (43.80, -79.20)
 TMP = tempfile.mkdtemp(prefix="velorona-dem-")

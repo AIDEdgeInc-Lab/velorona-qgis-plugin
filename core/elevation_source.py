@@ -1,8 +1,7 @@
 """Where a terrain analysis gets its ground heights from, and how a failure to get them is reported. Pure Python (no QGIS), so it is unit-testable.
 
-The library seam (aei-link-clearance >= 0.3: ``analyze_link(elevation_provider=)``) owns caching and 429 backoff for the online service. A
-library older than that cannot take a provider: the plugin then keeps its previous behaviour (one online request wrapped in
-``provider_retry.call_with_backoff``) and the local-DEM choice is unavailable, with the reason stated.
+The library seam (aei-link-clearance >= 0.3: ``analyze_link(elevation_provider=)``) owns caching and 429 backoff for the online service; the plugin
+requires that library (core/dependencies.py), so there is no fallback of its own. (``provider_retry`` stays: the weather fetch uses it.)
 """
 
 from __future__ import annotations
@@ -12,26 +11,15 @@ from typing import Optional
 from . import messages
 
 ONLINE_LABEL = "Online (Open-Meteo, 90 m surface model)"
-# What the library 0.2.x constant says; used only for a result that predates the ``elevation_source`` field.
+# What the library's online-source constant says; used only for a result that predates the ``elevation_source`` field.
 ONLINE_SOURCE_TEXT = "Open-Meteo Elevation API (Copernicus DEM GLO-90, 90 m surface model)"
 
 _online = None
 
 
-def providers_supported() -> bool:
-    """True when the installed aei_link_clearance has the elevation-provider seam."""
-    try:
-        import aei_link_clearance
-    except ImportError:
-        return False
-    return hasattr(aei_link_clearance, "OpenMeteoProvider") and hasattr(aei_link_clearance, "LocalDEMProvider")
-
-
 def online_provider():
-    """The one shared online provider (cache + cool-down live in it, so they must be shared by every analysis), or None for an old library."""
+    """The one shared online provider (cache + cool-down live in it, so they must be shared by every analysis)."""
     global _online
-    if not providers_supported():
-        return None
     if _online is None:
         from aei_link_clearance import OpenMeteoProvider
         from . import provider_retry

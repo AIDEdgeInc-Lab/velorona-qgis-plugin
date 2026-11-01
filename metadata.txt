@@ -3,32 +3,27 @@ name=Velorona
 qgisMinimumVersion=4.0
 qgisMaximumVersion=4.99
 description=Telecom link evidence, inside QGIS. Explore -> Select -> Analyze -> Evidence -> Export.
-version=1.1.10
+version=1.1.11
 author=AID Edge Inc.
 email=sara.khosravi.ds@gmail.com
 license=GPL-2.0-or-later
 about=Velorona for QGIS -- Telecom link evidence, inside QGIS. 1. Explore -- Load public telecom infrastructure and your own data. 2. Select -- Choose a site, link, or two endpoints. 3. Analyze -- Run path clearance, microwave weather exposure, or satellite geometry. 4. Evidence -- See what is observed, what is calculated, and what is inferred. 5. Export -- Take the evidence with you as a structured CSV result or an Excel (.xlsx) workbook. Terrain clearance can also be run for many links at once (Processing Toolbox). United States FCC infrastructure loads automatically for the area you view (overview counts when zoomed out, detailed records and clusters when zoomed in; internet required). Three analysis engines, all reused unmodified: Terrestrial Path Clearance (aei_link_clearance), Microwave Weather Exposure (aei_mw_exposure), Satellite/Earth-Space look angles (skyfield/SGP4). Requires aei-microwave-link-exposure (0.2.0 or newer), aei-link-clearance (0.2.0 or newer), aei-geo-features, and skyfield to be installed in QGIS's own Python environment.
-changelog=1.1.10 - Batch terrain clearance, USA data like Velorona Map, selection fixes, safer CSV exports
+changelog=1.1.11 - Elevation from a raster of your own, local history, radar only inside Canada, data credits
     NEW
-    - Terrain clearance for many links. Processing Toolbox > Velorona > "Terrain clearance for many Fixed Service links", or Plugins > Velorona > Analyze: Terrain Clearance for Many Links (batch). Runs the same analysis as a single link for every link of a layer or for the selected links, one row per link with its status (CLEAR, WATCH, AT RISK, CRITICAL, NO DATA) and the reason, and the same Observed/Assumed typing of frequency and antenna heights. A link that cannot be analysed is NO DATA with its reason and never stops the others. Runs in the background with progress and Cancel (links not reached are listed as NOT RUN). Up to 100 links per run by default (1,000 maximum), optional pause between links, optional fallback frequency for records without one (typed Assumed), optional CSV. Terrain clearance only (no weather or satellite batch). The elevation service limits how fast links can be analysed: if it answers "too many requests" those links are reported as NO DATA to retry; use a pause of several seconds for more than a handful of links.
-    - USA data now works like Velorona Map, with no setup. After Explore > Load Public Data, zoom to the United States: zoomed out you see pale count bubbles (an overview, not individual records, not selectable); zoomed in to a state-sized area the USA links and sites load by themselves, with Canada-style clusters, and follow you as you pan. Only the area you view is downloaded from Velorona's online USA data (internet required; one message tells you). Choose another source or turn it off in Explore > USA Data Setup. Very large views keep the overview; zoom in for records (limit about 36 map tiles or 20,000 links per view). An explicit Load USA Links in View now also shows the USA links in Records.
+    - Elevation source: online (as before) or any single-band raster layer of your project. Elevation is typed Reference data (DEM), never Observed. A raster that does not cover the whole path, has nodata cells on it or has no coordinate system gives NO DATA with the reason; 0 m is never used.
+    - Local history (this computer only, nothing is uploaded): weather values are kept for 24 h (1 h to 7 d) and a "What changed" block compares with them. History window with CSV export; your own site names are in the CSV only if you tick "Include my site names". Needs the optional aei-history-contract package.
+    - Analyses, and the weather of a selected Fixed Service link, run in a background task; QGIS stays responsive.
+    - Guide links: a "?" button and a Guide button on messages open the matching entry of map.velorona.ai/guide (message IDs shared with Velorona Map). Menu: Guide, and Get updates (opens map.velorona.ai/join in your browser; the plugin sends and counts nothing).
+    - Data credits: Open-Meteo (CC BY 4.0) and the Copernicus DEM GLO-90 licence notice under results and in exports that used them.
     FIXED
-    - A selected record could stay selected, or be shown in the details panel, against a different record after a layer reloaded. Selection is now kept only for the same, unchanged record and cleared otherwise.
-    - Selection did not respond for Velorona layers already in the project after the plugin was reloaded, and could answer twice; it now answers once per layer, also for layers added later.
-    - Removing a Velorona layer no longer breaks the Records picker.
-    - A Records row no longer stays highlighted when the map selection moved to a record hidden by the search; switching dataset shows that layer's own selection; the Records dataset and the QGIS active layer follow each other without selecting anything.
-    SAFER EXPORTS
-    - Text in CSV exports (names, identifiers, licensees, source and reason text) that begins with = + - or @ is now marked as text so Excel and Numbers do not run it as a formula. Calculated numbers, including negative values, are unchanged. The mark is a leading apostrophe, visible in a CSV. The Excel (.xlsx) export keeps the original text, stored as plain text.
-    CLEARER
-    - Terrain Details and the Excel summary now say where antenna heights and the frequency came from (the record's own value is Observed; a default or something you changed is Assumed), as the Evidence view and exports already did.
-    - The optional imagery group is named "USA Aerial Imagery & Topo (USGS)" (off by default; projects saved with the old name are renamed). The plugin description no longer mentions a GeoJSON export (CSV and Excel). The Operator filter is stated to cover the Canadian layers.
+    - ECCC radar is used only inside Canada, as in Velorona Map. ECCC's radar map answers 0 mm/h both where there is no rain and where no radar can see, so a US site showed an "Observed" 0.0 mm/h. Outside Canada the radar is now not asked, and the result says "Not covered"; nothing from it is shown or stored.
+    CHANGED
+    - "Predicted rain fade" is now "Estimated rain fade", derived from the current rain rate. Every model weather row states source, kind, time and unit.
+    - Elevation values are cached and HTTP 429 is backed off by the library; the plugin's own terrain fallback is removed.
+    REQUIREMENTS
+    - QGIS 4.0-4.99; aei-link-clearance 0.3.x (was 0.2.x), aei-microwave-link-exposure 0.2.x, aei-geo-features and skyfield in QGIS's own Python; optional aei-history-contract 0.2.x for local history (see README). A library outside the range is reported when QGIS starts and the first terrain analysis is refused.
     NOT CHANGED
-    - Terrain clearance and weather calculations, thresholds, statuses, the Canada data and the satellite engine are unchanged (no change to those parts of the code since 1.1.9).
-    REQUIREMENTS AND LIMITS
-    - QGIS 4.0-4.99; aei-link-clearance 0.2.x, aei-microwave-link-exposure 0.2.x, aei-geo-features and skyfield must be installed in QGIS's own Python (see README).
-    - USA data and the other live sources need internet access.
-    - Satellite live-data behaviour could not be re-tested for this release (the orbital data service was unreachable); it is unchanged from 1.1.9.
-    UNRELEASED, NOT PART OF 1.1.10 (next version, pending owner approval): elevation source choice (online or a local raster; elevation is typed Reference data (DEM)), local history with "What changed" (stored only on this computer; needs the optional aei-history-contract package), analyses and link-selection weather run in the background, "predicted rain fade" reworded to "estimated rain fade from the current rain rate", source/time/unit on every model weather row. See CHANGELOG.md.
+    - Thresholds, statuses, the Canada and USA data, and the satellite engine.
     Earlier versions: see CHANGELOG.md in the repository (https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/blob/main/CHANGELOG.md).
 tracker=https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/issues
 repository=https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin

@@ -11,7 +11,7 @@ from aei_link_clearance import LinkClearanceResult, analyze_link, explain
 from aei_link_clearance import terrain as _library_terrain
 
 from .. import elevation_source
-from ..provider_retry import call_with_backoff, classify
+from ..provider_retry import classify
 from ..record_source import (frequency_ghz_from_record, frequency_origin, height_origin, record_labels)
 from ..validation import NoDataError, require_corrected_clearance, terrain_input_reasons
 
@@ -85,7 +85,7 @@ def analyze_endpoints(lat_a, lon_a, lat_b, lon_b, params: dict, link_id: str, el
     """QGIS-free boundary of the terrain decision: library guard, explicit NO DATA validation, then the unmodified library call.
 
     ``elevation_provider``: a library provider chosen by the user (a local DEM), or None for the shared online provider. Caching and 429
-    backoff for the online service are the library's (aei-link-clearance >= 0.3); with an older library the plugin's own backoff is used."""
+    backoff for the online service are the library's (aei-link-clearance >= 0.3, the pinned range)."""
     require_corrected_clearance(_library_terrain)
     reasons = terrain_input_reasons(lat_a, lon_a, lat_b, lon_b, params["site_a_height_m"], params["site_b_height_m"], params["frequency_ghz"])
     if reasons:
@@ -100,26 +100,16 @@ def analyze_endpoints(lat_a, lon_a, lat_b, lon_b, params: dict, link_id: str, el
         site_b_lat=lat_b, site_b_lon=lon_b, site_b_height_m=params["site_b_height_m"],
         frequency_ghz=params["frequency_ghz"],
     )
-    if elevation_source.providers_supported():
-        try:
-            return analyze_link(**inputs, elevation_provider=elevation_provider or elevation_source.online_provider())
-        except ElevationDataError as exc:
-            known = elevation_source.failure_reason(exc)
-            if known is None:                       # bad data from the service (null/NaN/wrong count): deterministic, not transient
-                raise NoDataError("terrain", [elevation_source.bad_reply(exc)], transient=False) from exc
-            raise NoDataError("terrain", [known[0]], transient=known[1]) from exc
-        except requests.exceptions.RequestException as exc:   # only a custom provider can let this through
-            failure = classify(exc)
-            raise NoDataError("terrain", [elevation_source.request_failed(failure.reason(exc))], transient=failure.transient) from exc
-    if elevation_provider is not None:
-        raise NoDataError("terrain", ["a local elevation raster needs aei-link-clearance 0.3 or newer; the installed library is older, so nothing was computed"])
     try:
-        return call_with_backoff(lambda: analyze_link(**inputs), retryable=(ElevationDataError, requests.exceptions.RequestException))
-    except (ElevationDataError, requests.exceptions.RequestException) as exc:   # the two explicit elevation-data failures only (T1, R5)
+        return analyze_link(**inputs, elevation_provider=elevation_provider or elevation_source.online_provider())
+    except ElevationDataError as exc:
+        known = elevation_source.failure_reason(exc)
+        if known is None:                       # bad data from the service (null/NaN/wrong count): deterministic, not transient
+            raise NoDataError("terrain", [elevation_source.bad_reply(exc)], transient=False) from exc
+        raise NoDataError("terrain", [known[0]], transient=known[1]) from exc
+    except requests.exceptions.RequestException as exc:   # only a custom provider can let this through
         failure = classify(exc)
-        reason = (elevation_source.bad_reply(exc) if isinstance(exc, ElevationDataError) and not failure.transient
-                  else elevation_source.request_failed(failure.reason(exc)))
-        raise NoDataError("terrain", [reason], transient=failure.transient) from exc
+        raise NoDataError("terrain", [elevation_source.request_failed(failure.reason(exc))], transient=failure.transient) from exc
 
 
 def prepare(entries) -> dict:

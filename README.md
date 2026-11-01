@@ -1,6 +1,6 @@
 # Velorona for QGIS
 
-**Velorona QGIS Plugin 1.1.10** — Telecom link evidence, inside QGIS.
+**Velorona QGIS Plugin 1.1.11** — Telecom link evidence, inside QGIS.
 
 Velorona puts public fixed-service telecom infrastructure (Canada and the United States) on your QGIS map, checks whether a radio link has line-of-sight clearance, estimates its rain exposure, and gives you the evidence behind every answer: what was observed, what was calculated, and what was assumed. It is for telecom and microwave-link engineers, spectrum and infrastructure analysts, and GIS users who need an answer and its justification, not just a number.
 
@@ -130,23 +130,23 @@ Python). On macOS that interpreter is:
 
 ```
 /Applications/QGIS-final-4_2_2.app/Contents/MacOS/python3.12 -m pip install \
-    skyfield 'aei-microwave-link-exposure>=0.2.0,<0.3' 'aei-link-clearance>=0.2.0,<0.3' aei-geo-features
+    skyfield 'aei-microwave-link-exposure>=0.2.0,<0.3' 'aei-link-clearance>=0.3.0,<0.4' aei-geo-features
 ```
 
 **Installing the packages from inside QGIS** (any platform where QGIS's Python ships pip; verified on macOS QGIS 4.2.2): Plugins → Python Console, then run
 
 ```
-from pip._internal.cli.main import main; main(['install', '-U', 'aei-link-clearance>=0.2.0,<0.3', 'aei-microwave-link-exposure>=0.2.0,<0.3', 'aei-geo-features', 'skyfield'])
+from pip._internal.cli.main import main; main(['install', '-U', 'aei-link-clearance>=0.3.0,<0.4', 'aei-microwave-link-exposure>=0.2.0,<0.3', 'aei-geo-features', 'skyfield'])
 ```
 
 and restart QGIS. **QGIS does not install Python packages for plugins** (the `plugin_dependencies` field in `metadata.txt` names other QGIS plugins only), so installing Velorona
 from the Plugin Manager or from the ZIP leaves these packages to you; if they are missing Velorona loads a stub that shows this instruction, and if `aei-link-clearance` is
-outside its supported range (`aei-link-clearance>=0.2.0,<0.3`, `aei-microwave-link-exposure>=0.2.0,<0.3`) it warns when QGIS starts and refuses the first terrain analysis with the same instruction.
+outside its supported range (`aei-link-clearance>=0.3.0,<0.4`, `aei-microwave-link-exposure>=0.2.0,<0.3`) it warns when QGIS starts and refuses the first terrain analysis with the same instruction.
 
 Local history (History window, "What changed") additionally needs `aei-history-contract>=0.2.0,<0.3`, the shared package that also defines the rules in Velorona Map. It is optional:
 without it history is switched off with this instruction and everything else, including the weather analysis, works.
 
-`aei-microwave-link-exposure` must be 0.2.0 or newer (0.2.x): 0.2.0 evaluates the ITU-R P.838-3 rain equations. `aei-link-clearance` must be 0.2.0 or newer (0.2.x): 0.2.0 corrects the earth-curvature sign, and the plugin
+`aei-microwave-link-exposure` must be 0.2.0 or newer (0.2.x): 0.2.0 evaluates the ITU-R P.838-3 rain equations. `aei-link-clearance` must be 0.3.0 or newer (0.3.x): 0.2.0 corrected the earth-curvature sign, 0.3.0 adds the elevation cache, the 429 backoff and local-raster elevation, and the plugin
 refuses to run against an older release rather than show overstated clearance.
 
 The ISED Fixed Service and SatNOGS snapshots the Explore step needs are
@@ -169,10 +169,12 @@ Velorona is published in the **QGIS Plugin Repository** ([plugins.qgis.org/plugi
 
 ## Version history
 
+**1.1.11** — Elevation from a raster of your own (or online); **local history** and "What changed"; analyses run in the background; guide links and shared message IDs; data credits (Open-Meteo, Copernicus DEM); menu **Get updates**; **ECCC radar only inside Canada** ("Not covered" elsewhere, never shown or stored); requires `aei-link-clearance` 0.3.x.
+
 **1.1.10** — Terrain-clearance **batch** (Processing algorithm and menu action, cancellable, one row per link); **USA data on by default** with overview count bubbles when zoomed out and detailed sites, links and clusters that load automatically as you pan; selection and layer-lifecycle fixes (stale selection after a reload, removed layers, Records highlight, active layer); **CSV formula-injection protection**; clearer provenance wording in Details; imagery group renamed *USA Aerial Imagery & Topo (USGS)*. No change to terrain or weather calculations, thresholds, statuses, Canada data or the satellite engine.
 
 Earlier releases: 1.1.9 field readability and stated data status; 1.1.8 satellite data path; 1.1.7 UI polish (also carries the 1.1.6 guided USA data setup); 1.1.5 corrected earth curvature, ITU-R P.838-3 rain model, five-level status contract, Observed/Assumed provenance, Canadian antenna heights and first USA support; 1.1.4 operational output (Summary / Details / Evidence, Ask, Excel). Full details: [CHANGELOG.md](CHANGELOG.md) and the [release pages](https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/releases).
 
 ## Status
 
-Version 1.1.10. Packaged and clean-profile install tested for QGIS 4.x (validated on QGIS 4.2.2). Velorona is decision support for operational analysis, not a field measurement and not an outage prediction.
+Version 1.1.11. Packaged and clean-profile install tested for QGIS 4.x (validated on QGIS 4.2.2). Velorona is decision support for operational analysis, not a field measurement and not an outage prediction.

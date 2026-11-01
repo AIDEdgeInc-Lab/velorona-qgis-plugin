@@ -1713,11 +1713,8 @@ class VeloronaPlugin:
 
     def _terrain_dialog(self, title: str, defaults: dict):
         """The terrain parameter dialog with the elevation-source choice: online by default, or any single-band raster of the project (needs the
-        library's elevation-provider seam; with an older library the choice is shown disabled, with the reason)."""
-        supported = elevation_source.providers_supported()
-        note = "" if supported else "A local elevation raster needs aei-link-clearance 0.3 or newer. Online elevation is used."
-        return ParamDialog(self.iface.mainWindow(), title, terrestrial.PARAM_SPEC, defaults,
-                           elevation_layers=local_dem.candidate_layers() if supported else [], elevation_note=note)
+        library's elevation-provider seam, which the pinned aei-link-clearance>=0.3 has)."""
+        return ParamDialog(self.iface.mainWindow(), title, terrestrial.PARAM_SPEC, defaults, elevation_layers=local_dem.candidate_layers())
 
     def _elevation_provider_from(self, dialog):
         """None = online default; a provider = the chosen raster; False = the raster cannot be used (the user was told, nothing runs)."""
