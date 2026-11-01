@@ -38,7 +38,7 @@ def test_text_fills_the_registry_placeholders():
 
 
 def test_plugin_copy_equals_the_map_registry_when_a_map_checkout_is_present():
-    path = os.environ.get("MAP_MESSAGES") or os.path.expanduser("~/velorona-repos/_worktrees/map-p0-20261029/web/messages.json")
+    path = os.environ.get("MAP_MESSAGES") or os.path.join(os.environ.get("MAP_REPO") or os.path.expanduser("~/velorona-repos/aei-link-clearance"), "web", "messages.json")
     if not os.path.exists(path):
         import pytest
         pytest.skip("no Map checkout")

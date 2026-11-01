@@ -116,7 +116,7 @@
    "what_to_do": "Analyse again in a minute.",
    "recheck": "Run weather exposure again.",
    "source": [
-    "mwexposure.js:521"
+    "mwexposure.js:530"
    ],
    "match": "Could not fetch live weather"
   },
@@ -181,7 +181,7 @@
    "what_to_do": "Change the value (or the row in your file) to a value in range.",
    "recheck": "Edit the value and analyse again.",
    "source": [
-    "mwexposure.js:420"
+    "mwexposure.js:429"
    ],
    "match": "\\b(Frequency|Polarization|Fade margin) (must be|-?[\\d.]+ (GHz|dB) is outside)"
   },
@@ -207,7 +207,7 @@
    "what_to_do": "Read the Evidence rows before relying on the result. Analyse again later for a station comparison.",
    "recheck": "Run weather exposure again.",
    "source": [
-    "workflow.js:498"
+    "workflow.js:499"
    ]
   },
   {
@@ -219,7 +219,7 @@
    "what_to_do": "Wait a few seconds.",
    "recheck": "The message clears when the result opens.",
    "source": [
-    "workflow.js:471"
+    "workflow.js:472"
    ]
   },
   {
@@ -231,7 +231,7 @@
    "what_to_do": "Wait a few seconds.",
    "recheck": "The message clears when the result opens.",
    "source": [
-    "app.js:2386"
+    "app.js:2390"
    ]
   },
   {
@@ -243,7 +243,7 @@
    "what_to_do": "Pan or zoom to retry. Other layers keep working.",
    "recheck": "Move the map and the layer asks again.",
    "source": [
-    "app.js:1197"
+    "app.js:1200"
    ]
   },
   {
@@ -255,8 +255,8 @@
    "what_to_do": "Zoom in again (the US pack loads at zoom 8 or closer) or reload.",
    "recheck": "Zoom out and in.",
    "source": [
-    "app.js:1375",
-    "app.js:2449"
+    "app.js:1378",
+    "app.js:2453"
    ]
   },
   {
@@ -268,7 +268,7 @@
    "what_to_do": "Switch My Data on under Data sources.",
    "recheck": "The link appears on the map.",
    "source": [
-    "app.js:2057"
+    "app.js:2060"
    ]
   },
   {
@@ -280,7 +280,7 @@
    "what_to_do": "Relax Operator/Search, Frequency or Select Area, or check more layers.",
    "recheck": "Records appear as soon as something matches.",
    "source": [
-    "app.js:2335"
+    "app.js:2339"
    ]
   },
   {
@@ -352,7 +352,7 @@
    "what_to_do": "Click a site or a Fixed Service link (Shift-click to add another), or use Import.",
    "recheck": "Select something.",
    "source": [
-    "workflow.js:159"
+    "workflow.js:160"
    ]
   },
   {
@@ -364,7 +364,7 @@
    "what_to_do": "Press Clear, then pick two sites, one link, or one satellite plus one ground station. Export still exports the selected records.",
    "recheck": "Select again.",
    "source": [
-    "workflow.js:160"
+    "workflow.js:161"
    ]
   },
   {
@@ -376,7 +376,7 @@
    "what_to_do": "Press Clear and select one imported link.",
    "recheck": "Select again.",
    "source": [
-    "workflow.js:161"
+    "workflow.js:162"
    ]
   },
   {
@@ -388,7 +388,7 @@
    "what_to_do": "Press Clear and select just the link, or select two sites.",
    "recheck": "Select again.",
    "source": [
-    "workflow.js:162"
+    "workflow.js:163"
    ]
   },
   {
@@ -400,7 +400,7 @@
    "what_to_do": "Shift-click a second site, or select a Fixed Service link on its own.",
    "recheck": "Select again.",
    "source": [
-    "workflow.js:163"
+    "workflow.js:164"
    ]
   },
   {
@@ -412,7 +412,7 @@
    "what_to_do": "Press Clear and pick two.",
    "recheck": "Select again.",
    "source": [
-    "workflow.js:164"
+    "workflow.js:165"
    ]
   },
   {
@@ -424,7 +424,7 @@
    "what_to_do": "Shift-click a ground or earth station.",
    "recheck": "Select again.",
    "source": [
-    "workflow.js:166"
+    "workflow.js:167"
    ]
   },
   {
@@ -436,7 +436,7 @@
    "what_to_do": "Shift-click a satellite.",
    "recheck": "Select again.",
    "source": [
-    "workflow.js:167"
+    "workflow.js:168"
    ]
   },
   {
@@ -448,7 +448,7 @@
    "what_to_do": "Select one satellite and one ground station.",
    "recheck": "Select again.",
    "source": [
-    "workflow.js:168"
+    "workflow.js:169"
    ]
   },
   {
@@ -460,7 +460,7 @@
    "what_to_do": "Select either two sites, or one satellite and one ground station.",
    "recheck": "Select again.",
    "source": [
-    "workflow.js:171"
+    "workflow.js:172"
    ]
   },
   {
@@ -472,7 +472,7 @@
    "what_to_do": "Path clearance and weather exposure need two sites or one link; look angles need one satellite and one ground station.",
    "recheck": "Select again.",
    "source": [
-    "workflow.js:173"
+    "workflow.js:174"
    ]
   },
   {
@@ -485,7 +485,7 @@
    "recheck": "Export again any time.",
    "source": [
     "agent_ui.js:273",
-    "workflow.js:269"
+    "workflow.js:270"
    ]
   },
   {
@@ -497,7 +497,7 @@
    "what_to_do": "Select features, run an analysis, or import links.",
    "recheck": "The Export button fills in when there is something.",
    "source": [
-    "workflow.js:200"
+    "workflow.js:201"
    ]
   },
   {
@@ -593,7 +593,7 @@
    "what_to_do": "Pick a shorter window, or analyse again and compare later.",
    "recheck": "Change the window or wait.",
    "source": [
-    "agent_history.js:69",
+    "agent_history.js:79",
     "weather_history_ui.js:121"
    ]
   },
@@ -618,7 +618,7 @@
    "what_to_do": "Use a normal window if you want the values to survive a restart.",
    "recheck": "Reopen in a normal window.",
    "source": [
-    "weather_history.js:117"
+    "weather_history.js:119"
    ]
   },
   {
@@ -630,7 +630,7 @@
    "what_to_do": "Correct the computer's clock.",
    "recheck": "The warning clears after the next analysis.",
    "source": [
-    "weather_history.js:164"
+    "weather_history.js:179"
    ]
   },
   {
@@ -642,7 +642,7 @@
    "what_to_do": "Export CSV, then Clear my history; or free space in the browser.",
    "recheck": "Reload after freeing space.",
    "source": [
-    "weather_history.js:174"
+    "weather_history.js:189"
    ]
   },
   {
@@ -654,8 +654,8 @@
    "what_to_do": "Export CSV now if you need the values.",
    "recheck": "Reload the page.",
    "source": [
-    "weather_history.js:174",
-    "weather_history.js:181"
+    "weather_history.js:189",
+    "weather_history.js:196"
    ]
   },
   {
@@ -667,7 +667,7 @@
    "what_to_do": "Try again; or clear the site's data in the browser settings.",
    "recheck": "Press Clear my history again.",
    "source": [
-    "weather_history.js:221"
+    "weather_history.js:236"
    ]
   },
   {
@@ -679,7 +679,7 @@
    "what_to_do": "Set it again next session.",
    "recheck": "–",
    "source": [
-    "weather_history.js:229"
+    "weather_history.js:244"
    ]
   },
   {
@@ -727,7 +727,7 @@
    "what_to_do": "Analyse the weather exposure of a link first.",
    "recheck": "Ask again after an analysis.",
    "source": [
-    "agent_history.js:41"
+    "agent_history.js:51"
    ]
   },
   {
@@ -847,6 +847,19 @@
    "recheck": "Move the map to a USA area and the links appear.",
    "source": [],
    "where": "velorona-qgis-plugin"
+  },
+  {
+   "id": "I-WEATHER-RADAR-NOT-COVERED",
+   "level": "info",
+   "area": "Weather",
+   "short_text": "Radar not covered: no radar value is used for this location.",
+   "meaning": "ECCC radar is used only inside Canada. For a location outside it, the radar is not asked and no radar value is shown, stored, compared or used in an answer. This is not a reading of 0 mm/h: ECCC's radar map shows 0 mm/h both where there is no rain and where no radar can see, so a value there would not be an observation by the Canadian network. The model value and any station within 50 km are still shown.",
+   "what_to_do": "Use the model value and the station, if one is listed. For a decision that depends on the rain at this link, check a radar or gauge service that covers the location.",
+   "recheck": "The radar column of the weather result says \"not covered\"; the evidence row for radar explains why.",
+   "source": [
+    "mwexposure.js:598",
+    "workflow.js:543"
+   ]
   }
  ]
 }

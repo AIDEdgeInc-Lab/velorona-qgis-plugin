@@ -13,7 +13,7 @@ from aei_mw_exposure import LinkExposure, MicrowaveLink, MicrowaveSite, Provenan
 from aei_mw_exposure.providers import eccc
 from aei_mw_exposure.representativeness import WeatherRepresentativeness, assess_representativeness
 
-from .. import messages
+from .. import eccc_coverage, messages
 from ..features import feature_id_name, feature_to_latlon
 from ..presentation import history as weather_history
 from ..presentation import precip
@@ -138,10 +138,11 @@ def analyze_sites(site_a: MicrowaveSite, site_b: MicrowaveSite, params: dict,
             weather_errors[f"{site.id} (ECCC station)"] = str(exc)
 
         radar_obs = None
-        try:
-            radar_obs = eccc.get_radar_precipitation(site.latitude, site.longitude)
-        except Exception as exc:
-            weather_errors[f"{site.id} (ECCC radar)"] = str(exc)
+        if eccc_coverage.covers(site.latitude, site.longitude):      # outside Canada the service answers 0 mm/h: not asked, never shown or stored
+            try:
+                radar_obs = eccc.get_radar_precipitation(site.latitude, site.longitude)
+            except Exception as exc:
+                weather_errors[f"{site.id} (ECCC radar)"] = str(exc)
 
         if station_obs is not None:
             rep = assess_representativeness(

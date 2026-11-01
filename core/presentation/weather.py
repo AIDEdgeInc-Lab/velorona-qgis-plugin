@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Dict, Optional
 
-from .. import evidence_record
+from .. import eccc_coverage, evidence_record
 from . import history as hist
 from .model import (AT_RISK, CLEAR, CRITICAL, NO_DATA, NOT_DETERMINED, WATCH, Brief, Fact, SiteWeather, link_title,
                     exact, fmt, signed)
@@ -67,6 +67,8 @@ def weather_status(exp) -> tuple:
 
 def _site_weather(rep, label: str, point, p=None) -> SiteWeather:
     model, station, radar = rep.model_observation, rep.nearest_station, rep.radar_observation
+    if radar is not None and not eccc_coverage.covers(rep.site.latitude, rep.site.longitude):
+        radar = None                                    # a radar value from outside Canada is never shown
     return SiteWeather(
         site_label=label, site_point=point,
         source=model.source if model else NOT_DETERMINED,

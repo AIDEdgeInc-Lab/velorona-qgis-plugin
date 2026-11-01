@@ -113,6 +113,14 @@ Calculated-result/Interpretation structure.
 - **Excel (.xlsx)** — for terrain, weather and Fixed Service link results: Summary, Link Analysis, Weather, Weather History, Elevation-Terrain, Evidence, Raw Data (un-rounded values with unit, source and calculation) and Data Dictionary. Cells are stored as plain values and text, never as formulas, so the original text is kept without the CSV apostrophe.
 - Satellite geometry is a computed snapshot at one instant and is not exported.
 
+## Data credits
+
+Weather and online elevation come from [Open-Meteo.com](https://open-meteo.com/), licensed [CC BY 4.0](https://open-meteo.com/en/license). The credit is shown under every result that used it and written into its exports. Online elevation is the Copernicus DEM GLO-90 surface model, so its licence notice is shown and exported beside the Open-Meteo credit:
+
+> Elevation: produced using Copernicus WorldDEM™-90 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved. The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM™-90.
+
+Terrain from a raster of your own credits neither. ECCC radar is used only inside Canada; outside it a result says "Not covered" and no radar value is shown or stored.
+
 ## Requirements
 
 QGIS 4.0–4.99 (validated against QGIS 4.2.2 / Qt 6.11.1 / Python 3.12), with

@@ -22,6 +22,7 @@ import io
 from datetime import datetime, timezone
 from typing import List, Optional
 
+from .. import attribution
 from . import registry
 from .ask import AskContext
 from .model import NOT_DETERMINED, fmt
@@ -134,6 +135,9 @@ def _summary(result, ctx: AskContext, generated: str) -> Sheet:
     for b in ctx.briefs():
         for cav in b.caveats:
             rows.append(["Caveat", cav, ""])
+    credit = attribution.text(attribution.credit_parts(result))
+    if credit:
+        rows.append(["Data credit", credit, ""])
     rows.append(["Note", "Status wording is Velorona's mapping of the engineering result; see DATA DICTIONARY.", ""])
     return Sheet("SUMMARY", rows, widths=[26, 56, 70], freeze=4)
 

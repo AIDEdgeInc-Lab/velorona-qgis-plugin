@@ -1,0 +1,515 @@
+{
+ "note": "Expected answers = Velorona Map's ecccRadarCovers (web/eccc_coverage.js at hotfix 9cbb542), run in Node when this file was made.",
+ "places": [
+  {
+   "name": "Vancouver",
+   "lat": 49.28,
+   "lon": -123.12,
+   "covered": true
+  },
+  {
+   "name": "Victoria",
+   "lat": 48.43,
+   "lon": -123.37,
+   "covered": true
+  },
+  {
+   "name": "Windsor ON",
+   "lat": 42.3,
+   "lon": -83.03,
+   "covered": true
+  },
+  {
+   "name": "Toronto",
+   "lat": 43.65,
+   "lon": -79.38,
+   "covered": true
+  },
+  {
+   "name": "Ottawa",
+   "lat": 45.42,
+   "lon": -75.7,
+   "covered": true
+  },
+  {
+   "name": "Montreal",
+   "lat": 45.5,
+   "lon": -73.57,
+   "covered": true
+  },
+  {
+   "name": "Halifax",
+   "lat": 44.65,
+   "lon": -63.57,
+   "covered": true
+  },
+  {
+   "name": "Charlottetown",
+   "lat": 46.24,
+   "lon": -63.13,
+   "covered": true
+  },
+  {
+   "name": "St John's",
+   "lat": 47.56,
+   "lon": -52.71,
+   "covered": true
+  },
+  {
+   "name": "Whitehorse",
+   "lat": 60.72,
+   "lon": -135.05,
+   "covered": true
+  },
+  {
+   "name": "Yellowknife",
+   "lat": 62.45,
+   "lon": -114.37,
+   "covered": true
+  },
+  {
+   "name": "Iqaluit",
+   "lat": 63.75,
+   "lon": -68.5,
+   "covered": true
+  },
+  {
+   "name": "Calgary",
+   "lat": 51.05,
+   "lon": -114.07,
+   "covered": true
+  },
+  {
+   "name": "Winnipeg",
+   "lat": 49.9,
+   "lon": -97.14,
+   "covered": true
+  },
+  {
+   "name": "Fredericton",
+   "lat": 45.96,
+   "lon": -66.64,
+   "covered": true
+  },
+  {
+   "name": "Prince Rupert",
+   "lat": 54.31,
+   "lon": -130.32,
+   "covered": true
+  },
+  {
+   "name": "Niagara Falls ON",
+   "lat": 43.09,
+   "lon": -79.08,
+   "covered": true
+  },
+  {
+   "name": "Surrey",
+   "lat": 49.19,
+   "lon": -122.85,
+   "covered": true
+  },
+  {
+   "name": "Ajax link A",
+   "lat": 43.8475,
+   "lon": -79.04333,
+   "covered": true
+  },
+  {
+   "name": "Coppin's Corners",
+   "lat": 44.03186,
+   "lon": -79.13678,
+   "covered": true
+  },
+  {
+   "name": "Edmonton",
+   "lat": 53.55,
+   "lon": -113.49,
+   "covered": true
+  },
+  {
+   "name": "Regina",
+   "lat": 50.45,
+   "lon": -104.62,
+   "covered": true
+  },
+  {
+   "name": "Saskatoon",
+   "lat": 52.13,
+   "lon": -106.67,
+   "covered": true
+  },
+  {
+   "name": "Thunder Bay",
+   "lat": 48.38,
+   "lon": -89.25,
+   "covered": true
+  },
+  {
+   "name": "Sudbury",
+   "lat": 46.49,
+   "lon": -81.0,
+   "covered": true
+  },
+  {
+   "name": "Sault Ste Marie ON",
+   "lat": 46.52,
+   "lon": -84.35,
+   "covered": false
+  },
+  {
+   "name": "Sarnia",
+   "lat": 42.97,
+   "lon": -82.4,
+   "covered": true
+  },
+  {
+   "name": "Kingston",
+   "lat": 44.23,
+   "lon": -76.48,
+   "covered": true
+  },
+  {
+   "name": "Moncton",
+   "lat": 46.09,
+   "lon": -64.78,
+   "covered": true
+  },
+  {
+   "name": "Saint John NB",
+   "lat": 45.27,
+   "lon": -66.06,
+   "covered": true
+  },
+  {
+   "name": "Quebec City",
+   "lat": 46.81,
+   "lon": -71.21,
+   "covered": true
+  },
+  {
+   "name": "Inuvik",
+   "lat": 68.36,
+   "lon": -133.72,
+   "covered": true
+  },
+  {
+   "name": "Churchill",
+   "lat": 58.77,
+   "lon": -94.17,
+   "covered": false
+  },
+  {
+   "name": "Goose Bay",
+   "lat": 53.3,
+   "lon": -60.33,
+   "covered": true
+  },
+  {
+   "name": "Kuujjuaq",
+   "lat": 58.1,
+   "lon": -68.4,
+   "covered": true
+  },
+  {
+   "name": "Fort Frances",
+   "lat": 48.61,
+   "lon": -93.4,
+   "covered": false
+  },
+  {
+   "name": "Stanstead",
+   "lat": 45.01,
+   "lon": -72.1,
+   "covered": false
+  },
+  {
+   "name": "Pelee Island",
+   "lat": 41.78,
+   "lon": -82.67,
+   "covered": true
+  },
+  {
+   "name": "Fort Erie",
+   "lat": 42.9,
+   "lon": -78.93,
+   "covered": false
+  },
+  {
+   "name": "Cornwall ON",
+   "lat": 45.02,
+   "lon": -74.73,
+   "covered": true
+  },
+  {
+   "name": "London ON",
+   "lat": 42.98,
+   "lon": -81.25,
+   "covered": true
+  },
+  {
+   "name": "Kelowna",
+   "lat": 49.89,
+   "lon": -119.5,
+   "covered": true
+  },
+  {
+   "name": "Lethbridge",
+   "lat": 49.69,
+   "lon": -112.84,
+   "covered": true
+  },
+  {
+   "name": "Brandon",
+   "lat": 49.85,
+   "lon": -99.95,
+   "covered": true
+  },
+  {
+   "name": "Rimouski",
+   "lat": 48.45,
+   "lon": -68.52,
+   "covered": true
+  },
+  {
+   "name": "Sydney NS",
+   "lat": 46.14,
+   "lon": -60.19,
+   "covered": true
+  },
+  {
+   "name": "Dawson City",
+   "lat": 64.06,
+   "lon": -139.43,
+   "covered": true
+  },
+  {
+   "name": "Phoenix",
+   "lat": 33.432,
+   "lon": -112.073,
+   "covered": false
+  },
+  {
+   "name": "Phoenix link A",
+   "lat": 33.41531,
+   "lon": -112.06958,
+   "covered": false
+  },
+  {
+   "name": "Seattle",
+   "lat": 47.6,
+   "lon": -122.3,
+   "covered": false
+  },
+  {
+   "name": "Detroit",
+   "lat": 42.33,
+   "lon": -83.05,
+   "covered": false
+  },
+  {
+   "name": "Buffalo",
+   "lat": 42.89,
+   "lon": -78.88,
+   "covered": false
+  },
+  {
+   "name": "Plattsburgh",
+   "lat": 44.7,
+   "lon": -73.45,
+   "covered": false
+  },
+  {
+   "name": "Skagway AK",
+   "lat": 59.46,
+   "lon": -135.31,
+   "covered": false
+  },
+  {
+   "name": "Ogdensburg NY",
+   "lat": 44.69,
+   "lon": -75.49,
+   "covered": false
+  },
+  {
+   "name": "Calais ME",
+   "lat": 45.19,
+   "lon": -67.28,
+   "covered": false
+  },
+  {
+   "name": "Massena NY",
+   "lat": 44.93,
+   "lon": -74.89,
+   "covered": false
+  },
+  {
+   "name": "Derby Line VT",
+   "lat": 45.0,
+   "lon": -72.1,
+   "covered": false
+  },
+  {
+   "name": "Northwest Angle MN",
+   "lat": 49.35,
+   "lon": -95.15,
+   "covered": false
+  },
+  {
+   "name": "Niagara Falls NY",
+   "lat": 43.1,
+   "lon": -79.04,
+   "covered": false
+  },
+  {
+   "name": "Great Falls",
+   "lat": 47.5,
+   "lon": -111.3,
+   "covered": false
+  },
+  {
+   "name": "Fargo",
+   "lat": 46.88,
+   "lon": -96.79,
+   "covered": false
+  },
+  {
+   "name": "Bangor",
+   "lat": 44.8,
+   "lon": -68.77,
+   "covered": false
+  },
+  {
+   "name": "Ketchikan",
+   "lat": 55.34,
+   "lon": -131.64,
+   "covered": false
+  },
+  {
+   "name": "Anchorage",
+   "lat": 61.2,
+   "lon": -149.9,
+   "covered": false
+  },
+  {
+   "name": "Honolulu",
+   "lat": 21.3,
+   "lon": -157.86,
+   "covered": false
+  },
+  {
+   "name": "Miami",
+   "lat": 25.8,
+   "lon": -80.2,
+   "covered": false
+  },
+  {
+   "name": "Mexico City",
+   "lat": 19.43,
+   "lon": -99.13,
+   "covered": false
+  },
+  {
+   "name": "Havana",
+   "lat": 23.1,
+   "lon": -82.4,
+   "covered": false
+  },
+  {
+   "name": "Hermosillo",
+   "lat": 29.1,
+   "lon": -110.95,
+   "covered": false
+  },
+  {
+   "name": "Tijuana",
+   "lat": 32.5,
+   "lon": -117.0,
+   "covered": false
+  },
+  {
+   "name": "Sault Ste Marie MI",
+   "lat": 46.5,
+   "lon": -84.35,
+   "covered": false
+  },
+  {
+   "name": "Blaine WA",
+   "lat": 48.99,
+   "lon": -122.75,
+   "covered": false
+  },
+  {
+   "name": "Chicago",
+   "lat": 41.88,
+   "lon": -87.63,
+   "covered": false
+  },
+  {
+   "name": "Minneapolis",
+   "lat": 44.98,
+   "lon": -93.27,
+   "covered": false
+  },
+  {
+   "name": "Boston",
+   "lat": 42.36,
+   "lon": -71.06,
+   "covered": false
+  },
+  {
+   "name": "Rochester NY",
+   "lat": 43.16,
+   "lon": -77.61,
+   "covered": false
+  },
+  {
+   "name": "Portland ME",
+   "lat": 43.66,
+   "lon": -70.26,
+   "covered": false
+  },
+  {
+   "name": "Juneau",
+   "lat": 58.3,
+   "lon": -134.4,
+   "covered": false
+  },
+  {
+   "name": "Cleveland",
+   "lat": 41.5,
+   "lon": -81.69,
+   "covered": false
+  },
+  {
+   "name": "Duluth",
+   "lat": 46.79,
+   "lon": -92.1,
+   "covered": false
+  },
+  {
+   "name": "Sweetgrass MT",
+   "lat": 48.99,
+   "lon": -111.96,
+   "covered": false
+  },
+  {
+   "name": "Monterrey",
+   "lat": 25.67,
+   "lon": -100.3,
+   "covered": false
+  },
+  {
+   "name": "Bogota",
+   "lat": 4.7,
+   "lon": -74.1,
+   "covered": false
+  },
+  {
+   "name": "London UK",
+   "lat": 51.5,
+   "lon": -0.12,
+   "covered": false
+  }
+ ]
+}

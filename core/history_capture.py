@@ -17,6 +17,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
+from . import eccc_coverage
 from .history_store import HistoryRecord, HistoryStore, to_utc_text, utc_text
 from .presentation.weather import weather_status
 
@@ -110,7 +111,7 @@ def records_from_result(result, store: HistoryStore, now: float) -> Tuple[List[H
                 add(ts=ts, fetched_ts=fetched_now, source=str(st.source)[:MODEL_SOURCE_MAX], entity_id=ent, entity_type="site", kind="observed",
                     metric="rain_rate", value=st.rain_rate_mm_h if reports else None, unit="mm/h",
                     nodata_reason=None if reports else "the station does not publish a precipitation reading")
-        rd = rep.radar_observation
+        rd = rep.radar_observation if eccc_coverage.covers(rep.site.latitude, rep.site.longitude) else None   # never store a radar value from outside Canada
         if rd is not None:
             ts = _iso_to_utc_text(rd.timestamp)
             if ts is None:

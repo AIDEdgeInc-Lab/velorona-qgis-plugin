@@ -21,7 +21,7 @@ from __future__ import annotations
 import io
 from datetime import datetime, timezone
 
-from . import csvsafe, elevation_source
+from . import attribution, csvsafe, eccc_coverage, elevation_source
 from .evidence_record import identity_lines, source_lines
 from .presentation import freshness
 from .presentation.registry import REFERENCE as REFERENCE_DEM
@@ -44,6 +44,12 @@ def _elevation_source_text(result) -> str:
     if elevation_source.is_online(result):
         return "aei_link_clearance (Open-Meteo Elevation API, Copernicus DEM GLO-90, 90m surface model)"
     return f"aei_link_clearance ({elevation_source.source_of(result)}; values taken as metres; surface/bare-earth model and vertical datum not known to Velorona)"
+
+def _credit(result) -> list:
+    """The data credit (core/attribution.py: Open-Meteo CC BY 4.0, Copernicus DEM notice) when the result used that data."""
+    line = attribution.text(attribution.credit_parts(result))
+    return [f"Data credit: {line}"] if line else []
+
 
 def _preamble(lines: list[str]) -> str:
     return "".join(f"# {line}\n" for line in lines) + "#\n"
@@ -326,6 +332,7 @@ def _terrestrial_to_csv(result) -> str:
         "Calculated via aei_link_clearance (ITU-R P.530 Fresnel-zone / earth-curvature terrain clearance), unmodified.",
         *identity_lines(decision=True),
         *source_lines(getattr(result, "record", None)),
+        *_credit(result),
         f"Generated: {datetime.now(timezone.utc).isoformat()}",
     ])
     buf = io.StringIO()
@@ -382,6 +389,7 @@ def _microwave_to_csv(result) -> str:
         f"Link: {link.site_a.name} <-> {link.site_b.name}",
         "Evidence of weather, not a hardware diagnosis or an outage prediction. Calculated via aei_mw_exposure (ITU-R P.530 / P.838-3), unmodified.",
         *identity_lines(decision=False, weather=True),
+        *_credit(result),
         f"Generated: {datetime.now(timezone.utc).isoformat()}",
     ])
     buf = io.StringIO()
@@ -497,6 +505,9 @@ def _representativeness_rows(representativeness, precipitation=None) -> list:
         if rep.radar_observation is not None:
             rows.append(_evidence_row(f"Radar precipitation ({site_label})", "Observed", rep.radar_observation.source,
                                        observation_input=f"{rep.radar_observation.rain_rate_mm_h:.1f} mm/h (estimated, {rep.radar_observation.timestamp})"))
+        elif not eccc_coverage.covers(rep.site.latitude, rep.site.longitude):
+            rows.append(_evidence_row(f"Radar precipitation ({site_label})", "Observed", "ECCC Radar (RADAR_1KM_RRAI)",
+                                       observation_input=NOT_DETERMINED, interpretation=eccc_coverage.NOT_COVERED))
         elif station is not None:
             rows.append(_evidence_row(f"Radar precipitation ({site_label})", "Observed", "ECCC Radar (RADAR_1KM_RRAI)",
                                        observation_input=NOT_DETERMINED,
@@ -532,6 +543,7 @@ def _link_investigation_to_csv(result) -> str:
         "Evidence of weather, not a hardware diagnosis or an outage prediction.",
         *identity_lines(decision=False, weather=True),
         *source_lines(d),
+        *_credit(result),
         f"Generated: {datetime.now(timezone.utc).isoformat()}",
     ])
     buf = io.StringIO()

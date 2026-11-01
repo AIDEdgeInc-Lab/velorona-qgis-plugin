@@ -37,7 +37,7 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
-from ..core import elevation_source, messages
+from ..core import attribution, eccc_coverage, elevation_source, messages
 from ..core.export import NotExportable, result_to_csv, result_to_xlsx
 from ..core.presentation import ask as ask_module
 from ..core.export import _precip_note
@@ -207,7 +207,7 @@ class VeloronaResultsDock(QDockWidget):
         view = self.view_combo.currentData() if ctx is not None else "evidence"
         if ctx is None or view == "evidence" or getattr(self._result, "weather_pending", False):
             # A link whose weather is still loading shows its record with a 'Loading weather' note; Summary/Details would otherwise call it NO DATA.
-            self.browser.setHtml(_render_html(self._result, self._dark))
+            self.browser.setHtml(_render_html(self._result, self._dark) + attribution.html(attribution.credit_parts(self._result)))
             return
         brief = (ctx.terrain or ctx.weather)
         render = operational_view.render_summary if view == "summary" else operational_view.render_details
@@ -223,7 +223,7 @@ class VeloronaResultsDock(QDockWidget):
         avail = self.browser.viewport().width() - 24
         if 120 < avail < charts.WIDTH:
             body = body.replace("<img src=", f"<img width='{avail}' src=")
-        self.browser.setHtml(report_style(self._dark) + body)
+        self.browser.setHtml(report_style(self._dark) + body + attribution.html(attribution.credit_parts(self._result)))
 
     def _rerender(self) -> None:
         self._render_current()
@@ -595,6 +595,8 @@ def _render_weather_evidence_site(rep, precipitation=None) -> str:
         model_rows += _field_row("Model precipitation", "unavailable")
     if rep.radar_observation is not None:
         observed += _field_row("Radar rate", f"{rep.radar_observation.rain_rate_mm_h:.1f} mm/h (estimated, {rep.radar_observation.timestamp})")
+    elif not eccc_coverage.covers(rep.site.latitude, rep.site.longitude):
+        observed += _field_row("Radar", eccc_coverage.NOT_COVERED)
     elif station is not None:
         observed += _field_row("Radar", "not available for this location/time")
     if rep.precipitation_difference_mm_h is not None:
@@ -670,6 +672,8 @@ def _render_endpoint_weather(label, rep, point, precipitation=None) -> str:
     if rep.radar_observation is not None:
         independent += _field_row("Radar precipitation", f"{rep.radar_observation.rain_rate_mm_h:.1f} mm/h",
                                   f"estimated, {rep.radar_observation.timestamp}")
+    elif not eccc_coverage.covers(rep.site.latitude, rep.site.longitude):
+        independent += _field_row("Radar precipitation", NOT_DETERMINED, eccc_coverage.NOT_COVERED)
     elif station is not None:
         independent += _field_row("Radar precipitation", NOT_DETERMINED, "not available for this location/time")
     if rep.precipitation_difference_mm_h is not None:
