@@ -303,6 +303,10 @@ try:
     opened.clear()
     VeloronaPlugin.open_guide(pl)
     check("Guide opens the guide top page", opened == ["https://map.velorona.ai/guide"], opened)
+    check("plugin menu lists a Get updates entry (menu only)", 'addPluginToMenu(MENU_NAME, self.action_updates)' in open(_pl.__file__).read())
+    opened.clear()
+    VeloronaPlugin.open_join(pl)
+    check("Get updates opens https://map.velorona.ai/join and nothing else", opened == ["https://map.velorona.ai/join"], opened)
 except Exception as exc:   # pragma: no cover
     check("plugin Guide entry", False, repr(exc))
 

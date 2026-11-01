@@ -22,3 +22,9 @@ def test_unknown_or_malformed_ids_open_the_top_of_the_guide():
 def test_plugin_only_messages_are_one_short_line():
     for mid, (_, _, line) in messages.PLUGIN_ONLY.items():
         assert messages.is_message_id(mid) and "\n" not in line and len(line) <= 110, mid
+
+
+def test_get_updates_opens_the_sign_up_page_and_sends_nothing():
+    assert guide.JOIN_URL == "https://map.velorona.ai/join"
+    src = open(guide.__file__, encoding="utf-8").read()
+    assert "requests" not in src and "urllib" not in src and "http.client" not in src      # the browser opens the page; the plugin makes no request

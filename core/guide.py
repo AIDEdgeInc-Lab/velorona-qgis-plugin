@@ -8,6 +8,7 @@ from __future__ import annotations
 from . import messages
 
 GUIDE_URL = "https://map.velorona.ai/guide"
+JOIN_URL = "https://map.velorona.ai/join"      # "Get updates": the Map's sign-up page; the plugin only opens it, it sends and counts nothing
 
 
 def is_message_id(message_id: str) -> bool:
@@ -24,3 +25,10 @@ def open_guide(message_id: str = "") -> bool:
     from qgis.PyQt.QtCore import QUrl
     from qgis.PyQt.QtGui import QDesktopServices
     return bool(QDesktopServices.openUrl(QUrl(guide_url(message_id))))
+
+
+def open_join() -> bool:
+    """Menu item "Get updates": opens the sign-up page in the browser. No data is passed in the address and nothing is sent by the plugin."""
+    from qgis.PyQt.QtCore import QUrl
+    from qgis.PyQt.QtGui import QDesktopServices
+    return bool(QDesktopServices.openUrl(QUrl(JOIN_URL)))

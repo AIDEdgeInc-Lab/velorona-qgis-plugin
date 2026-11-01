@@ -359,6 +359,13 @@ class VeloronaPlugin:
         self.iface.addPluginToMenu(MENU_NAME, self.action_guide)
         self.actions.append(self.action_guide)
 
+        # "Get updates" (menu only): opens the Velorona sign-up page in the browser. The plugin sends and counts nothing.
+        self.action_updates = QAction("Get updates", self.iface.mainWindow())
+        self.action_updates.setToolTip("Open https://map.velorona.ai/join in your browser to get product updates. Velorona for QGIS sends nothing.")
+        self.action_updates.triggered.connect(lambda *_: self.open_join())
+        self.iface.addPluginToMenu(MENU_NAME, self.action_updates)
+        self.actions.append(self.action_updates)
+
         self._register_processing_provider()
 
         # Guard against a stale/pre-existing project: one saved before
@@ -408,6 +415,10 @@ class VeloronaPlugin:
     def open_guide(self, message_id: str = "") -> bool:
         from .core import guide
         return guide.open_guide(message_id)
+
+    def open_join(self) -> bool:
+        from .core import guide
+        return guide.open_join()
 
     def show_panel(self):
         """Reopens the one Velorona dock. QGIS also lists it under View >
