@@ -7,9 +7,12 @@ Coupling (documented, not hidden):
 * The plugin imports `qgis.core` at module level in core/features.py, which core/engines/microwave_exposure.py imports. A system
   Python has no QGIS, so this runner registers an EMPTY stand-in `qgis.core` (three placeholder names). Nothing in the decision path
   uses them; they exist only so the real `analyze_sites()` can be imported.
-* aei-link-clearance is the released PyPI package (>=0.2.0,<0.3), as a shipped QGIS loads it; the other aei_* libraries are
+* aei-link-clearance is the released PyPI package (>=0.3.0,<0.4), as a shipped QGIS loads it; the other aei_* libraries are
   taken from the installed packages, falling back to sibling checkouts only when absent.
 * Terrain: `requests.get` is replaced (elevation.py imports requests lazily), so the library's own get_elevations() (count check, float()) runs.
+  The 0.3 online provider asks only for DISTINCT points (rounded to 5 decimals) and caches them, so the stub answers per requested coordinate
+  (the fixture's samples carry lat/lon) and the shared provider is reset for every fixture; a fixture that deliberately returns a wrong count or a
+  null still reaches the library's own checks.
 * Weather: TypedPrecipitationProvider(get=...) takes an injected HTTP getter; ECCC station/radar lookups are replaced by "none" and the
   hourly-history fetcher raises (history is context only, not a decision input -- microwave_exposure.py).
 """
@@ -21,7 +24,7 @@ REPOS = os.path.dirname(ROOT)
 sys.path.insert(0, ROOT)
 import importlib.util
 # Installed (PyPI) packages win; a sibling checkout is used only for a library that is not installed. aei-link-clearance has no
-# sibling fallback: the plugin requires the released package (>=0.2.0,<0.3).
+# sibling fallback: the plugin requires the released package (>=0.3.0,<0.4).
 for mod, r in (("aei_mw_exposure", "aei-microwave-link-exposure"), ("aei_geo_features", "aei-geo-features")):
     if importlib.util.find_spec(mod) is None:
         sys.path.insert(0, os.path.join(REPOS, r, "src"))
@@ -81,9 +84,15 @@ def terrain_stage(fx):
         def raise_for_status(self):
             if self.err: raise rq.exceptions.HTTPError(self.err)
         def json(self): return self.body
+    by_point = {(round(s[0], 5), round(s[1], 5)): s[2] for s in t.get("samples", [])}
     def fake_get(url, params=None, timeout=None):
         if t["mode"] == "error": return Resp(None, t["error"])
-        return Resp({"elevation": [s[2] for s in t["samples"]]})   # nulls included, as a provider could return them
+        asked = [(round(float(la), 5), round(float(lo), 5)) for la, lo in zip(params["latitude"].split(","), params["longitude"].split(","))]
+        if asked and all(k in by_point for k in asked):
+            return Resp({"elevation": [by_point[k] for k in asked]})   # the value of each requested point (nulls included, as a provider could return them)
+        return Resp({"elevation": [s[2] for s in t["samples"]]})       # a fixture whose samples do not match the request (wrong count): as given
+    from core import elevation_source
+    elevation_source.reset_online_provider()      # the provider caches heights by point; one fixture must not see another's
     orig = rq.get
     rq.get = fake_get          # the library's own get_elevations() runs; only the HTTP edge is replaced
     try:
