@@ -17,15 +17,16 @@ WGS84 = QgsCoordinateReferenceSystem("EPSG:4326")
 def candidate_layers(project=None) -> List[Tuple[str, "QgsRasterLayer"]]:
     """[(label, layer)] for every valid single-band raster layer in the project, labelled so two layers with one name stay distinguishable."""
     project = project or QgsProject.instance()
-    layers = [l for l in project.mapLayers().values() if isinstance(l, QgsRasterLayer) and l.isValid() and l.bandCount() == 1]
-    layers.sort(key=lambda l: l.name().lower())
+    layers = [layer for layer in project.mapLayers().values()
+              if isinstance(layer, QgsRasterLayer) and layer.isValid() and layer.bandCount() == 1]
+    layers.sort(key=lambda layer: layer.name().lower())
     seen = {}
-    for l in layers:
-        seen[l.name()] = seen.get(l.name(), 0) + 1
+    for layer in layers:
+        seen[layer.name()] = seen.get(layer.name(), 0) + 1
     out = []
-    for l in layers:
-        label = l.name() if seen[l.name()] == 1 else f"{l.name()}  [{l.id()[-8:]}]"
-        out.append((label, l))
+    for layer in layers:
+        label = layer.name() if seen[layer.name()] == 1 else f"{layer.name()}  [{layer.id()[-8:]}]"
+        out.append((label, layer))
     return out
 
 

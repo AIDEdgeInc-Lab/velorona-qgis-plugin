@@ -91,6 +91,22 @@ check("raster without CRS is refused with the reason", ok)
 # 6. candidate list + dialog selector
 labels = [l for l, _ in local_dem.candidate_layers()]
 check("candidate layers are the project's single-band rasters", set(labels) >= {"wgs84dem", "utmdem", "small", "holes", "nocrs"}, str(labels))
+# 6b. the candidate list itself: only valid single-band rasters, sorted by name, two layers with one name told apart by their id tail
+dup_a = QgsRasterLayer(write_raster("dup_a.tif", 4326, -79.6, 43.9, 0.01, 4, 4, lambda r, c: 10.0), "twin"); QgsProject.instance().addMapLayer(dup_a)
+dup_b = QgsRasterLayer(write_raster("dup_b.tif", 4326, -79.6, 43.9, 0.01, 4, 4, lambda r, c: 20.0), "twin"); QgsProject.instance().addMapLayer(dup_b)
+bad = QgsRasterLayer(os.path.join(TMP, "not_a_raster.tif"), "broken"); QgsProject.instance().addMapLayer(bad)
+cands = local_dem.candidate_layers()
+labels2 = [name for name, _ in cands]
+check("candidate list is sorted by layer name", [lyr.name().lower() for _, lyr in cands] == sorted(lyr.name().lower() for _, lyr in cands), str(labels2))
+check("an invalid raster is not offered", "broken" not in labels2 and all(lyr.isValid() for _, lyr in cands))
+twins = [name for name, lyr in cands if lyr.name() == "twin"]
+tails = {dup_a.id()[-8:], dup_b.id()[-8:]}
+check("two layers with one name get distinct labels ending in their own id tail",
+      len(twins) == 2 and twins[0] != twins[1] and all(t.startswith("twin  [") for t in twins)
+      and {t[-9:-1] for t in twins} == tails, str(twins))
+check("a name used once stays plain", "wgs84dem" in labels2 and "small" in labels2)
+QgsProject.instance().removeMapLayer(dup_a.id()); QgsProject.instance().removeMapLayer(dup_b.id()); QgsProject.instance().removeMapLayer(bad.id())
+
 app = QApplication.instance()
 from velorona.ui.param_dialog import ParamDialog  # noqa: E402
 d = ParamDialog(None, "t", TR.PARAM_SPEC, {p["key"]: p["default"] for p in TR.PARAM_SPEC}, elevation_layers=local_dem.candidate_layers())
