@@ -103,8 +103,8 @@ plugin._warn = lambda m: warnings.append(m)
 plugin._error = lambda m: warnings.append("ERROR: " + m)
 plugin.initGui()
 check("plugin enables without traceback", True)
-# 5 + the two USA actions (Load USA Links in View, USA Data Setup)
-check("toolbar/menu actions registered", len(plugin.actions) == 8,
+# 5 + the two USA actions (Load USA Links in View, USA Data Setup) + Show Velorona Panel + batch terrain + Guide + Get updates
+check("toolbar/menu actions registered", len(plugin.actions) == 10,
       f"{len(plugin.actions)} actions: {[a.text() for a in plugin.actions]}")
 check("no duplicate action labels",
       len({a.text() for a in plugin.actions}) == len(plugin.actions))
@@ -195,8 +195,8 @@ plugin2 = velorona.classFactory(iface)
 plugin2._warn = lambda m: warnings.append(m)
 plugin2.initGui()
 check("plugin re-enables without traceback", True)
-check("no duplicate actions after re-enable", len(plugin2.actions) == 8
-      and len({a.text() for a in plugin2.actions}) == 8, f"{len(plugin2.actions)} actions")
+check("no duplicate actions after re-enable", len(plugin2.actions) == 10
+      and len({a.text() for a in plugin2.actions}) == 10, f"{len(plugin2.actions)} actions")
 plugin2.unload()
 check("second unload is clean", True)
 
