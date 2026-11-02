@@ -17,6 +17,7 @@ import xml.etree.ElementTree as ET
 ALLOWED = {
     "tests.test_usa_provider::test_real_pack_dedup_matches_the_index",
     "tests.test_usa_provider::test_real_extract_loads_whole_with_contract_counts",
+    "tests.test_messages::test_plugin_copy_equals_the_map_registry_when_a_map_checkout_is_present",   # needs the Map checkout; tools/gate.sh runs it (MAP_REPO)
     "::tests.test_workflow_core_semantics",     # module-level importorskip("aei_workflow"): reported by pytest without a test name
 }
 
