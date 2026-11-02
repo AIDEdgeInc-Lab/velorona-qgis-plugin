@@ -66,6 +66,9 @@ def make_provider(layer):
 
 
 def _basename(source: str) -> str:
-    # layer.source() can be a path, a URI with options ("file.tif|layername=..") or a URL; keep the readable tail only
-    tail = source.replace("\\", "/").split("|", 1)[0].rstrip("/").rsplit("/", 1)[-1]
-    return tail or source
+    """The readable file name of a raster source for the 'source' text of results and exports; "" when there is nothing safe to show (the caller then
+    uses the layer name). ``layer.source()`` can be a path, a URI with options ("file.tif|layername=.."), or a URL; a URL query or fragment, and
+    key=value URI options, can carry tokens or passwords ("?sig=..", "username=.. password=.."), so they are never shown."""
+    head = source.split("|", 1)[0].split("?", 1)[0].split("#", 1)[0]
+    tail = head.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
+    return "" if any(c in tail for c in "=&@;") else tail
