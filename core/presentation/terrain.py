@@ -22,6 +22,7 @@ check) is a verification FLAG shown beside the status; it never changes the stat
 from __future__ import annotations
 
 import math
+from .. import elevation_source
 from .model import link_title, AT_RISK, CLEAR, CRITICAL, NO_DATA, NOT_DETERMINED, WATCH, Brief, Fact, exact, fmt, signed
 
 # Mirrors of library constants, kept in sync by tests/test_presentation_terrain.py
@@ -166,7 +167,7 @@ def terrain_brief(result) -> Brief:
     ]
     evidence = [
         Fact("Evidence", f"{len(r.profile)} elevation samples along the path"),
-        Fact("Elevation source", ELEVATION_SOURCE),
+        Fact("Elevation source", ELEVATION_SOURCE if elevation_source.is_online(result) else elevation_source.source_of(result)),
         Fact("Calculation", "aei_link_clearance.analyze_link (ITU-R P.530 Fresnel zone, earth-curvature adjusted)"),
         Fact("Site A source", result.site_a_source),
         Fact("Site B source", result.site_b_source),
@@ -174,8 +175,11 @@ def terrain_brief(result) -> Brief:
     ]
     caveats = [
         CRITICAL_POINT_DEFINITION,
-        f"Elevation comes from a 90 m surface model; a different but equally valid source can differ by about "
-        f"{fmt(ELEVATION_UNCERTAINTY_M, 0)} m at one point."
+        (f"Elevation comes from a 90 m surface model; a different but equally valid source can differ by about "
+         f"{fmt(ELEVATION_UNCERTAINTY_M, 0)} m at one point.") if elevation_source.is_online(result) else
+        (f"Elevation comes from the raster you chose ({elevation_source.source_of(result)}). Velorona does not know whether it is a surface or "
+         f"bare-earth model, its vertical datum or its vintage; its values are used as metres. A different but equally valid source can differ by about "
+         f"{fmt(ELEVATION_UNCERTAINTY_M, 0)} m at one point."),
     ]
     if r.near_threshold:
         caveats.append("Result is near a classification boundary: a survey could move it to the next status.")
@@ -195,6 +199,7 @@ def terrain_brief(result) -> Brief:
             "terrain_clearance_m": available, "margin_m": margin, "clearance_ratio": r.clearance_ratio,
             "percent_fresnel_clear": r.percent_fresnel_clear, "los_status": r.los_status,
             "near_threshold": r.near_threshold, "samples": len(r.profile),
+            "elevation_source": elevation_source.source_of(result),
             "critical_distance_from_a_km": crit.distance_from_a_km if crit else None,
             "critical_latitude": crit.latitude if crit else None,
             "critical_longitude": crit.longitude if crit else None,

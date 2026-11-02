@@ -9,7 +9,7 @@ import pytest
 from core.export import result_to_csv
 from presentation_fixtures import terrain_result, weather_result
 
-VOCAB = {"Observed", "Model-derived", "Calculated", "Inferred", "Assumed"}
+VOCAB = {"Observed", "Model-derived", "Calculated", "Inferred", "Assumed", "Reference data (DEM)"}
 
 
 def rows(res):
@@ -22,7 +22,7 @@ def test_terrain_user_entered_values_are_assumed_feature_attributes_are_observed
     r = rows(res)
     assert r["Site A antenna height"][1] == "Assumed" and r["Site B antenna height"][1] == "Observed"
     assert r["Frequency"][1] == "Assumed" and "user-provided" in r["Frequency"][5].lower()
-    assert r["Ground elevation profile"][1] == "Observed"
+    assert r["Ground elevation profile"][1] == "Reference data (DEM)"      # a reference dataset, not a measurement of this path
     assert {x[1] for x in r.values()} <= VOCAB
 
 

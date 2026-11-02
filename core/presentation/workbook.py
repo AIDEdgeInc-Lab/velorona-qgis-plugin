@@ -22,6 +22,7 @@ import io
 from datetime import datetime, timezone
 from typing import List, Optional
 
+from .. import attribution
 from . import registry
 from .ask import AskContext
 from .model import NOT_DETERMINED, fmt
@@ -118,7 +119,7 @@ def _summary(result, ctx: AskContext, generated: str) -> Sheet:
         if w.key_facts:
             rows += [
                 ["Rain rate used", w.key_facts[0].value, w.key_facts[0].comparison],
-                ["Predicted rain fade", w.key_facts[1].value, w.key_facts[1].comparison],
+                ["Estimated rain fade", w.key_facts[1].value, w.key_facts[1].comparison],
                 ["Fade margin remaining", w.key_facts[2].value, w.key_facts[2].meaning],
             ]
         for s in w.sites:
@@ -134,6 +135,9 @@ def _summary(result, ctx: AskContext, generated: str) -> Sheet:
     for b in ctx.briefs():
         for cav in b.caveats:
             rows.append(["Caveat", cav, ""])
+    credit = attribution.text(attribution.credit_parts(result))
+    if credit:
+        rows.append(["Data credit", credit, ""])
     rows.append(["Note", "Status wording is Velorona's mapping of the engineering result; see DATA DICTIONARY.", ""])
     return Sheet("SUMMARY", rows, widths=[26, 56, 70], freeze=4)
 
@@ -168,6 +172,8 @@ def _link_analysis(ctx: AskContext) -> Sheet:
             ["Status", _status_cell(t.status), "", "", t.reason]]
     for label, key, unit, numfmt, compared, meaning in _TERRAIN_ROWS:
         value = t.data.get(key)
+        if key == "samples" and t.data.get("elevation_source") and "Open-Meteo" not in t.data["elevation_source"]:
+            meaning = t.data["elevation_source"]        # a raster the user chose: say so instead of the online wording
         rows.append([label, Cell(value, fmt=numfmt) if value is not None else NOT_DETERMINED, unit, compared, meaning])
     return Sheet("LINK ANALYSIS", rows, widths=[28, 16, 11, 46, 52], freeze=1)
 

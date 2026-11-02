@@ -17,6 +17,7 @@ irrelevant for that kind)."""
 from __future__ import annotations
 
 import html
+import os
 
 from qgis.PyQt.QtCore import QUrl, Qt
 from qgis.PyQt.QtGui import QTextDocument
@@ -36,11 +37,13 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
+from ..core import attribution, eccc_coverage, elevation_source, messages
 from ..core.export import NotExportable, result_to_csv, result_to_xlsx
 from ..core.presentation import ask as ask_module
 from ..core.export import _precip_note
 from ..core.presentation.model import exact
 from ..core.record_source import is_fcc
+from ..core.presentation import freshness
 from ..core.presentation.terrain import ratio_meaning, ratio_value, terrain_explanation
 from ..core.presentation.workbook import context_for
 from . import charts, operational_view, theme
@@ -70,11 +73,14 @@ class VeloronaResultsDock(QDockWidget):
         self._dark = True
         self.elevation_profile_requested = None  # callable, set by plugin.py
         self.map_appearance_changed = None       # callable, set by plugin.py
+        self.history_requested = None            # callable(), set by plugin.py: opens the History window
+        self.history_block = None                # callable(result) -> html, set by plugin.py: the 'What changed' block for a weather result
 
         evidence = QWidget(self)
         layout = QVBoxLayout(evidence)
         layout.setContentsMargins(6, 6, 6, 6)
         self.browser = QTextBrowser(evidence)
+        self.browser.setOpenExternalLinks(True)          # message IDs link to the user guide (map.velorona.ai/guide#ID)
         button_row = QHBoxLayout()
         self.export_button = QPushButton("Export as CSV...", evidence)
         self.export_button.clicked.connect(self._on_export_clicked)
@@ -85,9 +91,14 @@ class VeloronaResultsDock(QDockWidget):
         self.elevation_button = QPushButton("Open Elevation Profile", evidence)
         self.elevation_button.clicked.connect(self._on_elevation_clicked)
         self.elevation_button.hide()
+        self.history_button = QPushButton("History...", evidence)
+        self.history_button.setToolTip("Values this computer has stored from your weather analyses: timeline, what changed, CSV, clear. Nothing is uploaded.")
+        self.history_button.clicked.connect(lambda: self.history_requested() if self.history_requested else None)
+        self.history_button.hide()
         button_row.addWidget(self.excel_button)
         button_row.addWidget(self.export_button)
         button_row.addWidget(self.elevation_button)
+        button_row.addWidget(self.history_button)
 
         # One result, three depths: Summary (seconds), Details (planner), Evidence
         # (the full Observed / Calculated / Inferred record, unchanged).
@@ -194,12 +205,15 @@ class VeloronaResultsDock(QDockWidget):
             return
         ctx = self._context()
         view = self.view_combo.currentData() if ctx is not None else "evidence"
-        if ctx is None or view == "evidence":
-            self.browser.setHtml(_render_html(self._result, self._dark))
+        if ctx is None or view == "evidence" or getattr(self._result, "weather_pending", False):
+            # A link whose weather is still loading shows its record with a 'Loading weather' note; Summary/Details would otherwise call it NO DATA.
+            self.browser.setHtml(_render_html(self._result, self._dark) + attribution.html(attribution.credit_parts(self._result)))
             return
         brief = (ctx.terrain or ctx.weather)
         render = operational_view.render_summary if view == "summary" else operational_view.render_details
         body, names = render(brief)
+        if self.history_block is not None and ctx.weather is not None:
+            body += self.history_block(self._result)       # UI_AUDIT order: What changed follows the values, before the evidence
         document = self.browser.document()
         for name, image in charts.images_for(names, brief, self._dark).items():
             document.addResource(QTextDocument.ResourceType.ImageResource,
@@ -209,7 +223,7 @@ class VeloronaResultsDock(QDockWidget):
         avail = self.browser.viewport().width() - 24
         if 120 < avail < charts.WIDTH:
             body = body.replace("<img src=", f"<img width='{avail}' src=")
-        self.browser.setHtml(report_style(self._dark) + body)
+        self.browser.setHtml(report_style(self._dark) + body + attribution.html(attribution.credit_parts(self._result)))
 
     def _rerender(self) -> None:
         self._render_current()
@@ -229,6 +243,7 @@ class VeloronaResultsDock(QDockWidget):
             self.ask_input.setCompleter(completer)
         kind = getattr(self._result, "kind", None)
         self.excel_button.setVisible(has_brief)
+        self.history_button.setVisible(kind in ("microwave-exposure", "link-investigation"))
         self.export_button.setVisible(kind not in (None, "satellite-earth-space"))
 
     def show_result(self, result) -> None:
@@ -249,6 +264,7 @@ class VeloronaResultsDock(QDockWidget):
         self.export_button.hide()
         self.excel_button.hide()
         self.elevation_button.hide()
+        self.history_button.hide()
 
     def _on_ask(self) -> None:
         ctx = self._context()
@@ -272,7 +288,7 @@ class VeloronaResultsDock(QDockWidget):
             return
         with open(path, "wb") as f:
             f.write(data)
-        QMessageBox.information(self, "Velorona", f"Exported to {path}")
+        QMessageBox.information(self, "Velorona", messages.text("I-EXPORT-DONE", file=os.path.basename(path)))
 
     def _on_export_clicked(self):
         if self._result is None:
@@ -287,7 +303,7 @@ class VeloronaResultsDock(QDockWidget):
             return
         with open(path, "w", encoding="utf-8", newline="") as f:
             f.write(csv_text)
-        QMessageBox.information(self, "Velorona", f"Exported to {path}")
+        QMessageBox.information(self, "Velorona", messages.text("I-EXPORT-DONE", file=os.path.basename(path)))
 
     def _on_elevation_clicked(self):
         if self.elevation_profile_requested:
@@ -525,8 +541,9 @@ def _render_terrestrial(result) -> str:
     observed = (
         _field_row("Distance (km)", f"{r.distance_km:.2f}") + _field_row("Bearing", f"{r.bearing_deg:.1f}°")
         + _field_row("Frequency (GHz)", exact(r.frequency_ghz))
-        + _field_row("Elevation samples", f"{len(r.profile)} points along path (Open-Meteo Elevation API, Copernicus DEM GLO-90)")
     )
+    # Elevation is a reference dataset (the online Copernicus DEM or the raster the user chose), never typed Observed.
+    reference = _field_row("Elevation samples", f"{len(r.profile)} points along path ({'Open-Meteo Elevation API, Copernicus DEM GLO-90' if elevation_source.is_online(result) else elevation_source.source_of(result)})")
     calculated = (
         _field_row("First Fresnel radius (critical point)", f"{r.first_fresnel_radius_m:.1f} m")
         + _field_row("Required clearance", f"{r.required_clearance_m:.1f} m")
@@ -541,6 +558,7 @@ def _render_terrestrial(result) -> str:
         f"<h3>{_esc(r.link_id)} {badge}</h3>"
         + source_note
         + _section_html("Observed", observed)
+        + _section_html("Reference data (DEM)", reference)
         + _section_html("Calculated", calculated)
         + _section_html("Inferred", inferred)
         + "<p class='caveat'>Calculated via aei_link_clearance (ITU-R P.530 Fresnel-zone / earth-curvature terrain "
@@ -577,6 +595,8 @@ def _render_weather_evidence_site(rep, precipitation=None) -> str:
         model_rows += _field_row("Model precipitation", "unavailable")
     if rep.radar_observation is not None:
         observed += _field_row("Radar rate", f"{rep.radar_observation.rain_rate_mm_h:.1f} mm/h (estimated, {rep.radar_observation.timestamp})")
+    elif not eccc_coverage.covers(rep.site.latitude, rep.site.longitude):
+        observed += _field_row("Radar", eccc_coverage.NOT_COVERED)
     elif station is not None:
         observed += _field_row("Radar", "not available for this location/time")
     if rep.precipitation_difference_mm_h is not None:
@@ -652,6 +672,8 @@ def _render_endpoint_weather(label, rep, point, precipitation=None) -> str:
     if rep.radar_observation is not None:
         independent += _field_row("Radar precipitation", f"{rep.radar_observation.rain_rate_mm_h:.1f} mm/h",
                                   f"estimated, {rep.radar_observation.timestamp}")
+    elif not eccc_coverage.covers(rep.site.latitude, rep.site.longitude):
+        independent += _field_row("Radar precipitation", NOT_DETERMINED, eccc_coverage.NOT_COVERED)
     elif station is not None:
         independent += _field_row("Radar precipitation", NOT_DETERMINED, "not available for this location/time")
     if rep.precipitation_difference_mm_h is not None:
@@ -762,7 +784,10 @@ def _render_link_investigation(result) -> str:
         "<div class='sec'>Weather evidence</div>",
     ]
 
-    if exposure is None:
+    if exposure is None and getattr(result, "weather_pending", False):
+        parts.append(f"<p><b>{messages.text('I-WEATHER-FETCHING')}</b> This panel updates by itself when it arrives. "
+                     "The rest of the record above is complete.</p>")
+    elif exposure is None:
         parts.append(f"<p>{NOT_DETERMINED} &mdash; live weather evidence could not be retrieved for this link.</p>"
                      f"<p class='caveat'>{_esc(result.weather_error or 'Weather provider unavailable.')}</p>")
     else:
@@ -780,7 +805,7 @@ def _render_link_investigation(result) -> str:
             + _field_row("Fade margin", f"{exp.link.fade_margin_db:.0f} dB", note_for("fade_margin_db"))
             + _field_row("Path length", f"{att.path_length_km:.2f} km")
             + _field_row("Specific attenuation", f"{att.specific_attenuation_db_km:.4f} dB/km")
-            + _field_row("Predicted rain attenuation", f"{att.predicted_attenuation_db:.2f} dB")
+            + _field_row("Estimated rain attenuation", f"{att.predicted_attenuation_db:.2f} dB")
             + _field_row("Exposure ratio", f"{exp.exposure_ratio * 100:.1f}% of the fade margin")
             + _field_row("Method", att.method)
         )
@@ -842,14 +867,15 @@ def _render_microwave(result) -> str:
 
     observed = (
         f"<p>{_esc(exp.rain_rate_assumption)}</p>"
-        f"<p>Rain rate used: <b>{exp.rain_rate_mm_h:.1f} mm/h</b> (model-derived)</p>"
+        f"<p>Rain rate used: <b>{exp.rain_rate_mm_h:.1f} mm/h</b></p>"
+        f"<p class='note'>{_esc(freshness.for_site(result.representativeness, exp.source_site_id))}</p>"
         + (f"<p class='note'>{_esc(_precip_note(result.precipitation.get(exp.source_site_id)))}</p>"
            if result.precipitation.get(exp.source_site_id) else "")
     )
     calculated = (
         f"<p>Method: {_esc(exp.attenuation.method)}</p>"
         f"<pre class='assumption'>{_esc(exp.attenuation.assumption)}</pre>"
-        f"<p>Predicted attenuation: <b>{exp.attenuation.predicted_attenuation_db:.2f} dB</b></p>"
+        f"<p>Estimated rain attenuation: <b>{exp.attenuation.predicted_attenuation_db:.2f} dB</b></p>"
         f"<p>Fade margin (link spec): {link.fade_margin_db:.0f} dB</p>"
         f"<p>Exposure ratio: {exp.exposure_ratio * 100:.1f}% of the fade margin</p>"
     )

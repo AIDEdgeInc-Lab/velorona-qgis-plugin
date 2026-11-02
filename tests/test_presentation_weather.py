@@ -84,7 +84,7 @@ def test_fetch_uses_injected_getter_and_reports_failures():
 
 
 def _band_cases():
-    """Predicted attenuation comes from the library; the fade margin is chosen to
+    """Estimated attenuation comes from the library; the fade margin is chosen to
     land each library severity band, so the test cannot drift from its rules."""
     base = weather_result(rain_a=12.0, rain_b=1.0, fade_margin=32.0)
     fade = base.exposure.attenuation.predicted_attenuation_db

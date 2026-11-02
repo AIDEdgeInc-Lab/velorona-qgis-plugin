@@ -1,0 +1,81 @@
+"""Where a terrain analysis gets its ground heights from, and how a failure to get them is reported. Pure Python (no QGIS), so it is unit-testable.
+
+The library seam (aei-link-clearance >= 0.3: ``analyze_link(elevation_provider=)``) owns caching and 429 backoff for the online service; the plugin
+requires that library (core/dependencies.py), so there is no fallback of its own. (``provider_retry`` stays: the weather fetch uses it.)
+"""
+
+from __future__ import annotations
+
+from typing import Optional
+
+from . import messages
+
+ONLINE_LABEL = "Online (Open-Meteo, 90 m surface model)"
+# What the library's online-source constant says; used only for a result that predates the ``elevation_source`` field.
+ONLINE_SOURCE_TEXT = "Open-Meteo Elevation API (Copernicus DEM GLO-90, 90 m surface model)"
+
+_online = None
+
+
+def online_provider():
+    """The one shared online provider (cache + cool-down live in it, so they must be shared by every analysis)."""
+    global _online
+    if _online is None:
+        from aei_link_clearance import OpenMeteoProvider
+        from . import provider_retry
+        # Waits go through provider_retry._sleep, the one place the plugin (and its tests) control how backoff sleeps.
+        _online = OpenMeteoProvider(sleep=lambda seconds: provider_retry._sleep(seconds))
+    return _online
+
+
+def reset_online_provider() -> None:
+    """Forget the cached heights and any cool-down (tests, and 'Clear elevation cache')."""
+    global _online
+    _online = None
+
+
+def source_of(result) -> str:
+    """The elevation source a library result (or a plugin result wrapping one) names; the online text for a result that does not say."""
+    r = getattr(result, "result", result)
+    return str(getattr(r, "elevation_source", None) or ONLINE_SOURCE_TEXT)
+
+
+def is_online(result) -> bool:
+    """True for the online default. Everything that is not is a user-chosen raster, whose own description must replace the online wording."""
+    text = source_of(result)
+    if text == ONLINE_SOURCE_TEXT:
+        return True
+    try:
+        from aei_link_clearance.elevation import SOURCE
+    except ImportError:
+        return False
+    return text == SOURCE
+
+
+def request_failed(detail: str) -> str:
+    """The Map's wording for a failed elevation request (registry E-TERRAIN-SERVICE-FAILED); ``detail`` says why (rate limit, unreachable...)."""
+    return f"{messages.short_text('E-TERRAIN-SERVICE-FAILED')}: {detail}"
+
+
+def bad_reply(exc: BaseException) -> str:
+    """The Map's wording for a service answer that cannot be used: a missing/non-numeric value (E-TERRAIN-VALUE-MISSING) or a wrong number of
+    values (E-TERRAIN-SERVICE-BAD-REPLY). Never a guess at which value is which."""
+    if "non-numeric" in str(exc) or "missing" in str(exc):
+        return "the elevation service returned a missing or non-numeric value (R5)"
+    return messages.short_text("E-TERRAIN-SERVICE-BAD-REPLY")
+
+
+def failure_reason(exc: BaseException) -> Optional[tuple]:
+    """(reason, transient) for the library's elevation errors, or None for anything else. The reason is written to the user; for a failure of
+    the SERVICE it says so and never presents it as a property of the link."""
+    try:
+        from aei_link_clearance import DEMCrsMismatchError, ElevationCoverageError, ElevationServiceUnavailable
+    except ImportError:
+        return None
+    if isinstance(exc, ElevationServiceUnavailable):
+        return request_failed(str(exc)), bool(exc.transient)
+    if isinstance(exc, DEMCrsMismatchError):
+        return f"the chosen elevation raster cannot be used (T1): {exc}", False
+    if isinstance(exc, ElevationCoverageError):
+        return f"the chosen elevation raster does not cover this path (T1): {exc}", False
+    return None

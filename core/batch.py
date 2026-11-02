@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Callable, Iterable, List, Optional, Tuple
 
-from . import csvsafe
+from . import csvsafe, elevation_source
 from .evidence_record import identity_lines
 from .presentation import terrain as pterrain
 from .presentation.model import AT_RISK, CLEAR, CRITICAL, NO_DATA, WATCH
@@ -149,7 +149,7 @@ def _row_from_result(index: int, link: BatchLink, res) -> BatchRow:
         margin_m=r.terrain_clearance_m - r.required_clearance_m, clearance_ratio=None if unbounded else ratio,
         clearance_ratio_text=pterrain.ratio_value(r), percent_fresnel_clear=r.percent_fresnel_clear,
         critical_distance_from_a_km=crit.distance_from_a_km if crit is not None else None,
-        elevation_samples=len(r.profile), elevation_source=pterrain.ELEVATION_SOURCE)
+        elevation_samples=len(r.profile), elevation_source=pterrain.ELEVATION_SOURCE if elevation_source.is_online(r) else elevation_source.source_of(r))
 
 
 def _defaults(engine=None):

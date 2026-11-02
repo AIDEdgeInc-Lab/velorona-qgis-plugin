@@ -24,7 +24,7 @@ from qgis.PyQt.QtCore import Qt, QTimer
 from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtWidgets import QAction, QApplication, QMessageBox, QWIDGETSIZE_MAX
 
-from .core import basemap_labels
+from .core import basemap_labels, messages
 from .core import imagery
 from .core import layers as layer_helpers
 from .core import network_context
@@ -40,6 +40,7 @@ from .core import dependencies, inspector
 from .core.inspector import feature_to_entry
 from .core.layers import LIFECYCLE_EVIDENCE, PUBLIC_RECORDS_DISCLOSURE
 from .core.sources import satellite_feed, space_public, terrestrial_public
+from .core import elevation_source, history_capture, history_store, history_view, local_dem
 from .core.validation import NoDataError
 from .core.viewport_cache import FAILED, MISS, ViewportCache
 from .ui import records_table
@@ -291,6 +292,12 @@ class VeloronaPlugin:
         self._dataset_notes = {}               # source key -> provenance/status line shown in Records (replayed when the dock is created)
         self._viewport_status = {}             # source key -> what the live viewport layers are showing (see _set_viewport_status)
         self._satellites_task = None           # the running QgsTask that loads satellite data (None when idle)
+        self._history = None                   # HistoryStore, created on first use (history is local to this computer)
+        self._link_weather_task = None          # the one running link-selection weather request (QgsTask) ...
+        self._link_weather_wanted = None        # ... and the newest selection waiting for it
+        self._warn_guide_id = None              # set by _warn_id for the duration of one warning box
+        self._history_labels = {}              # {entity id: name}, this session; the names are also kept in the history file on this computer
+        self._analysis_task = None             # the running QgsTask of a terrain or weather analysis (None when idle); progress shows in the QGIS task manager
         self._endpoint_index = {}
         self._usa_provider = None
         self.network_context_layer = None
@@ -345,6 +352,20 @@ class VeloronaPlugin:
             self.show_panel,
         )
 
+        # "Guide" is in the plugin menu only (not a toolbar button): opens the user guide in the browser.
+        self.action_guide = QAction("Guide", self.iface.mainWindow())
+        self.action_guide.setToolTip("Open the Velorona user guide in your browser.")
+        self.action_guide.triggered.connect(lambda *_: self.open_guide())
+        self.iface.addPluginToMenu(MENU_NAME, self.action_guide)
+        self.actions.append(self.action_guide)
+
+        # "Get updates" (menu only): opens the Velorona sign-up page in the browser. The plugin sends and counts nothing.
+        self.action_updates = QAction("Get updates", self.iface.mainWindow())
+        self.action_updates.setToolTip("Open https://map.velorona.ai/join in your browser to get product updates. Velorona for QGIS sends nothing.")
+        self.action_updates.triggered.connect(lambda *_: self.open_join())
+        self.iface.addPluginToMenu(MENU_NAME, self.action_updates)
+        self.actions.append(self.action_updates)
+
         self._register_processing_provider()
 
         # Guard against a stale/pre-existing project: one saved before
@@ -391,6 +412,14 @@ class VeloronaPlugin:
         from qgis import processing
         processing.execAlgorithmDialog("velorona:terrain_clearance_batch", {})
 
+    def open_guide(self, message_id: str = "") -> bool:
+        from .core import guide
+        return guide.open_guide(message_id)
+
+    def open_join(self) -> bool:
+        from .core import guide
+        return guide.open_join()
+
     def show_panel(self):
         """Reopens the one Velorona dock. QGIS also lists it under View >
         Panels because it carries a stable object name; this action is the
@@ -424,6 +453,9 @@ class VeloronaPlugin:
         return action
 
     def unload(self):
+        self._link_weather_wanted = None
+        if self._link_weather_task is not None:
+            self._link_weather_task.cancel()
         if self.processing_provider is not None:
             QgsApplication.processingRegistry().removeProvider(self.processing_provider)
             self.processing_provider = None
@@ -489,7 +521,22 @@ class VeloronaPlugin:
         self.network_context_layer = None
 
     def _warn(self, message: str) -> None:
-        QMessageBox.warning(self.iface.mainWindow(), "Velorona", message)
+        """A warning box. When it was raised for a registry message (``_warn_id``) it also has a Guide button for that ID."""
+        guide_id, self._warn_guide_id = self._warn_guide_id, None
+        box = QMessageBox(QMessageBox.Icon.Warning, "Velorona", message, QMessageBox.StandardButton.Ok, self.iface.mainWindow())
+        guide_button = box.addButton("Guide", QMessageBox.ButtonRole.HelpRole) if guide_id else None
+        box.exec()
+        if guide_button is not None and box.clickedButton() is guide_button:
+            self.open_guide(guide_id)
+
+    def _warn_id(self, message_id: str, **fill) -> None:
+        """A registry message (same ID and wording as Velorona Map): its short text and its ID so it can be quoted, with a Guide button that opens
+        https://map.velorona.ai/guide#<ID>. Goes through ``_warn`` so there is one place that shows warnings."""
+        self._warn_guide_id = message_id
+        try:
+            self._warn(f"{messages.text(message_id, **fill)}\n\n{message_id}")
+        finally:
+            self._warn_guide_id = None
 
     def _error(self, message: str) -> None:
         QMessageBox.critical(self.iface.mainWindow(), "Velorona", message)
@@ -1097,7 +1144,7 @@ class VeloronaPlugin:
             return
         bar = self.iface.messageBar()
         if bar is not None:
-            bar.pushMessage("Velorona", "Loading satellite data...", Qgis.MessageLevel.Info, 0)
+            bar.pushMessage("Velorona", messages.text("I-SATELLITE-LOADING"), Qgis.MessageLevel.Info, 0)
         cache = self._orbit_cache()                 # resolved here, in the GUI thread
 
         def work(task):
@@ -1143,7 +1190,7 @@ class VeloronaPlugin:
             return
         if exception is not None or not result:
             if bar is not None:
-                bar.pushMessage("Velorona", "Satellite data unavailable.", Qgis.MessageLevel.Warning, 8)
+                bar.pushMessage("Velorona", messages.text("E-SATELLITE-DOWN", reason=f"{exception or 'cancelled'}"), Qgis.MessageLevel.Warning, 8)
             self._warn(f"Satellites (CelesTrak) unavailable right now: {exception or 'cancelled'}")
             self._set_satellite_note("CelesTrak satellites: unavailable right now; nothing is substituted.")
             return
@@ -1159,13 +1206,17 @@ class VeloronaPlugin:
             pass
         elif status == "unavailable" or not rows:
             if bar is not None:
-                bar.pushMessage("Velorona", "Satellite data unavailable -- no valid CelesTrak element sets. The layer is empty.", Qgis.MessageLevel.Warning, 8)
+                bar.pushMessage("Velorona", messages.text("E-SATELLITE-DOWN", reason="no valid CelesTrak element sets. The layer is empty."), Qgis.MessageLevel.Warning, 8)
             self._warn("No usable CelesTrak element sets: " + (detail or "none returned") + ". The Satellites layer is empty; nothing is substituted. "
                        "The source is not asked again until its back-off has passed.")
         else:
             label = {"stale": "older than the 2-hour refresh window (shown, flagged 'stale')", "partial": "only some groups available"}.get(status, status)
             if bar is not None:
-                bar.pushMessage("Velorona", f"Satellite data is {label}.", Qgis.MessageLevel.Warning, 8)
+                groups = list(feed.get("per_group", {}).values())
+                missing = sum(1 for g in groups if g.get("status") == "unavailable")
+                shown = (messages.text("W-SATELLITE-PARTIAL", N=missing, M=len(groups)) if status == "partial" and groups
+                         else f"Satellite data is {label}.")
+                bar.pushMessage("Velorona", shown, Qgis.MessageLevel.Warning, 8)
             self._warn(f"Satellites: {label}. {detail}")
         if skipped:
             self._warn(f"{skipped} element set(s) were not shown (SGP4 could not propagate them to this time).")
@@ -1501,7 +1552,10 @@ class VeloronaPlugin:
         engine against the two endpoints the link record itself carries, so the
         investigation the user needs arrives with the selection instead of
         requiring a separate action. Pairing still comes from the shared
-        authorization in ISED's extract -- never from proximity."""
+        authorization in ISED's extract -- never from proximity.
+
+        The record is shown at once. A weather request that is not already cached runs in a background task (never on the interface thread) and
+        the panel is refreshed when it finishes, if that link is still the one selected."""
         if entry.site_a_point is None or entry.site_b_point is None:
             return inspector.LinkInvestigation(
                 entry=entry, weather_error="This link record has no usable endpoint geometry.")
@@ -1519,26 +1573,63 @@ class VeloronaPlugin:
                 entry=entry, param_origins=origins,
                 weather_error="Live weather was unavailable for this link a moment ago; not retried yet.")
 
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        QApplication.processEvents()  # paint the busy state before the blocking fetch
-        try:
-            exposure = microwave_exposure.analyze_link_record(
-                entry.site_a_point, entry.site_b_point, entry.data, params)
-        except NoDataError as exc:
-            if not exc.transient:
-                # Deterministic input validation (e.g. a frequency below the rain model's range): say why, every time. It is not an
-                # outage and must not be remembered as one ("unavailable a moment ago").
-                return inspector.LinkInvestigation(entry=entry, param_origins=origins, weather_error=str(exc))
-            self._link_weather_cache.put_failure(cache_key, bbox)
-            return inspector.LinkInvestigation(entry=entry, param_origins=origins, weather_error=str(exc))
-        except Exception as exc:  # live public weather services -- degrade, don't crash
-            self._link_weather_cache.put_failure(cache_key, bbox)
-            return inspector.LinkInvestigation(entry=entry, param_origins=origins, weather_error=str(exc))
-        finally:
-            QApplication.restoreOverrideCursor()
+        investigation = inspector.LinkInvestigation(
+            entry=entry, param_origins=origins, weather_pending=True,
+            weather_error="Weather is still loading for this link; open or export it again once it has loaded.")
+        self._request_link_weather(investigation, params, cache_key, bbox)
+        return investigation
 
-        self._link_weather_cache.put(cache_key, bbox, exposure)
-        return inspector.LinkInvestigation(entry=entry, exposure=exposure, param_origins=origins)
+    def _request_link_weather(self, investigation, params, cache_key, bbox) -> None:
+        """Starts (or queues) the background weather request for a selected link. One request runs at a time; if the user keeps selecting, only the
+        newest link waits, so a quick run through many links cannot flood the weather service."""
+        self._link_weather_wanted = (investigation, params, cache_key, bbox)         # the newest selection wins
+        if self._link_weather_task is None:
+            self._start_link_weather()
+
+    def _start_link_weather(self) -> None:
+        wanted, self._link_weather_wanted = self._link_weather_wanted, None
+        if wanted is None:
+            return
+        investigation, params, cache_key, bbox = wanted
+        entry = investigation.entry
+
+        def work(task):
+            # Returns the outcome instead of raising, so the GUI thread never depends on how the task machinery hands an exception back.
+            try:
+                return ("ok", microwave_exposure.analyze_link_record(entry.site_a_point, entry.site_b_point, entry.data, params))
+            except NoDataError as exc:
+                return ("nodata", exc)
+            except Exception as exc:                     # live public weather services -- degrade, don't crash
+                return ("error", exc)
+
+        def finished(exception, result=None):
+            self._link_weather_task = None
+            if exception is not None:
+                result = ("error", exception)
+            if result is not None:
+                self._finish_link_weather(investigation, cache_key, bbox, *result)
+            self._start_link_weather()                   # a newer selection may be waiting
+
+        task = QgsTask.fromFunction("Velorona: link weather", work, on_finished=finished)
+        self._link_weather_task = task
+        QgsApplication.taskManager().addTask(task)
+
+    def _finish_link_weather(self, investigation, cache_key, bbox, outcome, value) -> None:
+        """GUI thread. Stores the outcome (so selecting the link again is instant) and refreshes the panel only if this link is still the selected one."""
+        if outcome == "ok":
+            self._link_weather_cache.put(cache_key, bbox, value)
+            investigation.exposure = value
+        else:
+            if outcome == "error" or getattr(value, "transient", True):
+                self._link_weather_cache.put_failure(cache_key, bbox)
+            # A deterministic input problem (e.g. a frequency below the rain model's range) is stated every time and is never remembered as an outage.
+            investigation.weather_error = str(value)
+        investigation.weather_pending = False
+        if self._shown_result() is investigation:
+            self._show_result(investigation)
+
+    def _shown_result(self):
+        return getattr(self.dock, "_result", None) if self.dock is not None else None
 
     def _open_elevation_profile(self):
         for action in self.iface.mainWindow().findChildren(QAction):
@@ -1559,6 +1650,17 @@ class VeloronaPlugin:
                 entries.append((kind, layer, feature))
         return entries
 
+    @staticmethod
+    def _selection_message(sites: int, links: int) -> str:
+        """The registry message for a selection that does not make a terrestrial analysis (same situations and wording as Velorona Map)."""
+        if links:
+            return "I-SELECT-LINK"                     # a Fixed Service link is analysed on its own
+        if sites == 0:
+            return "I-SELECT-NONE"
+        if sites == 1:
+            return "I-SELECT-ONE-SITE"
+        return "I-SELECT-SITES"
+
     def _selected_by_kind(self, kind: str):
         return [(layer, feature) for k, layer, feature in self._gather_selected_entries() if k == kind]
 
@@ -1571,23 +1673,22 @@ class VeloronaPlugin:
             if not entries and len(links) == 1:
                 self._run_terrestrial_for_link(*links[0])
                 return
-            self._warn(
-                f"Select exactly two 'site' features (any layer, public or your own import) as "
-                f"the link's endpoints, or exactly one Fixed Service link. Currently {len(entries)} site(s) and "
-                f"{len(links)} link(s) selected."
-            )
+            self._warn_id(self._selection_message(len(entries), len(links)), N=len(entries))
             return
         defaults = terrestrial.build_params(entries)
-        dialog = ParamDialog(self.iface.mainWindow(), "Velorona -- Terrestrial Path Clearance", terrestrial.PARAM_SPEC, defaults)
+        dialog = self._terrain_dialog("Velorona -- Terrestrial Path Clearance", defaults)
         if dialog.exec() != dialog.DialogCode.Accepted:
             return
+        values = dialog.values()
+        provider = self._elevation_provider_from(dialog)
+        if provider is False:
+            return
         try:
-            result = terrestrial.analyze(entries, dialog.values())
+            prep = terrestrial.prepare(entries)         # QGIS objects are read here, in the GUI thread
         except Exception as exc:
             self._error(f"Analysis failed:\n{exc}")
             return
-        self._update_terrain_layer(result)
-        self._show_result(result)
+        self._run_in_background("terrain clearance", lambda: terrestrial.analyze_prepared(prep, values, provider), self._on_terrain_done)
 
     def _run_terrestrial_for_link(self, layer, feature):
         """Terrain clearance for ONE selected Fixed Service link (Canada or USA): the record's own endpoints, and its highest published
@@ -1600,16 +1701,58 @@ class VeloronaPlugin:
         defaults, record_ghz, note = terrestrial.build_link_params(entry.data)
         title = ("Velorona -- Terrestrial Path Clearance (link record: frequency pre-filled from the record)" if record_ghz is not None
                  else "Velorona -- Terrestrial Path Clearance (the record publishes no usable frequency)")
-        dialog = ParamDialog(self.iface.mainWindow(), title, terrestrial.PARAM_SPEC, defaults)
+        dialog = self._terrain_dialog(title, defaults)
         if dialog.exec() != dialog.DialogCode.Accepted:
             return
-        try:
-            result = terrestrial.analyze_link_record(entry.data, entry.site_a_point, entry.site_b_point, dialog.values())
-        except Exception as exc:
-            self._error(f"Analysis failed:\n{exc}")
+        values = dialog.values()
+        provider = self._elevation_provider_from(dialog)
+        if provider is False:
             return
+        data, point_a, point_b = entry.data, entry.site_a_point, entry.site_b_point
+        self._run_in_background("terrain clearance", lambda: terrestrial.analyze_link_record(data, point_a, point_b, values, provider), self._on_terrain_done)
+
+    def _terrain_dialog(self, title: str, defaults: dict):
+        """The terrain parameter dialog with the elevation-source choice: online by default, or any single-band raster of the project (needs the
+        library's elevation-provider seam, which the pinned aei-link-clearance>=0.3 has)."""
+        return ParamDialog(self.iface.mainWindow(), title, terrestrial.PARAM_SPEC, defaults, elevation_layers=local_dem.candidate_layers())
+
+    def _elevation_provider_from(self, dialog):
+        """None = online default; a provider = the chosen raster; False = the raster cannot be used (the user was told, nothing runs)."""
+        layer = dialog.elevation_layer()
+        if layer is None:
+            return None
+        try:
+            return local_dem.make_provider(layer)
+        except Exception as exc:
+            self._error(f"The chosen elevation raster cannot be used. Nothing was computed.\n\n{exc}")
+            return False
+
+    def _on_terrain_done(self, result) -> None:
         self._update_terrain_layer(result)
         self._show_result(result)
+
+    def _run_in_background(self, what: str, compute, on_result) -> None:
+        """Runs an analysis in a QgsTask worker, so a (possibly retried) network request never blocks the interface. Everything that touches
+        QGIS (dialogs, the raster clone, layers, the result panel) happens in the GUI thread: before the task starts, or in ``on_result`` /
+        the error report after it finishes. One analysis of this kind at a time; progress shows in the QGIS task manager."""
+        if self._analysis_task is not None:
+            self._warn("An analysis is already running. Wait for it to finish.")
+            return
+
+        def work(task):
+            return compute()
+
+        def finished(exception, result=None):
+            self._analysis_task = None
+            if exception is not None:
+                kind = "NO DATA" if isinstance(exception, NoDataError) else "Analysis failed"
+                self._error(f"{kind}:\n{exception}")
+                return
+            on_result(result)
+
+        task = QgsTask.fromFunction(f"Velorona: {what}", work, on_finished=finished)
+        self._analysis_task = task
+        QgsApplication.taskManager().addTask(task)
 
     # -- USA (FCC ULS) data pack ----------------------------------------------------------------------------------------
 
@@ -1795,7 +1938,7 @@ class VeloronaPlugin:
                 self._usa_retry_after = time.monotonic() + 60.0
                 if have_layers:
                     for key in (layer_helpers.SOURCE_US_SITES, layer_helpers.SOURCE_US_LINKS):
-                        self._set_note(key, f"USA records could not be refreshed for this view: {exc}")
+                        self._set_note(key, messages.text("W-LAYER-US-DOWN", reason=f"{exc}."))
                 else:
                     QgsMessageLog.logMessage(f"USA data could not be loaded for this view: {exc}", "Velorona", Qgis.MessageLevel.Warning)
                 return
@@ -1867,31 +2010,38 @@ class VeloronaPlugin:
     def run_microwave(self):
         entries = self._selected_by_kind("site")
         if len(entries) != 2:
-            self._warn(
-                f"Select exactly two 'site' features (any layer -- public or your own import) as "
-                f"the link's endpoints. Currently {len(entries)} selected."
-            )
+            self._warn_id(self._selection_message(len(entries), len(self._selected_by_kind("link"))), N=len(entries))
             return
         defaults = microwave_exposure.build_params(entries)
         dialog = ParamDialog(self.iface.mainWindow(), "Velorona -- Microwave Weather Exposure", microwave_exposure.PARAM_SPEC, defaults)
         if dialog.exec() != dialog.DialogCode.Accepted:
             return
+        values = dialog.values()
+
+        def done(result):
+            self._update_weather_evidence_layers(result)
+            self._show_result(result)
+
         try:
-            result = microwave_exposure.analyze(entries, dialog.values())
+            site_a, site_b = microwave_exposure.prepare(entries, values)     # QGIS objects are read here, in the GUI thread
         except Exception as exc:
-            self._error(f"Analysis failed:\n{exc}")
+            kind = "NO DATA" if isinstance(exc, NoDataError) else "Analysis failed"
+            self._error(f"{kind}:\n{exc}")
             return
-        self._update_weather_evidence_layers(result)
-        self._show_result(result)
+        self._run_in_background("microwave weather exposure", lambda: microwave_exposure.analyze_sites(site_a, site_b, values), done)
 
     def run_satellite(self):
         ground_stations = self._selected_by_kind("ground-station")
         satellites = self._selected_by_kind("satellite")
         if len(ground_stations) != 1 or len(satellites) != 1:
-            self._warn(
-                f"Select exactly 1 Ground/Earth Station feature and 1 Satellite feature. Currently "
-                f"{len(ground_stations)} ground station(s), {len(satellites)} satellite(s) selected."
-            )
+            if len(satellites) == 1 and not ground_stations:
+                self._warn_id("I-SELECT-SATELLITE")
+            elif len(ground_stations) == 1 and not satellites:
+                self._warn_id("I-SELECT-STATION")
+            elif not ground_stations and not satellites:
+                self._warn_id("I-SELECT-NONE")
+            else:
+                self._warn_id("I-SELECT-LOOKANGLE")
             return
         try:
             result = satellite_earth_space.analyze(ground_stations[0], satellites[0])
@@ -1905,6 +2055,8 @@ class VeloronaPlugin:
             self.dock = VeloronaResultsDock(self.iface.mainWindow())
             self.dock.elevation_profile_requested = self._open_elevation_profile
             self.dock.map_appearance_changed = self.set_map_appearance
+            self.dock.history_requested = self._open_history
+            self.dock.history_block = self._history_block_for
             self.dock.set_map_appearance(self._map_appearance)
             for key, text in self._dataset_notes.items():       # statuses recorded before the dock existed
                 self.dock.records.set_dataset_note(key, text)
@@ -2026,8 +2178,74 @@ class VeloronaPlugin:
         })
         dock.records.populate_licensees(self._operator_counts())
 
+    # -- Local history (customer-owned, this computer only) -----------------------------------------------------------------------------
+
+    def _history_store(self):
+        if getattr(self, "_history", None) is None:
+            self._history = history_store.HistoryStore(history_store.default_path(QgsApplication.qgisSettingsDirPath()))
+        return self._history
+
+    def _capture_history(self, result) -> None:
+        """Keeps the values a weather analysis fetched, so 'what changed' can compare them later. Never makes the analysis fail: a problem
+        (database busy, disk full, clock) is stated in the message bar and the analysis result is shown as usual."""
+        if getattr(result, "kind", "") not in ("microwave-exposure", "link-investigation") or history_capture.exposure_of(result) is None:
+            return
+        report = history_capture.capture(result, self._history_store(), time.time())
+        self._remember_history_labels(result)
+        text = report.user_text()
+        if text:
+            self.iface.messageBar().pushWarning("Velorona", text)
+
+    def _remember_history_labels(self, result) -> None:
+        """Names of the entities just captured, kept in this session and in the history file on this computer (the rows hold only the code; the name
+        is the user's own and never leaves the machine)."""
+        mw = history_capture.exposure_of(result)
+        if mw is None:
+            return
+        store = self._history_store()
+        link_id, site_ids = history_capture.entity_ids(result, store)
+        labels = self._history_labels
+        link = mw.exposure.link
+        labels[link_id] = f"{link.site_a.name} \u2194 {link.site_b.name}"
+        for sid, rep in mw.representativeness.items():
+            labels[site_ids[sid]] = rep.site.name
+        try:
+            store.set_labels({k: v for k, v in labels.items() if k in {link_id, *site_ids.values()}})
+        except history_store.HistoryError:
+            pass                                       # the names are a convenience; the capture's own report already says what went wrong
+
+    def _history_block_for(self, result) -> str:
+        try:
+            mw = history_capture.exposure_of(result)
+            if mw is None:
+                return ""
+            store = self._history_store()
+            link_id, site_ids = history_capture.entity_ids(result, store)
+            known = {**store.labels(), **self._history_labels}
+            wanted = {link_id: known.get(link_id, "this link"), **{eid: known.get(eid, eid) for eid in site_ids.values()}}
+            records = [r for r in store.records() if r.entity_id in wanted]
+            return history_view.changes_html(records, wanted, time.time())
+        except history_store.HistoryError as exc:
+            return history_view.error_html(str(exc))
+
+    def _open_history(self) -> None:
+        from .ui.history_dialog import HistoryDialog
+        entity = None
+        if self.dock is not None and self.dock._result is not None:
+            try:
+                entity = history_capture.entity_ids(self.dock._result, self._history_store())[0]
+            except Exception:
+                entity = None
+        try:
+            known = {**self._history_store().labels(), **self._history_labels}
+        except history_store.HistoryError:
+            known = dict(self._history_labels)
+        dialog = HistoryDialog(self.iface.mainWindow(), self._history_store(), known, entity, dark=self._map_appearance == "dark")
+        dialog.exec()
+
     def _show_result(self, result):
         self._ensure_dock()
+        self._capture_history(result)
         self.dock.show_result(result)
         self.dock.show()
         self.dock.raise_()

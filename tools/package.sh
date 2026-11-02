@@ -27,13 +27,20 @@ mkdir -p "$STAGE/$NAME"
 
 # Runtime content only. tests/, examples/ (a made-up two-site sample CSV: sample data does not ship), tools/, parity/ (the Map/QGIS parity harness and fixtures), the internal SESSION_HANDOFF.md and the
 # GitHub community files (.github/, CONTRIBUTING.md) are development-only; caches and
-# build output never ship.
+# build output never ship: every dotted cache folder (.ruff_cache, .mypy_cache, .pytest_cache, ...), virtualenvs and env files.
 tar -C "$PLUGIN" -cf - \
     --exclude='.git' \
     --exclude='.gitignore' \
     --exclude='__pycache__' \
     --exclude='*.py[cod]' \
     --exclude='.pytest_cache' \
+    --exclude='.*_cache' \
+    --exclude='.cache' \
+    --exclude='.hypothesis' \
+    --exclude='.tox' \
+    --exclude='.venv' \
+    --exclude='.env' \
+    --exclude='.env.*' \
     --exclude='.DS_Store' \
     --exclude='dist' \
     --exclude='tests' \

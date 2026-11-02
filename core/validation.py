@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import math
 
+from . import messages
+
 # Owner decision P11 (CONFIRMED PHYSICS CORRECTION): effective-earth bulge is subtracted from geometric clearance. aei_link_clearance
 # announces the convention it implements; the plugin refuses a library that still has the pre-correction sign rather than show
 # clearance numbers that are wrong by twice the bulge.
@@ -25,8 +27,18 @@ def require_corrected_clearance(terrain_module) -> None:
             "The installed aei-link-clearance uses the pre-correction earth-curvature sign "
             f"(CLEARANCE_CONVENTION={found!r}, required {REQUIRED_CLEARANCE_CONVENTION!r}). Terrain clearance would be overstated by "
             "twice the earth bulge. Upgrade aei-link-clearance to a release that contains the correction (needs "
-            "aei-link-clearance>=0.2.0,<0.3): in QGIS, Plugins > Python Console, run:  from pip._internal.cli.main import main; "
-            "main(['install', '-U', 'aei-link-clearance>=0.2.0,<0.3'])  then restart QGIS.")
+            "aei-link-clearance>=0.3.0,<0.4): in QGIS, Plugins > Python Console, run:  from pip._internal.cli.main import main; "
+            "main(['install', '-U', 'aei-link-clearance>=0.3.0,<0.4'])  then restart QGIS.")
+
+
+def require_elevation_seam(library_module) -> None:
+    """The plugin needs aei-link-clearance >= 0.3 (the elevation-provider seam: cache, 429 backoff, local raster). An older release is refused with the
+    install instruction, never a raw ImportError and never a silent different behaviour (the plugin has no fallback for the old library)."""
+    if not (hasattr(library_module, "OpenMeteoProvider") and hasattr(library_module, "LocalDEMProvider")):
+        raise LibraryOutOfDateError(
+            "The installed aei-link-clearance is older than this Velorona version needs (it has no elevation provider: caching, rate-limit backoff, local "
+            "elevation raster). Upgrade aei-link-clearance>=0.3.0,<0.4: in QGIS, Plugins > Python Console, run:  from pip._internal.cli.main import main; "
+            "main(['install', '-U', 'aei-link-clearance>=0.3.0,<0.4'])  then restart QGIS.")
 
 
 # ---------------------------------------------------------------------------------------------------------------------------------
@@ -66,9 +78,9 @@ def valid_coordinate(lat, lon) -> bool:
 def path_reasons(lat_a, lon_a, lat_b, lon_b) -> list:
     """R4 (invalid coordinates) and R9 (zero-length link: identical endpoints). Identical endpoints never produce CLEAR."""
     if not (valid_coordinate(lat_a, lon_a) and valid_coordinate(lat_b, lon_b)):
-        return ["invalid coordinates (R4)"]
+        return [messages.short_text("E-PATH-COORDINATES")]
     if lat_a == lat_b and lon_a == lon_b:
-        return ["zero-length link: identical endpoints (R4, R9)"]
+        return [messages.short_text("E-PATH-ZERO-LENGTH")]
     return []
 
 
@@ -80,10 +92,12 @@ def _range_reason(value, bounds, label, unit):
 
 def terrain_input_reasons(lat_a, lon_a, lat_b, lon_b, height_a, height_b, frequency_ghz) -> list:
     reasons = path_reasons(lat_a, lon_a, lat_b, lon_b)
-    for label, value in (("antenna height A", height_a), ("antenna height B", height_b)):
-        r = _range_reason(value, HEIGHT_M, label, "m")
-        if r:
-            reasons.append(r)
+    for site, value in (("A", height_a), ("B", height_b)):
+        if not is_finite_number(value) or not (HEIGHT_M[0] <= value <= HEIGHT_M[1]):
+            shown = f"{value:g} m" if is_finite_number(value) else "no value"
+            # The Map's wording (registry E-TERRAIN-HEIGHT-RANGE): the height is refused, never clamped or replaced by a default.
+            reasons.append(f"record antenna height at Site {site} ({shown}) is outside {HEIGHT_M[0]:g}-{HEIGHT_M[1]:g} m (R5); "
+                           "it is not clamped and not replaced by a default")
     r = _range_reason(frequency_ghz, TERRAIN_FREQ_GHZ, "frequency", "GHz")
     if r:
         reasons.append(r)
@@ -92,19 +106,22 @@ def terrain_input_reasons(lat_a, lon_a, lat_b, lon_b, height_a, height_b, freque
 
 def weather_input_reasons(lat_a, lon_a, lat_b, lon_b, params) -> list:
     reasons = path_reasons(lat_a, lon_a, lat_b, lon_b)
-    r = _range_reason(params.get("frequency_ghz"), WEATHER_FREQ_GHZ, "frequency", "GHz (ITU-R P.838-3 range)")
-    if r:
-        reasons.append(r)
-    r = _range_reason(params.get("fade_margin_db"), FADE_DB, "fade margin", "dB")
-    if r:
-        reasons.append(r)
+    # The Map's wording (mwexposure.js validateMwParams, registry E-WEATHER-PARAMS): refused, never clamped.
+    for key, label, unit, (lo, hi), basis in (
+            ("frequency_ghz", "Frequency", "GHz", WEATHER_FREQ_GHZ, "Derived and library-enforced: ITU-R P.838-3's tabulated range (1-100 GHz)."),
+            ("fade_margin_db", "Fade margin", "dB", FADE_DB, "Lower bound derived: the link model rejects a fade margin <= 0.")):
+        v = params.get(key)
+        if not is_finite_number(v):
+            reasons.append(f"{label} must be a number.")
+        elif not lo <= v <= hi:
+            reasons.append(f"{label} {v:g} {unit} is outside {lo:g}-{hi:g} {unit}. {basis}")
     if params.get("polarization") not in ("V", "H"):
-        reasons.append("polarization must be V or H")
+        reasons.append("Polarization must be one of V, H.")
     return reasons
 
 
 def interval_reason(interval):
     """R3: without a valid averaging interval the provider value cannot be converted to a rate; no default is assumed."""
     if not is_finite_number(interval) or interval <= 0:
-        return "Open-Meteo `current.interval` missing or invalid (R3)"
+        return messages.short_text("E-WEATHER-INTERVAL")
     return None

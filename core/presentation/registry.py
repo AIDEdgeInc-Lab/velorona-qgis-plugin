@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from typing import Dict, List
 
 OBSERVED, MODEL, CALCULATED, INPUT, INFERRED = "Observed", "Model-derived", "Calculated", "Input", "Inferred"
+# Elevation (the online Copernicus DEM or a raster the user chose) is a reference dataset, not a measurement of this path: never typed Observed.
+REFERENCE = "Reference data (DEM)"
 
 
 @dataclass(frozen=True)
@@ -79,12 +81,12 @@ CALCULATIONS: List[Calculation] = [
     Calculation("weather.effective_path", "Effective path length", "d_eff = d / (1 + d/d0), d0 = 35*exp(-0.015*R), R capped at 100",
                 "path length, rain rate", "km", _LIB_X + ".physics (ITU-R P.530)", "none",
                 "Rain cells are smaller than long hops, so the wet path is shorter than the geometric one."),
-    Calculation("weather.attenuation", "Predicted rain fade", "gamma * d_eff", "specific attenuation, effective path length", "dB",
-                _LIB_X + ".physics.estimate_rain_attenuation", "none", "Signal the rain is predicted to remove."),
-    Calculation("weather.exposure_ratio", "Exposure ratio", "predicted fade / fade margin (rounded to 3 decimals)",
-                "predicted fade, fade margin", "ratio", _LIB_X + ".exposure.calculate_exposure", "moderate >= 0.3, high >= 0.7 (library conventions, not a validated risk model)",
+    Calculation("weather.attenuation", "Estimated rain fade", "gamma * d_eff", "specific attenuation, effective path length", "dB",
+                _LIB_X + ".physics.estimate_rain_attenuation", "none", "Signal the current rain rate is estimated to remove."),
+    Calculation("weather.exposure_ratio", "Exposure ratio", "estimated fade / fade margin (rounded to 3 decimals)",
+                "estimated fade, fade margin", "ratio", _LIB_X + ".exposure.calculate_exposure", "moderate >= 0.3, high >= 0.7 (library conventions, not a validated risk model)",
                 "Share of the fade margin the rain would use."),
-    Calculation("weather.fade_remaining", "Fade margin remaining", "fade margin - predicted fade", "fade margin, predicted fade", "dB",
+    Calculation("weather.fade_remaining", "Fade margin remaining", "fade margin - estimated fade", "fade margin, estimated fade", "dB",
                 "Velorona presentation layer (difference of two library values)", "CRITICAL when <= 0", "Room left before the margin is used up."),
     Calculation("weather.station_distance", "Station distance", "haversine(site, station)", "site and station coordinates", "km",
                 _LIB_X + ".providers.eccc.find_nearest_station", "50 km search radius, 90 min window",
@@ -99,7 +101,7 @@ CALCULATIONS: List[Calculation] = [
                 "library class, near_threshold, ratio", "status", "Velorona presentation layer", "1.3 = library COMFORTABLE_MARGIN_RATIO",
                 "Operator status for terrain."),
     Calculation("status.weather", "Weather status", "fade>=margin->CRITICAL; high->AT RISK; moderate->WATCH; low->CLEAR",
-                "predicted fade, fade margin, severity", "status", "Velorona presentation layer", "library 0.3 / 0.7 bands",
+                "estimated fade, fade margin, severity", "status", "Velorona presentation layer", "library 0.3 / 0.7 bands",
                 "Operator status for weather."),
     Calculation("satellite.look_angles", "Satellite look angles", "SGP4 propagation, topocentric alt/az/range", "TLE, station lat/lon/altitude, now (UTC)",
                 "deg, km", "skyfield (core.engines.satellite_earth_space)", "visible if elevation >= 10 deg mask",
@@ -121,15 +123,15 @@ _FIELD_LIST = [
     Field("near_threshold", "Near threshold", "flag", INFERRED, "aei_link_clearance", "terrain.near_threshold", "Result could change with another elevation source"),
     Field("explanation", "Plain comparison", "text", INFERRED, "Velorona presentation of the library result", "status.terrain", "Available vs required clearance in metres, ratio as a multiple"),
     Field("library_explanation", "Library explain() text", "text", INFERRED, "aei_link_clearance.explain", "", "The library's own one-line wording, kept for audit; it expresses the margin as a percentage"),
-    Field("samples", "Elevation samples", "count", OBSERVED, "Open-Meteo Elevation API (Copernicus DEM GLO-90)", "", "Points sampled along the path"),
+    Field("samples", "Elevation samples", "count", REFERENCE, "Elevation source named in Details: Open-Meteo Elevation API (Copernicus DEM GLO-90) or the raster you chose", "", "Points sampled along the path"),
     Field("critical_distance_from_a_km", "Critical point, distance from Site A", "km", CALCULATED, "aei_link_clearance", "terrain.critical_point", "Where clearance is lowest"),
     Field("critical_latitude", "Critical point latitude", "degrees", CALCULATED, "aei_link_clearance", "terrain.critical_point", "WGS84"),
     Field("critical_longitude", "Critical point longitude", "degrees", CALCULATED, "aei_link_clearance", "terrain.critical_point", "WGS84"),
     Field("rain_rate_mm_h", "Rain rate used", "mm/h", MODEL, "Open-Meteo weather model (liquid rain = rain + showers; snow excluded)", "weather.rain_rate_used", "Higher of the two sites' model rain rate"),
-    Field("predicted_attenuation_db", "Predicted rain fade", "dB", CALCULATED, "aei_mw_exposure", "weather.attenuation", "Signal removed by rain"),
+    Field("predicted_attenuation_db", "Estimated rain fade", "dB", CALCULATED, "aei_mw_exposure", "weather.attenuation", "Signal removed by rain"),
     Field("fade_margin_db", "Fade margin", "dB", INPUT, "User dialog or engine default (not published by ISED)", "", "Signal the link can lose before failing"),
-    Field("fade_remaining_db", "Fade margin remaining", "dB", CALCULATED, "Velorona presentation layer", "weather.fade_remaining", "Fade margin minus predicted fade"),
-    Field("exposure_ratio", "Exposure ratio", "ratio", CALCULATED, "aei_mw_exposure", "weather.exposure_ratio", "Predicted fade / fade margin"),
+    Field("fade_remaining_db", "Fade margin remaining", "dB", CALCULATED, "Velorona presentation layer", "weather.fade_remaining", "Fade margin minus estimated fade"),
+    Field("exposure_ratio", "Exposure ratio", "ratio", CALCULATED, "aei_mw_exposure", "weather.exposure_ratio", "Estimated fade / fade margin"),
     Field("severity", "Library severity", "class", INFERRED, "aei_mw_exposure", "weather.exposure_ratio", "low / moderate / high"),
     Field("path_length_km", "Path length", "km", CALCULATED, "aei_mw_exposure", "terrain.distance", "Great-circle link length"),
     Field("specific_attenuation_db_km", "Specific attenuation", "dB/km", CALCULATED, "aei_mw_exposure", "weather.specific_attenuation", "Rain loss per km"),
@@ -143,7 +145,7 @@ FIELDS: Dict[str, Field] = {f.key: f for f in _FIELD_LIST}
 STATUS_DEFINITIONS = [
     ("CLEAR", "Nothing needs attention."),
     ("WATCH", "Within limits, but the margin is small or the data is uncertain enough that it could change."),
-    ("AT RISK", "Below the required minimum (terrain), or most of the fade margin is predicted to be used (weather)."),
-    ("CRITICAL", "Far below the required minimum (terrain), or predicted rain fade exceeds the fade margin (weather)."),
+    ("AT RISK", "Below the required minimum (terrain), or most of the fade margin is estimated to be used, from the current rain rate (weather)."),
+    ("CRITICAL", "Far below the required minimum (terrain), or the rain fade estimated from the current rain rate exceeds the fade margin (weather)."),
     ("NO DATA", "The data needed to decide could not be retrieved. Nothing was substituted."),
 ]

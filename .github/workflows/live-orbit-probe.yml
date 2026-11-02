@@ -25,12 +25,12 @@ jobs:
       - name: 1. probe (real source, one request per GEO group)
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE":/work/velorona -v /tmp/orbitcache:/orbitcache -e ORBIT_CACHE_DIR=/orbitcache -w /work/velorona qgis/qgis:4.0 bash -c 'set -o pipefail
-            python3 -m pip install --quiet --break-system-packages requests skyfield sgp4 "aei-link-clearance>=0.2.0,<0.3" "aei-microwave-link-exposure>=0.2.0,<0.3" aei-geo-features
+            python3 -m pip install --quiet --break-system-packages requests skyfield sgp4 "aei-link-clearance>=0.3.0,<0.4" "aei-microwave-link-exposure>=0.2.0,<0.3" aei-geo-features
             python3 tools/live_orbit_probe.py'
       - name: 2. render the Satellites layer from the real cache in real QGIS
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE":/work/velorona -v /tmp/orbitcache:/orbitcache -v /tmp/render:/render -e ORBIT_CACHE_DIR=/orbitcache -e RENDER_OUT=/render -e QT_QPA_PLATFORM=offscreen -w /work/velorona qgis/qgis:4.0 bash -c 'set -o pipefail
-            python3 -m pip install --quiet --break-system-packages requests skyfield sgp4 "aei-link-clearance>=0.2.0,<0.3" "aei-microwave-link-exposure>=0.2.0,<0.3" aei-geo-features
+            python3 -m pip install --quiet --break-system-packages requests skyfield sgp4 "aei-link-clearance>=0.3.0,<0.4" "aei-microwave-link-exposure>=0.2.0,<0.3" aei-geo-features
             python3 tools/run_qgis_suite.py tests/qgis_satellite_render.py 2>&1 | tail -40'
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()

@@ -33,3 +33,12 @@ def no_real_backoff_sleep(monkeypatch):
     waits = []
     monkeypatch.setattr(provider_retry, "_sleep", waits.append)
     return waits
+
+
+@pytest.fixture(autouse=True)
+def fresh_online_elevation_provider():
+    """The shared online provider caches heights and keeps a rate-limit cool-down; neither may leak from one test into the next."""
+    from core import elevation_source
+    elevation_source.reset_online_provider()
+    yield
+    elevation_source.reset_online_provider()

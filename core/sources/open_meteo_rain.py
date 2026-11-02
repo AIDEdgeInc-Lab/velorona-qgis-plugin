@@ -23,6 +23,9 @@ class TypedPrecipitationProvider(OpenMeteoProvider):
         super().__init__(timeout)
         self._get = get
         self.precipitation: Dict[str, precip.Precipitation] = {}
+        # Seconds east of UTC for each site's `current.time` (Open-Meteo answers in the site's local time with timezone=auto). Kept so a stored
+        # value can be given its true UTC time; absent when the provider did not say.
+        self.utc_offsets: Dict[str, int] = {}
 
     def get_current(self, site) -> WeatherObservation:
         get = self._get
@@ -42,7 +45,11 @@ class TypedPrecipitationProvider(OpenMeteoProvider):
         # Bounded backoff for a rate limit / server error / network failure only (core/provider_retry.py); the caller turns a final failure into
         # NO DATA (transient), never into a status.
         resp = call_with_backoff(fetch, retryable=(requests.exceptions.RequestException,))
-        current = resp.json()["current"]
+        body = resp.json()
+        current = body["current"]
+        offset = body.get("utc_offset_seconds")
+        if isinstance(offset, (int, float)) and not isinstance(offset, bool):
+            self.utc_offsets[site.id] = int(offset)
         p = precip.classify(current)
         self.precipitation[site.id] = p
         return WeatherObservation(

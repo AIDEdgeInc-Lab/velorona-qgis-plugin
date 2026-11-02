@@ -11,13 +11,20 @@ from qgis.PyQt.QtWidgets import (
     QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
+    QHBoxLayout,
+    QLabel,
     QMessageBox,
     QVBoxLayout,
 )
 
+from ..core import messages
+from .guide_button import guide_button
+
 
 class ParamDialog(QDialog):
-    def __init__(self, parent, title: str, param_spec: list, defaults: dict):
+    def __init__(self, parent, title: str, param_spec: list, defaults: dict, elevation_layers=None, elevation_note: str = ""):
+        """``elevation_layers``: None = no elevation row (the microwave dialog); otherwise [(label, QgsRasterLayer)] of the project's single-band
+        rasters, offered next to the default online source. ``elevation_note`` (non-empty) disables the choice and says why."""
         super().__init__(parent)
         self.setWindowTitle(title)
         self._spec = param_spec
@@ -57,6 +64,28 @@ class ParamDialog(QDialog):
             self._widgets[p["key"]] = widget
             form.addRow(p["label"], widget)
 
+        self._elevation_combo = None
+        if elevation_layers is not None:
+            from ..core.elevation_source import ONLINE_LABEL
+            combo = QComboBox(self)
+            combo.addItem(ONLINE_LABEL, None)
+            for label, layer in elevation_layers:
+                combo.addItem(f"Local raster: {label}", layer)
+            combo.setToolTip("Where the ground heights along the path come from. A local raster never leaves your machine and is not rate-limited. "
+                             "Cells it does not cover make the analysis NO DATA; nothing is substituted.")
+            if elevation_note:
+                combo.setEnabled(False)
+                combo.setToolTip(elevation_note)
+            self._elevation_combo = combo
+            form.addRow("Elevation source", combo)
+            hint = QLabel(elevation_note or messages.text("I-TERRAIN-ELEVATION-SOURCE"), self)
+            hint.setWordWrap(True)
+            hint.setStyleSheet("color: palette(mid);")
+            hint_row = QHBoxLayout()
+            hint_row.addWidget(hint, 1)
+            hint_row.addWidget(guide_button("I-TERRAIN-ELEVATION-SOURCE", self))   # online vs local raster, units, datum: in the guide
+            form.addRow("", hint_row)
+
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, self)
         buttons.accepted.connect(self._on_accept)
@@ -65,6 +94,12 @@ class ParamDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         layout.addWidget(buttons)
+
+    def elevation_layer(self):
+        """The raster layer chosen as elevation source, or None for the online default."""
+        if self._elevation_combo is None:
+            return None
+        return self._elevation_combo.currentData()
 
     def _float_value(self, p) -> float:
         key = p["key"]

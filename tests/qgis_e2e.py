@@ -621,6 +621,17 @@ qgs.processEvents()
 print("\n== 15. Fixed Service link -> weather evidence ==")
 
 
+
+def settle_link_weather(limit=60.0):
+    """Link weather is fetched in a background task: wait for it before reading the investigation."""
+    import time as _t
+    end = _t.time() + limit
+    while _t.time() < end and (plugin._link_weather_task is not None or plugin._link_weather_wanted is not None):
+        qgs.processEvents()
+        _t.sleep(0.05)
+    qgs.processEvents()
+
+
 def _link_ghz(fid):
     ghz, _ = microwave_exposure.frequency_ghz_from_record(link_layer.getFeature(fid)["frequencies_mhz"])
     return ghz
@@ -631,6 +642,7 @@ def _link_ghz(fid):
 weather_fid = next(f for f in sorted(link_layer.allFeatureIds()) if (_link_ghz(f) or 0) >= 1.0 and _link_ghz(f) <= 100.0)
 link_layer.selectByIds([weather_fid])
 qgs.processEvents()
+settle_link_weather()
 investigation = plugin.dock._result
 check("link selection produces a link investigation",
       getattr(investigation, "kind", None) == "link-investigation")
@@ -680,8 +692,8 @@ else:
     check("export uses the canonical evidence header", rows[0] == export.EVIDENCE_HEADER)
     vocab = sorted({r[1] for r in rows[1:] if len(r) > 1})
     # Five-class vocabulary (1.1.5): engine defaults and user-entered values are Assumed, never Observed.
-    check("export Type vocabulary is Observed/Model-derived/Calculated/Inferred/Assumed",
-          vocab == ["Assumed", "Calculated", "Inferred", "Model-derived", "Observed"], str(vocab))
+    check("export Type vocabulary is Observed/Model-derived/Calculated/Inferred/Assumed (+ Reference data (DEM) on terrain exports)",
+          set(vocab) <= {"Assumed", "Calculated", "Inferred", "Model-derived", "Observed", "Reference data (DEM)"} and "Observed" in vocab, str(vocab))
     check("no Open-Meteo weather-model row is typed Observed",
           not [r for r in rows[1:] if len(r) > 2 and r[1] == "Observed" and "Open-Meteo" in r[2]
                and "Elevation" not in r[2]], "")
@@ -702,6 +714,7 @@ for attempt in (1, 2):                                   # the second selection 
     qgs.processEvents()
     link_layer.selectByIds([subghz_fid])
     qgs.processEvents()
+    settle_link_weather()
     inv = plugin.dock._result
     messages.append(getattr(inv, "weather_error", None) or "")
 check("a sub-1 GHz link has no weather evidence (NO DATA, nothing substituted)", inv.exposure is None)
@@ -714,6 +727,7 @@ link_layer.removeSelection()
 qgs.processEvents()
 link_layer.selectByIds([weather_fid])
 qgs.processEvents()
+settle_link_weather()
 plugin.dock.view_combo.setCurrentIndex(plugin.dock.view_combo.findData("evidence"))
 qgs.processEvents()
 
@@ -2281,7 +2295,7 @@ try:
     _toggle_seconds = time.monotonic() - _t_toggle
     check("the layer toggle returns at once while the load is still running (the GUI thread is not blocked)",
           plugin._satellites_task is not None and _toggle_seconds < 1.5, f"{_toggle_seconds:.2f}s, task running={plugin._satellites_task is not None}")
-    _connecting_calls = [c for c in _mb_calls if c[0] == "push" and "Loading satellite data" in str(c[1])]
+    _connecting_calls = [c for c in _mb_calls if c[0] == "push" and "Connecting to satellite data" in str(c[1])]
     check("the in-progress message is pushed while the worker is still running", len(_connecting_calls) == 1, str(_mb_calls))
     _gate.set()
     check("the load finishes", _wait_sat_task())

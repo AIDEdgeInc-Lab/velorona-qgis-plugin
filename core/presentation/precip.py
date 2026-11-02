@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+from .. import messages
 from ..validation import NoDataError, interval_reason, is_finite_number
 
 BASIS_SPLIT = "rain + showers (liquid)"
@@ -73,12 +74,12 @@ def classify(current: dict) -> Precipitation:
         if v is None:
             return None
         if not is_finite_number(v) or v < 0:
-            raise NoDataError("weather", [f"invalid {key} value (W4)"])
+            raise NoDataError("weather", [messages.text("E-WEATHER-INVALID-VALUE", field=key)])
         return float(v)
 
     total, rain, showers, snow = num("precipitation"), num("rain"), num("showers"), num("snowfall")
     if rain is None and showers is None:
-        raise NoDataError("weather", ["precipitation type not reported: rain and showers absent (W1)"])
+        raise NoDataError("weather", [messages.short_text("E-WEATHER-NO-PRECIP-TYPE")])
     liquid = (rain or 0.0) + (showers or 0.0)
     frozen = (snow or 0.0) / SNOW_WE_DIVISOR > _EPS
     code = current.get("weather_code")

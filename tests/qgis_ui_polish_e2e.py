@@ -255,6 +255,65 @@ QApplication.processEvents()
 check("changing dataset clears the hand-sized flag and refits", wide._user_sized_columns is False and wide.view.columnWidth(0) != 321,
       wide.view.columnWidth(0))
 
+# --- guide links: one line + "?" opening map.velorona.ai/guide#<id>; "Guide" in the plugin menu --------------------------------------------
+from qgis.PyQt.QtCore import QUrl  # noqa: E402
+from qgis.PyQt.QtGui import QDesktopServices  # noqa: E402
+from qgis.PyQt.QtWidgets import QToolButton  # noqa: E402
+from velorona.ui.param_dialog import ParamDialog  # noqa: E402
+from velorona.ui.usa_setup_dialog import UsaSetupDialog  # noqa: E402
+
+opened = []
+QDesktopServices.openUrl = staticmethod(lambda url: opened.append(url.toString()) or True)    # never launch a browser in a test
+pd = ParamDialog(None, "T", [], {}, elevation_layers=[])
+gb = [b for b in pd.findChildren(QToolButton) if b.property("guideId")]
+check("terrain dialog: elevation hint is one line with a ? button", len(gb) == 1 and gb[0].property("guideId") == "I-TERRAIN-ELEVATION-SOURCE")
+gb[0].click()
+check("? opens the guide at the message ID", opened == ["https://map.velorona.ai/guide#I-TERRAIN-ELEVATION-SOURCE"], opened)
+ud = UsaSetupDialog(None)
+ub = [b for b in ud.findChildren(QToolButton) if b.property("guideId")]
+check("USA setup: lead text is one short line with a ? button", len(ub) == 1 and ub[0].property("guideId") == "I-USA-DATA-SOURCE" and len(ud.lead.text()) < 120, ud.lead.text())
+
+from velorona.plugin import VeloronaPlugin  # noqa: E402
+
+
+class _Menu:
+    def __init__(self):
+        self.added = []
+
+    def addPluginToMenu(self, menu, action):
+        self.added.append((menu, action.text()))
+
+    def addToolBarIcon(self, action):
+        self.added.append(("toolbar", action.text()))
+
+    def mainWindow(self):
+        return None
+
+    def mapCanvas(self):
+        return None
+
+
+try:
+    pl = VeloronaPlugin.__new__(VeloronaPlugin)
+    pl.iface, pl.actions = _Menu(), []
+    VeloronaPlugin.initGui.__code__  # exists
+    from velorona import plugin as _pl
+    check("plugin menu lists a Guide entry (menu only, not a toolbar button)", "Guide" in open(_pl.__file__).read() and
+          'addPluginToMenu(MENU_NAME, self.action_guide)' in open(_pl.__file__).read())
+    opened.clear()
+    VeloronaPlugin.open_guide(pl)
+    check("Guide opens the guide top page", opened == ["https://map.velorona.ai/guide"], opened)
+    check("plugin menu lists a Get updates entry (menu only)", 'addPluginToMenu(MENU_NAME, self.action_updates)' in open(_pl.__file__).read())
+    opened.clear()
+    VeloronaPlugin.open_join(pl)
+    check("Get updates opens https://map.velorona.ai/join and nothing else", opened == ["https://map.velorona.ai/join"], opened)
+except Exception as exc:   # pragma: no cover
+    check("plugin Guide entry", False, repr(exc))
+
+_pick = VeloronaPlugin._selection_message
+check("selection messages are registry IDs (Map wording)", [_pick(0, 0), _pick(1, 0), _pick(3, 0), _pick(0, 2), _pick(2, 1)] ==
+      ["I-SELECT-NONE", "I-SELECT-ONE-SITE", "I-SELECT-SITES", "I-SELECT-LINK", "I-SELECT-LINK"])
+
 passed = sum(1 for _, ok, _ in RESULTS if ok)
 print(f"\n===== {passed}/{len(RESULTS)} checks passed =====")
 sys.exit(0 if passed == len(RESULTS) else 1)

@@ -13,6 +13,7 @@ import sys
 import types
 
 import pytest
+from core import elevation_source
 
 try:
     import qgis.core  # noqa: F401
@@ -94,6 +95,7 @@ def elevation_service(monkeypatch):
 
 def tracked(attrs, a, b, params):
     CURRENT[0] = attrs["id"]
+    elevation_source.reset_online_provider()     # fixtures share endpoints but have different synthetic terrain: no cache across them
     return tr.analyze_link_record(attrs, a, b, params)
 
 
@@ -161,7 +163,7 @@ def test_a_failing_elevation_service_for_one_link_does_not_stop_the_batch():
     ok_fx = [f for f in FIXTURES if f["terrain"]["mode"] == "samples"][:3]
     batch = run([to_link(ok_fx[0]), to_link(err_fx), to_link(ok_fx[1]), to_link(ok_fx[2])])
     st = [r.status for r in batch.rows]
-    assert st[1] == B.NO_DATA and "elevation data unavailable" in batch.rows[1].reason
+    assert st[1] == B.NO_DATA and batch.rows[1].reason.startswith("elevation request failed (T1)")
     with pytest.raises(NoDataError) as single:                       # the single-link flow refuses this link the same way, with the same reason and transient flag
         independent_single(to_link(err_fx))
     assert batch.rows[1].reason == "; ".join(single.value.reasons) and batch.rows[1].transient == single.value.transient

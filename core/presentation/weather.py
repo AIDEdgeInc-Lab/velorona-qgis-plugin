@@ -1,12 +1,12 @@
 """Weather-exposure brief: aei_mw_exposure's result, with its provenance spelled out.
 
-Nothing is recalculated. Fade remaining = fade margin - predicted attenuation,
+Nothing is recalculated. Fade remaining = fade margin - estimated attenuation,
 both library values. Status mapping:
 
     severity low       -> CLEAR     (library: exposure ratio < 0.3)
     severity moderate  -> WATCH     (0.3 to < 0.7)
     severity high      -> AT RISK   (>= 0.7)
-    predicted attenuation >= fade margin -> CRITICAL  (the margin is used up;
+    estimated attenuation >= fade margin -> CRITICAL  (the margin is used up;
                           this is the definition of the margin, not a new threshold)
     no exposure result -> NO DATA
 
@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Dict, Optional
 
-from .. import evidence_record
+from .. import eccc_coverage, evidence_record
 from . import history as hist
 from .model import (AT_RISK, CLEAR, CRITICAL, NO_DATA, NOT_DETERMINED, WATCH, Brief, Fact, SiteWeather, link_title,
                     exact, fmt, signed)
@@ -53,20 +53,22 @@ def weather_status(exp) -> tuple:
     fade = exp.attenuation.predicted_attenuation_db
     margin = exp.link.fade_margin_db
     if fade >= margin:
-        return (CRITICAL, f"Predicted rain fade ({fmt(fade)} dB) is larger than the fade margin ({fmt(margin, 0)} dB).",
-                "The model predicts rain loss bigger than the link is designed to absorb.")
+        return (CRITICAL, f"Estimated rain fade ({fmt(fade)} dB) is larger than the fade margin ({fmt(margin, 0)} dB).",
+                "At the current rain rate the model estimates rain loss bigger than the link is designed to absorb.")
     if exp.severity == "high":
-        return (AT_RISK, f"Predicted rain fade ({fmt(fade)} dB) uses most of the {fmt(margin, 0)} dB fade margin.",
+        return (AT_RISK, f"Estimated rain fade ({fmt(fade)} dB) uses most of the {fmt(margin, 0)} dB fade margin.",
                 "Rain is likely to push this link close to its limit.")
     if exp.severity == "moderate":
-        return (WATCH, f"Predicted rain fade ({fmt(fade)} dB) is a noticeable part of the {fmt(margin, 0)} dB fade margin.",
+        return (WATCH, f"Estimated rain fade ({fmt(fade)} dB) is a noticeable part of the {fmt(margin, 0)} dB fade margin.",
                 "Rain is starting to matter for this link, but it is not yet a likely capacity problem.")
-    return (CLEAR, f"Predicted rain fade ({fmt(fade)} dB) is small compared with the {fmt(margin, 0)} dB fade margin.",
+    return (CLEAR, f"Estimated rain fade ({fmt(fade)} dB) is small compared with the {fmt(margin, 0)} dB fade margin.",
             "Weather is not a meaningful concern for this link right now.")
 
 
 def _site_weather(rep, label: str, point, p=None) -> SiteWeather:
     model, station, radar = rep.model_observation, rep.nearest_station, rep.radar_observation
+    if radar is not None and not eccc_coverage.covers(rep.site.latitude, rep.site.longitude):
+        radar = None                                    # a radar value from outside Canada is never shown
     return SiteWeather(
         site_label=label, site_point=point,
         source=model.source if model else NOT_DETERMINED,
@@ -148,15 +150,15 @@ def exposure_brief(mw, param_origins: Optional[dict] = None, weather_error: Opti
              f"the higher of the two sites: {driver_name}"
              + (f" ({fmt(other.rain_mm_h)} mm/h at {other.site_label})" if other and other.rain_mm_h is not None else ""),
              "Model-derived liquid rain; used as a stand-in for rain along the path"),
-        Fact("Predicted rain fade", f"{fmt(att.predicted_attenuation_db)} dB",
+        Fact("Estimated rain fade", f"{fmt(att.predicted_attenuation_db)} dB",
              f"link fade margin {fmt(link.fade_margin_db, 0)} dB", "Signal the rain is expected to remove"),
-        Fact("Fade margin remaining", f"{signed(fade_left)} dB", "fade margin minus predicted rain fade",
+        Fact("Fade margin remaining", f"{signed(fade_left)} dB", "fade margin minus estimated rain fade",
              "Positive means the link can absorb it"),
         Fact("Path", f"{fmt(att.path_length_km, 2)} km", f"{exact(link.frequency_ghz)} GHz, {link.polarization} polarization"),
     ]
     technical = [
         Fact("Exposure ratio", f"{exp.exposure_ratio * 100:.1f}% of fade margin used",
-             "predicted rain fade / fade margin", "Library bands: WATCH from 30%, AT RISK from 70%"),
+             "estimated rain fade / fade margin", "Library bands: WATCH from 30%, AT RISK from 70%"),
         Fact("Specific attenuation", f"{att.specific_attenuation_db_km:.4f} dB/km", f"k={att.k:g}, α={att.alpha:g}",
              "Rain loss per kilometre (ITU-R P.838-3)"),
         Fact("Effective path length", f"{fmt(att.effective_path_length_km, 2)} km",

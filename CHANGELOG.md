@@ -3,6 +3,34 @@
 Canonical human-readable version history. (The plugin manager shows the shorter `changelog=` text in `metadata.txt`; this file is the detailed record.)
 Compare any two releases: https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/compare/v1.1.4...v1.1.5
 
+## 1.1.11 — 2026-11-01 (compared with 1.1.10)
+
+Why it matters: ECCC radar no longer shows an "Observed" 0.0 mm/h for a place it cannot see (Phoenix did); heights can come from a raster you hold (offline, no rate limit), a weather analysis now leaves a record on your computer that "What changed" compares against, and rain-fade wording no longer claims a prediction.
+
+### Added
+- **Elevation source choice** in the terrain dialog: online (Open-Meteo, as before) or any single-band raster layer of the project. Elevation is typed **Reference data (DEM)** in the Evidence view, exports, Excel data dictionary and the dock (online or local), never Observed. A raster that does not cover the whole path, has nodata cells on it, or has no coordinate system makes the analysis NO DATA with the reason; nothing is substituted and 0 m is never used.
+- **Local history** (this computer only, nothing is uploaded): weather values and the three numbers derived from them are kept in `<QGIS profile>/velorona/history.sqlite` for 24 h (1 h to 7 d), at most 5 MB / 20,000 values. A History window (timeline with "N hours ago", observed and model-derived apart, CSV export, retention, clear this link / clear all) and a "What changed" block in the weather result. The rules, wording, retention/size pruning, validation and CSV are the shared `aei-history-contract` package (also used by Velorona Map), an optional dependency: without it history is off with an instruction and nothing else changes. The names of your own sites and links are stored in the same local file next to their codes.
+- Caching of elevation values and bounded backoff on HTTP 429 now come from the library (aei-link-clearance 0.3). The plugin's own terrain fallback for the 0.2.x library is removed; `provider_retry` stays for the weather fetch.
+- **Guide links and message IDs** shared with Velorona Map (`core/messages.json`, refreshed with `tools/sync_messages.py`): a "?" button and a Guide button open `https://map.velorona.ai/guide#<ID>`; the Summary shows the ID of a NO DATA reason. Nothing is sent from the plugin.
+- **Menu: Get updates** opens `https://map.velorona.ai/join` in the browser. The plugin sends and counts nothing.
+- **Data credits**: "Elevation/Weather data by Open-Meteo.com" (CC BY 4.0, with links) and the Copernicus DEM GLO-90 licence notice (ESA licence Art. 6(b) and 6(c)) under the results panel, in the CSV preambles, the Excel Summary and the README; terrain from your own raster credits neither.
+- `tools/gate.sh`: local release gate and pre-push hook (replaces GitHub Actions while they are unavailable).
+
+### Fixed
+- **ECCC radar only inside Canada (message `I-WEATHER-RADAR-NOT-COVERED`).** ECCC's radar mosaic includes US radars and answers 0 mm/h "Undetected" where no radar can see, so a link in Phoenix showed an Observed radar 0.0. The outline is the Map's own (`core/eccc_coverage.json`, from Natural Earth, cut back about 1 km from the US border; `tools/sync_eccc_coverage.py`). Outside it the radar service is not asked, nothing is shown or stored, and the result and exports say "Not covered: ECCC radar is used only inside Canada, so no radar value is shown or stored for this location." The station (within 50 km) and the model value are unchanged. Tests run 85 places through both the plugin and the Map's function: 0 disagreements.
+
+### Changed
+- **Terrain and weather analyses, and the weather of a selected Fixed Service link, run in a background task** (QGIS task manager) instead of freezing the interface during the network request. Selecting a link shows its record at once with "Loading weather"; the panel updates when the weather arrives (only if that link is still selected). One request runs at a time and the newest selection wins.
+- **"Predicted rain fade" is now "Estimated rain fade", derived from the current rain rate**; status definitions say so. Library field names are unchanged.
+- Every model weather row (exports and the weather panel) states source, kind, time and unit. Open-Meteo's time is the site's local time and is labelled so, never as UTC.
+- Evidence, summary, workbook, layer text and the dock name the elevation source actually used instead of always the 90 m surface model.
+
+### Requirements
+- `aei-link-clearance>=0.3.0,<0.4` (was `>=0.2.0,<0.3`); `aei-history-contract>=0.2.0,<0.3` (optional); `aei-microwave-link-exposure>=0.2.0,<0.3` unchanged.
+
+### Tests
+- New: `test_elevation_seam.py`, `test_history_store.py`, `test_history_changes.py`, `test_history_capture.py`, `test_history_view.py`, `test_freshness.py`, `test_no_predicted_wording.py`, real-QGIS `qgis_local_dem_e2e.py`, `qgis_history_e2e.py` and `qgis_link_weather_e2e.py`.
+
 ## 1.1.10 — 2026-10-19 (compared with 1.1.9)
 
 Why it matters: terrain clearance can now be run for many links at once with the same result as the single-link analysis; a selected record can no longer be left selected, or shown, against a different record after a layer reloads, a layer is removed or the plugin is reloaded; and exported CSV files can no longer run formulas in a spreadsheet. No terrain, weather, status or threshold calculation changed.

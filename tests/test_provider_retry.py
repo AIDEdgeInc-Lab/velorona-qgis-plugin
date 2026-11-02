@@ -4,6 +4,7 @@ import types
 
 import pytest
 import requests
+from core import elevation_source
 
 if "qgis" not in sys.modules:
     try:
@@ -103,7 +104,7 @@ def test_persistent_rate_limit_is_no_data_marked_transient_with_the_real_cause(m
     with pytest.raises(NoDataError) as exc:
         TR.analyze_endpoints(A[0], A[1], B[0], B[1], PARAMS, "t")
     assert exc.value.transient is True and exc.value.domain == "terrain"
-    assert "rate-limiting" in exc.value.reasons[0] and "(T1/R5)" in exc.value.reasons[0]
+    assert "rate-limiting" in exc.value.reasons[0] and exc.value.reasons[0].startswith("elevation request failed (T1): ")
     assert len(calls) == 3 and no_real_backoff_sleep == [1.0, 3.0]          # bounded: 1 try + 2 retries
 
 
@@ -134,6 +135,7 @@ def test_retry_after_is_honoured_and_capped(monkeypatch, no_real_backoff_sleep):
     TR.analyze_endpoints(A[0], A[1], B[0], B[1], PARAMS, "t")
     assert no_real_backoff_sleep == [5.0]
     no_real_backoff_sleep.clear()
+    elevation_source.reset_online_provider()          # the first scenario's heights are cached (by design); the second must hit the service
     calls = serve(monkeypatch, Resp(429, text="x", headers={"Retry-After": "999"}))
     with pytest.raises(NoDataError):
         TR.analyze_endpoints(A[0], A[1], B[0], B[1], PARAMS, "t")

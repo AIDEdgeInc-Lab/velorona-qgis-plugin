@@ -13,6 +13,7 @@ from aei_mw_exposure import LinkExposure, MicrowaveLink, MicrowaveSite, Provenan
 from aei_mw_exposure.providers import eccc
 from aei_mw_exposure.representativeness import WeatherRepresentativeness, assess_representativeness
 
+from .. import eccc_coverage, messages
 from ..features import feature_id_name, feature_to_latlon
 from ..presentation import history as weather_history
 from ..presentation import precip
@@ -53,6 +54,8 @@ class MicrowaveAnalysisResult:
     history: Dict[str, weather_history.WeatherHistory] = field(default_factory=dict)
     # How each site's precipitation was split into liquid rain and the rest.
     precipitation: Dict[str, precip.Precipitation] = field(default_factory=dict)
+    # Seconds east of UTC for each site's model observation time (Open-Meteo reports site-local time); used only to store values with a UTC time.
+    utc_offsets: Dict[str, int] = field(default_factory=dict)
 
 
 def build_params(entries) -> dict:
@@ -119,8 +122,7 @@ def analyze_sites(site_a: MicrowaveSite, site_b: MicrowaveSite, params: dict,
     missing = [s.id for s in (site_a, site_b) if s.id not in weather_by_site]
     if missing:
         raise NoDataError("weather", [
-            "Could not fetch live weather (Open-Meteo) for: "
-            + ", ".join(f"{site_id} ({weather_errors.get(site_id, 'unknown error')})" for site_id in missing) + " (T3)"],
+            messages.text("E-WEATHER-FETCH-FAILED", site=", ".join(f"{site_id} ({weather_errors.get(site_id, 'unknown error')})" for site_id in missing))],
             transient=True)
 
     exposure = calculate_exposure(link=link, weather_by_site=weather_by_site)
@@ -136,10 +138,11 @@ def analyze_sites(site_a: MicrowaveSite, site_b: MicrowaveSite, params: dict,
             weather_errors[f"{site.id} (ECCC station)"] = str(exc)
 
         radar_obs = None
-        try:
-            radar_obs = eccc.get_radar_precipitation(site.latitude, site.longitude)
-        except Exception as exc:
-            weather_errors[f"{site.id} (ECCC radar)"] = str(exc)
+        if eccc_coverage.covers(site.latitude, site.longitude):      # outside Canada the service answers 0 mm/h: not asked, never shown or stored
+            try:
+                radar_obs = eccc.get_radar_precipitation(site.latitude, site.longitude)
+            except Exception as exc:
+                weather_errors[f"{site.id} (ECCC radar)"] = str(exc)
 
         if station_obs is not None:
             rep = assess_representativeness(
@@ -164,7 +167,15 @@ def analyze_sites(site_a: MicrowaveSite, site_b: MicrowaveSite, params: dict,
         kind="microwave-exposure", exposure=exposure,
         representativeness=representativeness, weather_errors=weather_errors, history=histories,
         precipitation=dict(getattr(provider, "precipitation", {})),
+        utc_offsets=dict(getattr(provider, "utc_offsets", {})),
     )
+
+
+def prepare(entries, params: dict):
+    """(site_a, site_b) built from the two selected features, validated; reads QGIS objects, so call it in the GUI thread. The returned sites are plain."""
+    (layer_a, feat_a), (layer_b, feat_b) = entries
+    _validate_endpoints(feature_to_latlon(layer_a, feat_a), feature_to_latlon(layer_b, feat_b), params)
+    return _build_site(layer_a, feat_a, "Selected site A"), _build_site(layer_b, feat_b, "Selected site B")
 
 
 def analyze(entries, params: dict) -> MicrowaveAnalysisResult:
