@@ -130,18 +130,18 @@ Python). On macOS that interpreter is:
 
 ```
 /Applications/QGIS-final-4_2_2.app/Contents/MacOS/python3.12 -m pip install \
-    skyfield 'aei-microwave-link-exposure>=0.2.0,<0.3' 'aei-link-clearance>=0.3.0,<0.4' aei-geo-features
+    skyfield 'aei-microwave-link-exposure>=0.2.0,<0.4' 'aei-link-clearance>=0.3.0,<0.5' aei-geo-features
 ```
 
 **Installing the packages from inside QGIS** (any platform where QGIS's Python ships pip; verified on macOS QGIS 4.2.2): Plugins → Python Console, then run
 
 ```
-from pip._internal.cli.main import main; main(['install', '-U', 'aei-link-clearance>=0.3.0,<0.4', 'aei-microwave-link-exposure>=0.2.0,<0.3', 'aei-geo-features', 'skyfield'])
+from pip._internal.cli.main import main; main(['install', '-U', 'aei-link-clearance>=0.3.0,<0.5', 'aei-microwave-link-exposure>=0.2.0,<0.4', 'aei-geo-features', 'skyfield'])
 ```
 
 and restart QGIS. **QGIS does not install Python packages for plugins** (the `plugin_dependencies` field in `metadata.txt` names other QGIS plugins only), so installing Velorona
 from the Plugin Manager or from the ZIP leaves these packages to you; if they are missing Velorona loads a stub that shows this instruction, and if `aei-link-clearance` is
-outside its supported range (`aei-link-clearance>=0.3.0,<0.4`, `aei-microwave-link-exposure>=0.2.0,<0.3`) it warns when QGIS starts and refuses the first terrain analysis with the same instruction.
+outside its supported range (`aei-link-clearance>=0.3.0,<0.5`, `aei-microwave-link-exposure>=0.2.0,<0.4`) it warns when QGIS starts and refuses the first terrain analysis with the same instruction.
 
 Local history (History window, "What changed") additionally needs `aei-history-contract>=0.2.0,<0.3`, the shared package that also defines the rules in Velorona Map. It is optional:
 without it history is switched off with this instruction and everything else, including the weather analysis, works.
