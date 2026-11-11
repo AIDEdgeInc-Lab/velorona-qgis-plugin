@@ -3,7 +3,7 @@
 Canonical human-readable version history. (The plugin manager shows the shorter `changelog=` text in `metadata.txt`; this file is the detailed record.)
 Compare any two releases: https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/compare/v1.1.4...v1.1.5
 
-## 1.1.12 — unreleased (release candidate; compared with 1.1.11)
+## 1.1.12 — 2026-11-11 (compared with 1.1.11)
 
 Why it matters: the AEI libraries' 2026-11 security releases can be installed without Velorona warning you to downgrade. Those releases refuse a missing or NaN rain value instead of reading it as 0 mm/h or "low", and refuse non-finite link inputs. Nothing in Velorona's own analyses, wording, exports or settings changed.
 
