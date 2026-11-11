@@ -11,8 +11,8 @@ from importlib.util import find_spec
 
 # (import name, pip requirement)
 REQUIREMENTS = [
-    ("aei_link_clearance", "aei-link-clearance>=0.3.0,<0.4"),
-    ("aei_mw_exposure", "aei-microwave-link-exposure>=0.2.0,<0.3"),
+    ("aei_link_clearance", "aei-link-clearance>=0.3.0,<0.5"),
+    ("aei_mw_exposure", "aei-microwave-link-exposure>=0.2.0,<0.4"),
     ("aei_geo_features", "aei-geo-features"),
     ("skyfield", "skyfield"),
 ]
@@ -41,14 +41,14 @@ def missing_requirements() -> list[str]:
 
 
 LC_DIST = "aei-link-clearance"
-LC_MIN, LC_BELOW = (0, 3, 0), (0, 4)
-LC_REQUIREMENT = "aei-link-clearance>=0.3.0,<0.4"
+LC_MIN, LC_BELOW = (0, 3, 0), (0, 5)
+LC_REQUIREMENT = "aei-link-clearance>=0.3.0,<0.5"
 MW_DIST = "aei-microwave-link-exposure"
-MW_REQUIREMENT = "aei-microwave-link-exposure>=0.2.0,<0.3"   # 0.2.0 evaluates ITU-R P.838-3; <= 0.1.5 used a table that was wrong in 21 of 24 rows
+MW_REQUIREMENT = "aei-microwave-link-exposure>=0.2.0,<0.4"   # 0.2.0 evaluates ITU-R P.838-3; <= 0.1.5 used a table that was wrong in 21 of 24 rows
 # (distribution, minimum, exclusive upper bound, pip requirement, why it matters)
 RANGES = [
     (LC_DIST, LC_MIN, LC_BELOW, LC_REQUIREMENT, "Terrain clearance will be refused until it is upgraded (0.1.x gets the earth-curvature sign wrong; 0.2.x lacks the elevation cache and local-raster support this version uses)."),
-    (MW_DIST, (0, 2, 0), (0, 3), MW_REQUIREMENT, "Older releases use a rain-coefficient table that differs from ITU-R P.838-3 and understate rain loss, most at 6-10 GHz."),
+    (MW_DIST, (0, 2, 0), (0, 4), MW_REQUIREMENT, "Older releases use a rain-coefficient table that differs from ITU-R P.838-3 and understate rain loss, most at 6-10 GHz."),
 ]
 
 

@@ -3,6 +3,17 @@
 Canonical human-readable version history. (The plugin manager shows the shorter `changelog=` text in `metadata.txt`; this file is the detailed record.)
 Compare any two releases: https://github.com/AIDEdgeInc-Lab/velorona-qgis-plugin/compare/v1.1.4...v1.1.5
 
+## 1.1.12 — 2026-11-11 (compared with 1.1.11)
+
+Why it matters: the AEI libraries' 2026-11 security releases can be installed without Velorona warning you to downgrade. Those releases refuse a missing or NaN rain value instead of reading it as 0 mm/h or "low", and refuse non-finite link inputs. Nothing in Velorona's own analyses, wording, exports or settings changed.
+
+### Requirements
+- `aei-link-clearance>=0.3.0,<0.5` (was `<0.4`) and `aei-microwave-link-exposure>=0.2.0,<0.4` (was `<0.3`). The minimums are unchanged, so nothing has to be upgraded; the plugin's install command now fetches the security releases. `aei-history-contract>=0.2.0,<0.3` (optional) is unchanged and accepts 0.2.1.
+- The start-up range warning and the install instructions follow the new ranges.
+
+### Tests
+- `test_dependencies.py`: the supported and out-of-range version cases follow the new ranges (0.4.x supported, 0.5.0 out of range for aei-link-clearance), and new cases check that aei-microwave-link-exposure 0.3.x gives no warning while 0.4.0 still does. The full suite passes against aei-link-clearance 0.4.0, aei-microwave-link-exposure 0.3.0 and aei-history-contract 0.2.1 release candidates.
+
 ## 1.1.11 — 2026-11-01 (compared with 1.1.10)
 
 Why it matters: ECCC radar no longer shows an "Observed" 0.0 mm/h for a place it cannot see (Phoenix did); heights can come from a raster you hold (offline, no rate limit), a weather analysis now leaves a record on your computer that "What changed" compares against, and rain-fade wording no longer claims a prediction.

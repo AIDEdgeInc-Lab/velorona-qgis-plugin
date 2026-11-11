@@ -27,8 +27,8 @@ def require_corrected_clearance(terrain_module) -> None:
             "The installed aei-link-clearance uses the pre-correction earth-curvature sign "
             f"(CLEARANCE_CONVENTION={found!r}, required {REQUIRED_CLEARANCE_CONVENTION!r}). Terrain clearance would be overstated by "
             "twice the earth bulge. Upgrade aei-link-clearance to a release that contains the correction (needs "
-            "aei-link-clearance>=0.3.0,<0.4): in QGIS, Plugins > Python Console, run:  from pip._internal.cli.main import main; "
-            "main(['install', '-U', 'aei-link-clearance>=0.3.0,<0.4'])  then restart QGIS.")
+            "aei-link-clearance>=0.3.0,<0.5): in QGIS, Plugins > Python Console, run:  from pip._internal.cli.main import main; "
+            "main(['install', '-U', 'aei-link-clearance>=0.3.0,<0.5'])  then restart QGIS.")
 
 
 def require_elevation_seam(library_module) -> None:
@@ -37,8 +37,8 @@ def require_elevation_seam(library_module) -> None:
     if not (hasattr(library_module, "OpenMeteoProvider") and hasattr(library_module, "LocalDEMProvider")):
         raise LibraryOutOfDateError(
             "The installed aei-link-clearance is older than this Velorona version needs (it has no elevation provider: caching, rate-limit backoff, local "
-            "elevation raster). Upgrade aei-link-clearance>=0.3.0,<0.4: in QGIS, Plugins > Python Console, run:  from pip._internal.cli.main import main; "
-            "main(['install', '-U', 'aei-link-clearance>=0.3.0,<0.4'])  then restart QGIS.")
+            "elevation raster). Upgrade aei-link-clearance>=0.3.0,<0.5: in QGIS, Plugins > Python Console, run:  from pip._internal.cli.main import main; "
+            "main(['install', '-U', 'aei-link-clearance>=0.3.0,<0.5'])  then restart QGIS.")
 
 
 # ---------------------------------------------------------------------------------------------------------------------------------
