@@ -56,6 +56,10 @@ echo
 echo "== QGIS cross-component workflow test (selection, navigation, provider outages; offline doubles) =="
 "$QGISPY" "$HERE/qgis_workflow_e2e.py"
 
+echo
+echo "== QGIS selection / filter / lifecycle synchronisation test (offline doubles) =="
+"$QGISPY" "$HERE/qgis_selection_sync_e2e.py"
+
 if [ "$1" = "--bench" ]; then
     echo
     echo "== performance benchmark =="

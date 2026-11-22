@@ -20,6 +20,7 @@ from qgis.PyQt.QtCore import (
     Qt,
     pyqtSignal,
 )
+from qgis.PyQt import sip
 from qgis.PyQt.QtGui import QAction
 from qgis.PyQt.QtWidgets import (
     QAbstractItemView,
@@ -122,6 +123,11 @@ DATASET_LABELS = {
 }
 
 
+def layer_alive(layer) -> bool:
+    """False once QGIS has deleted the C++ layer behind a Python wrapper (the user removed it from the project): touching it raises RuntimeError."""
+    return layer is not None and not sip.isdeleted(layer)
+
+
 def _format(value):
     if value is None:
         return ""
@@ -171,7 +177,7 @@ class RecordsModel(QAbstractTableModel):
         self.beginResetModel()
         self._columns = COLUMNS.get(source_key, [])
         self._rows, self._fids = [], []
-        if layer is not None and self._columns:
+        if layer_alive(layer) and self._columns:
             for feature in layer.getFeatures():
                 self._rows.append(display_row(feature, self._columns))
                 self._fids.append(feature.id())
@@ -217,6 +223,7 @@ class VeloronaRecordsTable(QWidget):
     featureChosen = pyqtSignal(object, int, str)      # layer, feature id, kind
     featuresChosen = pyqtSignal(object, list, str)    # layer, feature ids, kind
     licenseeChanged = pyqtSignal(str)                 # '' means every licensee
+    datasetActivated = pyqtSignal(object)             # the layer behind the dataset the user just chose in the picker
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -257,8 +264,8 @@ class VeloronaRecordsTable(QWidget):
         self.licensee_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self.licensee_combo.lineEdit().setPlaceholderText("Filter by operator...")
         self.licensee_combo.setToolTip(
-            "Show only this operator's records across Fixed Service sites, Fixed Service "
-            "links and Cellular sites. Counts are record counts.")
+            "Show only this operator's records across the Canadian Fixed Service sites, Fixed Service "
+            "links and Cellular sites. Counts are record counts. USA layers are not filtered by operator; search them in the table.")
         self.licensee_combo.setAccessibleName("Operator filter")
         self.licensee_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self.licensee_combo.setMinimumContentsLength(8)
@@ -341,7 +348,7 @@ class VeloronaRecordsTable(QWidget):
 
     def set_layers(self, layers_by_key: dict) -> None:
         """Point the table at the Velorona layers currently in the project."""
-        self._layers = {k: v for k, v in layers_by_key.items() if v is not None and k in COLUMNS}
+        self._layers = {k: v for k, v in layers_by_key.items() if layer_alive(v) and k in COLUMNS}
         previous = self._current_key
         self.dataset_combo.blockSignals(True)
         self.dataset_combo.clear()
@@ -350,12 +357,48 @@ class VeloronaRecordsTable(QWidget):
                 self.dataset_combo.addItem(DATASET_LABELS[key], key)
         self.dataset_combo.blockSignals(False)
         if self.dataset_combo.count() == 0:
+            self._current_key = None
             self.model.load(None, None)
             self.status_label.setText("Run Explore: Load Public Data to populate records.")
             return
         index = max(0, self.dataset_combo.findData(previous))
-        self.dataset_combo.setCurrentIndex(index)
-        self._on_dataset_changed(index)
+        self._syncing = True        # repopulating the picker is not the user choosing a dataset: the QGIS active layer is left alone
+        try:
+            self.dataset_combo.setCurrentIndex(index)
+            self._on_dataset_changed(index)
+        finally:
+            self._syncing = False
+
+    def drop_layers(self, layer_ids) -> None:
+        """The user removed these layers from the project: forget them before QGIS deletes them, so no row, refresh or dataset switch can touch a
+        deleted layer. The picker is rebuilt from the layers that remain."""
+        ids = set(layer_ids)
+        remaining = {k: v for k, v in self._layers.items() if layer_alive(v) and v.id() not in ids}
+        if len(remaining) != len(self._layers):
+            self.set_layers(remaining)
+
+    def select_dataset(self, source_key: str) -> bool:
+        """Show this dataset (the QGIS active layer changed to it) without announcing it back as a new active layer."""
+        index = self.dataset_combo.findData(source_key)
+        if index < 0:
+            return False
+        if self.dataset_combo.currentIndex() != index:
+            self._syncing = True
+            try:
+                self.dataset_combo.setCurrentIndex(index)
+            finally:
+                self._syncing = False
+        return True
+
+    def _mirror_layer_selection(self) -> None:
+        """A freshly shown dataset highlights the rows its layer already has selected on the map (the table and the map must not disagree
+        about the selection when the user switches datasets); nothing is echoed back as a new selection."""
+        layer = self._layers.get(self._current_key)
+        if not layer_alive(layer):
+            return
+        fids = layer.selectedFeatureIds()
+        if fids:
+            self._highlight(fids)
 
     def _on_dataset_changed(self, _index):
         key = self.dataset_combo.currentData()
@@ -367,6 +410,10 @@ class VeloronaRecordsTable(QWidget):
         self._fit_columns()
         self._apply_column_visibility()
         self._update_status()
+        self._mirror_layer_selection()
+        layer = self._layers.get(key)
+        if layer_alive(layer) and not self._syncing:
+            self.datasetActivated.emit(layer)
         # The Operator combo itself stays visible and enabled regardless of
         # which dataset tab is showing: it is a map-wide filter (Fixed
         # Service sites, Fixed Service links and Cellular sites all filter
@@ -500,7 +547,7 @@ class VeloronaRecordsTable(QWidget):
         self.licensee_combo.blockSignals(False)
         self.licensee_combo.setEnabled(bool(counts))
         self.operator_hint.setText(
-            f"{len(counts):,} operator(s); {total:,} records across the loaded Velorona layers (the table below shows one layer at a time).")
+            f"{len(counts):,} operator(s); {total:,} records across the loaded Canadian layers (the table below shows one layer at a time).")
         self.operator_hint.setVisible(bool(counts))
 
     def _on_licensee_changed(self, _index):
@@ -537,6 +584,7 @@ class VeloronaRecordsTable(QWidget):
         if self._current_key:
             self.model.load(self._layers.get(self._current_key), self._current_key)
             self._update_status()
+            self._mirror_layer_selection()
 
     def _on_search(self, text):
         self.proxy.setFilterFixedString(text)
@@ -563,6 +611,8 @@ class VeloronaRecordsTable(QWidget):
                 self.status_label.setText(self._dataset_notes.get(self._current_key) or "No records in this dataset yet.")
         else:
             count = f"{total:,} records" if shown == total else f"{shown:,} of {total:,} records"
+            if shown == 0:
+                count = f"No records match the search \u201c{self.search_edit.text().strip()}\u201d ({total:,} in this dataset). Clear the search to see them."
             # The layer NAMES no longer carry this disclosure (the Layers panel truncated it); it stays on screen here.
             if self._current_key in layer_helpers.OPERATOR_SOURCE_KEYS + (layer_helpers.SOURCE_TOWERS, layer_helpers.SOURCE_US_LINKS,
                                                                            layer_helpers.SOURCE_US_SITES):
@@ -577,7 +627,7 @@ class VeloronaRecordsTable(QWidget):
             return
         indexes = self.view.selectionModel().selectedRows()
         layer = self._layers.get(self._current_key)
-        if layer is None or not indexes:
+        if not layer_alive(layer) or not indexes:
             return
         kind = KINDS.get(self._current_key, "site")
         fids = [fid for fid in
@@ -590,18 +640,13 @@ class VeloronaRecordsTable(QWidget):
         else:
             self.featuresChosen.emit(layer, fids, kind)
 
-    def show_features(self, layer, fids) -> None:
-        """Highlight several rows for a multi-feature map selection, without
-        echoing the change back as a new selection."""
-        key = layer_helpers.layer_source_key(layer)
-        if key not in self._layers:
-            return
+    def _highlight(self, fids) -> None:
+        """Highlight exactly these features' rows in the current dataset, without echoing the change back as a selection. A feature with no
+        visible row (the search hides it, or the dataset was rebuilt without it) leaves nothing highlighted: the previous row must never stay
+        lit while the map selection has moved on."""
+        was_syncing = self._syncing
         self._syncing = True
         try:
-            if key != self._current_key:
-                index = self.dataset_combo.findData(key)
-                if index >= 0:
-                    self.dataset_combo.setCurrentIndex(index)
             selection_model = self.view.selectionModel()
             selection_model.clearSelection()
             wanted = set(fids)
@@ -618,27 +663,24 @@ class VeloronaRecordsTable(QWidget):
             if first is not None:
                 self.view.scrollTo(first, QAbstractItemView.ScrollHint.PositionAtCenter)
         finally:
-            self._syncing = False
+            self._syncing = was_syncing
+
+    def _show_dataset_of(self, layer) -> bool:
+        key = layer_helpers.layer_source_key(layer)
+        if key not in self._layers:
+            return False
+        if key != self._current_key:
+            self.select_dataset(key)
+        return True
+
+    def show_features(self, layer, fids) -> None:
+        """Highlight several rows for a multi-feature map selection, without
+        echoing the change back as a new selection."""
+        if layer_alive(layer) and self._show_dataset_of(layer):
+            self._highlight(fids)
 
     def show_feature(self, layer, fid) -> None:
         """Highlight the row for a feature selected on the map, switching
         dataset if that feature belongs to another Velorona layer."""
-        key = layer_helpers.layer_source_key(layer)
-        if key not in self._layers:
-            return
-        self._syncing = True
-        try:
-            if key != self._current_key:
-                index = self.dataset_combo.findData(key)
-                if index >= 0:
-                    self.dataset_combo.setCurrentIndex(index)
-            row = self.model.row_for_feature(fid)
-            if row < 0:
-                return
-            proxy_index = self.proxy.mapFromSource(self.model.index(row, 0))
-            if not proxy_index.isValid():
-                return
-            self.view.selectRow(proxy_index.row())
-            self.view.scrollTo(proxy_index, QAbstractItemView.ScrollHint.PositionAtCenter)
-        finally:
-            self._syncing = False
+        if layer_alive(layer) and self._show_dataset_of(layer):
+            self._highlight([fid])

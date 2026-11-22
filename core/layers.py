@@ -728,13 +728,48 @@ def build_link_layer(
     return layer
 
 
+SELECTION_KEY_FIELD = "id"     # the record's own identifier (every Velorona dataset carries it); QgsFeature ids are NOT stable across a reload
+
+
+def _selected_record_ids(layer) -> list:
+    """The stable record ids of the layer's selected features (QgsFeature ids are reissued when a layer is repopulated)."""
+    if not layer.selectedFeatureCount() or layer.fields().indexFromName(SELECTION_KEY_FIELD) < 0:
+        return []
+    return [str(f[SELECTION_KEY_FIELD]) for f in layer.selectedFeatures() if f[SELECTION_KEY_FIELD] not in (None, "")]
+
+
+def _restore_selection(layer, record_ids) -> None:
+    """After a layer's content was replaced, select the features that carry the same record ids as before, or nothing. The old feature ids
+    are discarded: they may be absent or, worse, now identify a different record.
+
+    A record that survives the reload is re-selected silently (the same record, so the details on screen stay right and the map must not jump
+    back to it while the user is panning); a selection that did not survive is announced as cleared so the details panel empties."""
+    if not record_ids and not layer.selectedFeatureCount():
+        return
+    had = list(layer.selectedFeatureIds())
+    wanted = set(record_ids)
+    layer.blockSignals(True)
+    try:
+        layer.removeSelection()
+        fids = ([f.id() for f in layer.getFeatures() if str(f[SELECTION_KEY_FIELD]) in wanted]
+                if wanted and layer.fields().indexFromName(SELECTION_KEY_FIELD) >= 0 else [])
+        if fids:
+            layer.selectByIds(fids)
+    finally:
+        layer.blockSignals(False)
+    if not fids and had:
+        layer.selectionChanged.emit([], had, True)
+
+
 def replace_point_features(layer: QgsVectorLayer, records: Iterable[dict], field_specs: Sequence[Tuple[str, QMetaType.Type]]) -> None:
     """Clears and repopulates a memory point layer in place -- used for the
     viewport-scoped live layers (towers, cellular) on canvas extentsChanged,
     same refresh-in-place pattern as app.js's refreshLiveLayers()."""
+    kept = _selected_record_ids(layer)
     layer.dataProvider().truncate()
     skipped = _fill(layer, records, field_specs, _point_feature)
     layer.updateExtents()
+    _restore_selection(layer, kept)
     layer.triggerRepaint()
     return skipped
 
@@ -769,9 +804,11 @@ def replace_link_features(layer: QgsVectorLayer, links: Iterable[dict],
     """Clears and repopulates a memory line layer in place, so a re-run of
     Load Public Data refreshes the existing layer instead of adding a second
     one (and keeps whatever visibility/styling the user set)."""
+    kept = _selected_record_ids(layer)
     layer.dataProvider().truncate()
     skipped = _fill(layer, links, field_specs, _link_feature)
     layer.updateExtents()
+    _restore_selection(layer, kept)
     layer.triggerRepaint()
     return skipped
 

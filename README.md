@@ -1,6 +1,6 @@
 # Velorona for QGIS
 
-**Velorona QGIS Plugin 1.1.6** — Telecom link evidence, inside QGIS.
+**Velorona QGIS Plugin 1.1.9** — Telecom link evidence, inside QGIS.
 
 ## Explore → Select → Analyze → Evidence → Export
 
