@@ -14,7 +14,7 @@ permissions:
 jobs:
   e2e:
     name: QGIS ${{ matrix.qgis }} full E2E
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
       fail-fast: false
